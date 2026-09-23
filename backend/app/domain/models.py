@@ -292,6 +292,34 @@ class Meal:
 
 
 @dataclass(frozen=True, slots=True)
+class PlannedMeal:
+    """What is actually on the plate for one slot today.
+
+    A snapshot, not a pointer: grams already have carb_scale and any swaps baked in, so
+    editing the meal template later never rewrites history.
+    """
+
+    meal_time: MealTime
+    meal_id: str | None
+    name: str
+    eaten_at: datetime | None
+    items: tuple[MealItem, ...]
+
+    @property
+    def eaten(self) -> bool:
+        return self.eaten_at is not None
+
+
+@dataclass(frozen=True, slots=True)
+class DayPlan:
+    date: date
+    meals: tuple[PlannedMeal, ...]
+
+    def slot(self, meal_time: MealTime) -> PlannedMeal | None:
+        return next((m for m in self.meals if m.meal_time is meal_time), None)
+
+
+@dataclass(frozen=True, slots=True)
 class Exchange:
     """One candidate when swapping a food for another in the same category."""
 

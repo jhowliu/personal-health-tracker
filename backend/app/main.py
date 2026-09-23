@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import domain_error_handler
-from app.api.routes import auth, body_logs, days, devices, training, users
+from app.api.routes import auth, body_logs, days, devices, foods, meals, training, users
 from app.config import settings
 from app.db import verify_schema
 from app.domain.errors import DomainError
@@ -39,5 +39,5 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-for router in (auth, users, body_logs, days, training, devices):
+for router in (auth, users, body_logs, days, foods, meals, training, devices):
     app.include_router(router.router)

@@ -11,11 +11,20 @@ from pydantic import BaseModel, EmailStr, Field
 
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
+from app.domain.meals import total
 from app.domain.models import (
     BodyLog,
     BodySummary,
     DayFlow,
+    DayPlan,
+    Exchange,
     Exercise,
+    Food,
+    FoodCategory,
+    Meal,
+    MealItem,
+    Nutrients,
+    PlannedMeal,
     Profile,
     ScheduleEntry,
     Targets,
@@ -315,3 +324,198 @@ class ScheduleEntryOut(BaseModel):
 class DeviceIn(BaseModel):
     push_token: str
     platform: Literal["ios", "android"]
+
+
+class NutrientsOut(BaseModel):
+    kcal: float
+    protein_g: float
+    fat_g: float
+    carb_g: float
+
+    @classmethod
+    def of(cls, nutrients: Nutrients) -> "NutrientsOut":
+        return cls(**_values(nutrients.rounded()))
+
+
+class FoodCategoryOut(BaseModel):
+    id: str
+    name: str
+    swap_by: str
+    sort_order: int
+
+    @classmethod
+    def of(cls, category: FoodCategory) -> "FoodCategoryOut":
+        return cls(
+            id=category.id,
+            name=category.name,
+            swap_by=category.swap_by.value,
+            sort_order=category.sort_order,
+        )
+
+
+class FoodOut(BaseModel):
+    id: str
+    category_id: str
+    name: str
+    state: str
+    per_100g: NutrientsOut
+    unit: str
+    grams_per_unit: float | None
+    usual_grams: float
+    max_grams: float
+    aliases: list[str]
+    is_builtin: bool
+
+    @classmethod
+    def of(cls, food: Food) -> "FoodOut":
+        return cls(
+            id=food.id,
+            category_id=food.category_id,
+            name=food.name,
+            state=food.state.value,
+            per_100g=NutrientsOut.of(food.per_100g),
+            unit=food.unit,
+            grams_per_unit=food.grams_per_unit,
+            usual_grams=food.usual_grams,
+            max_grams=food.max_grams,
+            aliases=list(food.aliases),
+            is_builtin=food.is_builtin,
+        )
+
+
+class FoodIn(BaseModel):
+    category_id: str
+    name: str
+    state: Literal["raw", "cooked", "na"] = "na"
+    kcal_per_100g: float = Field(ge=0)
+    protein_per_100g: float = Field(ge=0)
+    fat_per_100g: float = Field(ge=0)
+    carb_per_100g: float = Field(ge=0)
+    unit: Literal["g", "ml", "piece", "scoop", "bowl"] = "g"
+    grams_per_unit: float | None = Field(default=None, gt=0)
+    usual_grams: float = Field(gt=0)
+    max_grams: float = Field(gt=0)
+
+
+class ExchangeOut(BaseModel):
+    food: FoodOut
+    grams: float
+    nutrients: NutrientsOut
+    delta: NutrientsOut
+    capped: bool
+
+    @classmethod
+    def of(cls, exchange: Exchange) -> "ExchangeOut":
+        return cls(
+            food=FoodOut.of(exchange.food),
+            grams=exchange.grams,
+            nutrients=NutrientsOut.of(exchange.nutrients),
+            delta=NutrientsOut.of(exchange.delta),
+            capped=exchange.capped,
+        )
+
+
+class MealItemOut(BaseModel):
+    id: str
+    food: FoodOut
+    category_id: str
+    grams: float
+    nutrients: NutrientsOut
+
+    @classmethod
+    def of(cls, item: MealItem) -> "MealItemOut":
+        return cls(
+            id=item.id,
+            food=FoodOut.of(item.food),
+            category_id=item.category_id,
+            grams=item.grams,
+            nutrients=NutrientsOut.of(item.nutrients),
+        )
+
+
+class MealItemIn(BaseModel):
+    food_id: str
+    grams: float = Field(gt=0)
+
+
+class MealOut(BaseModel):
+    id: str
+    name: str
+    tag: str
+    meal_times: list[str]
+    items: list[MealItemOut]
+    nutrients: NutrientsOut
+
+    @classmethod
+    def of(cls, meal: Meal) -> "MealOut":
+        return cls(
+            id=meal.id,
+            name=meal.name,
+            tag=meal.tag.value,
+            meal_times=sorted(slot.value for slot in meal.meal_times),
+            items=[MealItemOut.of(i) for i in meal.items],
+            nutrients=NutrientsOut.of(total(meal.items)),
+        )
+
+
+class MealIn(BaseModel):
+    name: str
+    tag: Literal["regular", "light", "occasional"] = "regular"
+    meal_times: list[Literal["breakfast", "lunch", "dinner"]]
+    items: list[MealItemIn]
+
+
+class MealPatch(BaseModel):
+    name: str | None = None
+    tag: Literal["regular", "light", "occasional"] | None = None
+    meal_times: list[Literal["breakfast", "lunch", "dinner"]] | None = None
+    items: list[MealItemIn] | None = None
+
+
+class CalculateIn(BaseModel):
+    items: list[MealItemIn]
+
+
+class PlannedMealOut(BaseModel):
+    meal_time: str
+    meal_id: str | None
+    name: str
+    eaten: bool
+    items: list[MealItemOut]
+    nutrients: NutrientsOut
+
+    @classmethod
+    def of(cls, planned: PlannedMeal) -> "PlannedMealOut":
+        return cls(
+            meal_time=planned.meal_time.value,
+            meal_id=planned.meal_id,
+            name=planned.name,
+            eaten=planned.eaten,
+            items=[MealItemOut.of(i) for i in planned.items],
+            nutrients=NutrientsOut.of(total(planned.items)),
+        )
+
+
+class DayPlanOut(BaseModel):
+    date: date
+    meals: list[PlannedMealOut]
+    nutrients: NutrientsOut
+
+    @classmethod
+    def of(cls, plan: DayPlan) -> "DayPlanOut":
+        every_item = tuple(i for m in plan.meals for i in m.items)
+        return cls(
+            date=plan.date,
+            meals=[PlannedMealOut.of(m) for m in plan.meals],
+            nutrients=NutrientsOut.of(total(every_item)),
+        )
+
+
+class ShuffleIn(BaseModel):
+    meal_time: Literal["breakfast", "lunch", "dinner"] | None = None
+
+
+class SwapItemIn(BaseModel):
+    item_id: str
+    to_food_id: str
+    match: Literal["carb", "protein", "kcal"] | None = None

@@ -13,7 +13,12 @@ from app.domain.models import (
     BodyLog,
     DayFacts,
     Exercise,
+    Food,
+    FoodCategory,
+    Meal,
+    MealItem,
     MealTime,
+    PlannedMeal,
     Profile,
     ScheduleEntry,
     TemplateItem,
@@ -160,6 +165,63 @@ class DayStore(Protocol):
     ) -> None: ...
 
     async def streak_until(self, user_id: str, day: date) -> int: ...
+
+    async def load_plan(self, user_id: str, day: date) -> tuple[PlannedMeal, ...]:
+        """What is on the plate today, as stored — grams already scaled and swapped."""
+
+    async def save_plan(
+        self,
+        user_id: str,
+        day: date,
+        meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
+        profile: Profile,
+    ) -> None:
+        """Write the snapshot for the given slots as (meal_id, name, items).
+
+        Takes the profile because day_meals hangs off a days row, which may not exist
+        yet — the plan can be the first thing that touches a given date.
+
+        Slots already marked eaten are left alone: what someone already ate is a fact,
+        not something a reshuffle gets to rewrite.
+        """
+
+    async def replace_plan_item(
+        self, user_id: str, day: date, meal_time: MealTime, item_id: str, food_id: str, grams: float
+    ) -> None:
+        """Swap one food in today's plate, keeping its position in the meal."""
+
+
+class FoodStore(Protocol):
+    async def categories(self) -> tuple[FoodCategory, ...]: ...
+
+    async def search(
+        self, user_id: str, query: str | None, category_id: str | None
+    ) -> tuple[Food, ...]:
+        """Browse or search the library. Matches names and aliases; built-ins plus the
+        user's own foods.
+        """
+
+    async def load(self, user_id: str, food_id: str) -> Food | None: ...
+
+    async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
+        """Swap candidates: everything in the same category."""
+
+    async def save_custom(self, user_id: str, food: Food) -> None: ...
+
+    async def archive_custom(self, user_id: str, food_id: str) -> None: ...
+
+
+class MealStore(Protocol):
+    async def list(
+        self, user_id: str, meal_time: MealTime | None, query: str | None
+    ) -> tuple[Meal, ...]: ...
+
+    async def load(self, user_id: str, meal_id: str) -> Meal | None: ...
+
+    async def save(self, user_id: str, meal: Meal) -> None:
+        """Upsert the meal along with its slots and items."""
+
+    async def archive(self, user_id: str, meal_id: str) -> None: ...
 
 
 class ReminderStore(Protocol):

@@ -14,11 +14,16 @@ from app.adapters.push.expo import ExpoPushSender
 from app.adapters.sqlite.accounts import SqliteAccountStore
 from app.adapters.sqlite.body import SqliteBodyStore
 from app.adapters.sqlite.days import SqliteDayStore
+from app.adapters.sqlite.foods import SqliteFoodStore
+from app.adapters.sqlite.meals import SqliteMealStore
 from app.adapters.sqlite.reminders import SqliteReminderStore
 from app.adapters.sqlite.training import SqliteTrainingStore
 from app.application.accounts import AccountService
 from app.application.body import BodyTrackingService
 from app.application.daily_flow import DailyFlowService
+from app.application.foods import FoodCatalogService
+from app.application.meals import MealService
+from app.application.planning import DailyPlanService
 from app.application.profiles import ProfileService
 from app.application.reminders import ReminderService
 from app.application.training import TrainingService
@@ -104,9 +109,30 @@ def reminders(conn: DbConn) -> ReminderService:
     return ReminderService(SqliteReminderStore(conn), push_sender(), clock())
 
 
+def foods(conn: DbConn) -> FoodCatalogService:
+    return FoodCatalogService(SqliteFoodStore(conn))
+
+
+def meals(conn: DbConn) -> MealService:
+    return MealService(SqliteMealStore(conn), SqliteFoodStore(conn))
+
+
+def daily_plan(conn: DbConn) -> DailyPlanService:
+    return DailyPlanService(
+        SqliteDayStore(conn),
+        SqliteMealStore(conn),
+        SqliteFoodStore(conn),
+        SqliteAccountStore(conn),
+        clock(),
+    )
+
+
 Accounts = Annotated[AccountService, Depends(accounts)]
 Profiles = Annotated[ProfileService, Depends(profiles)]
 BodyTracking = Annotated[BodyTrackingService, Depends(body_tracking)]
 Training = Annotated[TrainingService, Depends(training)]
 DailyFlow = Annotated[DailyFlowService, Depends(daily_flow)]
 Reminders = Annotated[ReminderService, Depends(reminders)]
+Foods = Annotated[FoodCatalogService, Depends(foods)]
+Meals = Annotated[MealService, Depends(meals)]
+DailyPlan = Annotated[DailyPlanService, Depends(daily_plan)]

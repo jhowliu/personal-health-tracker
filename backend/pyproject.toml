@@ -51,3 +51,7 @@ select = ["E", "F", "W", "I", "N", "UP", "B"]
 # N818 要求例外類別以 Error 結尾。domain 的例外讀起來是 `raise NotFound("找不到這個課表")`,
 # 加上後綴反而囉嗦,而且基底類別 DomainError 已經帶了後綴。
 ignore = ["N818"]
+
+[tool.ruff.lint.per-file-ignores]
+# Seed rows are tabular data. One food per line reads far better than wrapped tuples.
+"seeds/foods.py" = ["E501"]

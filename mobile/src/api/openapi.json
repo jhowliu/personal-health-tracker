@@ -1201,6 +1201,967 @@
         }
       }
     },
+    "/days/{day}/plan": {
+      "get": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Read Plan",
+        "description": "Today's plate. Generates one on first look when auto-assign is on.",
+        "operationId": "read_plan_days__day__plan_get",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/days/{day}/plan/shuffle": {
+      "post": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Shuffle Plan",
+        "operationId": "shuffle_plan_days__day__plan_shuffle_post",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShuffleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/days/{day}/plan/{meal_time}/items": {
+      "patch": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Swap Plan Item",
+        "description": "Swap one food on today's plate; the portion is converted for you.",
+        "operationId": "swap_plan_item_days__day__plan__meal_time__items_patch",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "meal_time",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MealTime"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapItemIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DayPlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/food-categories": {
+      "get": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "List Categories",
+        "operationId": "list_categories_food_categories_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FoodCategoryOut"
+                  },
+                  "type": "array",
+                  "title": "Response List Categories Food Categories Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/foods": {
+      "get": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "Search Foods",
+        "operationId": "search_foods_foods_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FoodOut"
+                  },
+                  "title": "Response Search Foods Foods Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "Add Food",
+        "operationId": "add_food_foods_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/foods/{food_id}": {
+      "patch": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "Edit Food",
+        "operationId": "edit_food_foods__food_id__patch",
+        "parameters": [
+          {
+            "name": "food_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Food Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoodIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "Remove Food",
+        "operationId": "remove_food_foods__food_id__delete",
+        "parameters": [
+          {
+            "name": "food_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Food Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/foods/{food_id}/exchanges": {
+      "get": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "List Exchanges",
+        "description": "Same-category swaps. `grams` defaults to the food's usual portion, `match` to\nthe category's own rule.",
+        "operationId": "list_exchanges_foods__food_id__exchanges_get",
+        "parameters": [
+          {
+            "name": "food_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Food Id"
+            }
+          },
+          {
+            "name": "grams",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grams"
+            }
+          },
+          {
+            "name": "match",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Match"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExchangeOut"
+                  },
+                  "title": "Response List Exchanges Foods  Food Id  Exchanges Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meals": {
+      "get": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "List Meals",
+        "operationId": "list_meals_meals_get",
+        "parameters": [
+          {
+            "name": "meal_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Meal Time"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MealOut"
+                  },
+                  "title": "Response List Meals Meals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Create Meal",
+        "operationId": "create_meal_meals_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meals/calculate": {
+      "post": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Calculate",
+        "description": "Totals for a draft meal. Stores nothing — the edit screen calls this while typing.",
+        "operationId": "calculate_meals_calculate_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalculateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NutrientsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/meals/{meal_id}": {
+      "get": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Read Meal",
+        "operationId": "read_meal_meals__meal_id__get",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Update Meal",
+        "operationId": "update_meal_meals__meal_id__patch",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MealPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MealOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "meals"
+        ],
+        "summary": "Remove Meal",
+        "operationId": "remove_meal_meals__meal_id__delete",
+        "parameters": [
+          {
+            "name": "meal_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meal Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/exercises": {
       "get": {
         "tags": [
@@ -2091,6 +3052,22 @@
         ],
         "title": "BodySummaryOut"
       },
+      "CalculateIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemIn"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "CalculateIn"
+      },
       "DayFlowOut": {
         "properties": {
           "steps": {
@@ -2178,6 +3155,32 @@
         "type": "object",
         "title": "DayPatch"
       },
+      "DayPlanOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "meals": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedMealOut"
+            },
+            "type": "array",
+            "title": "Meals"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "meals",
+          "nutrients"
+        ],
+        "title": "DayPlanOut"
+      },
       "DeviceIn": {
         "properties": {
           "push_token": {
@@ -2199,6 +3202,36 @@
           "platform"
         ],
         "title": "DeviceIn"
+      },
+      "ExchangeOut": {
+        "properties": {
+          "food": {
+            "$ref": "#/components/schemas/FoodOut"
+          },
+          "grams": {
+            "type": "number",
+            "title": "Grams"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          },
+          "delta": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          },
+          "capped": {
+            "type": "boolean",
+            "title": "Capped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "food",
+          "grams",
+          "nutrients",
+          "delta",
+          "capped"
+        ],
+        "title": "ExchangeOut"
       },
       "ExerciseIn": {
         "properties": {
@@ -2269,6 +3302,194 @@
         ],
         "title": "ExerciseOut"
       },
+      "FoodCategoryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "swap_by": {
+            "type": "string",
+            "title": "Swap By"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "swap_by",
+          "sort_order"
+        ],
+        "title": "FoodCategoryOut"
+      },
+      "FoodIn": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "title": "Category Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "raw",
+              "cooked",
+              "na"
+            ],
+            "title": "State",
+            "default": "na"
+          },
+          "kcal_per_100g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Kcal Per 100G"
+          },
+          "protein_per_100g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Protein Per 100G"
+          },
+          "fat_per_100g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Fat Per 100G"
+          },
+          "carb_per_100g": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Carb Per 100G"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "g",
+              "ml",
+              "piece",
+              "scoop",
+              "bowl"
+            ],
+            "title": "Unit",
+            "default": "g"
+          },
+          "grams_per_unit": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grams Per Unit"
+          },
+          "usual_grams": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Usual Grams"
+          },
+          "max_grams": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Max Grams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "name",
+          "kcal_per_100g",
+          "protein_per_100g",
+          "fat_per_100g",
+          "carb_per_100g",
+          "usual_grams",
+          "max_grams"
+        ],
+        "title": "FoodIn"
+      },
+      "FoodOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "category_id": {
+            "type": "string",
+            "title": "Category Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "per_100g": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "grams_per_unit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grams Per Unit"
+          },
+          "usual_grams": {
+            "type": "number",
+            "title": "Usual Grams"
+          },
+          "max_grams": {
+            "type": "number",
+            "title": "Max Grams"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category_id",
+          "name",
+          "state",
+          "per_100g",
+          "unit",
+          "grams_per_unit",
+          "usual_grams",
+          "max_grams",
+          "aliases",
+          "is_builtin"
+        ],
+        "title": "FoodOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2317,6 +3538,209 @@
         ],
         "title": "LoginIn"
       },
+      "MealIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tag": {
+            "type": "string",
+            "enum": [
+              "regular",
+              "light",
+              "occasional"
+            ],
+            "title": "Tag",
+            "default": "regular"
+          },
+          "meal_times": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "breakfast",
+                "lunch",
+                "dinner"
+              ]
+            },
+            "type": "array",
+            "title": "Meal Times"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemIn"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "meal_times",
+          "items"
+        ],
+        "title": "MealIn"
+      },
+      "MealItemIn": {
+        "properties": {
+          "food_id": {
+            "type": "string",
+            "title": "Food Id"
+          },
+          "grams": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Grams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "food_id",
+          "grams"
+        ],
+        "title": "MealItemIn"
+      },
+      "MealItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "food": {
+            "$ref": "#/components/schemas/FoodOut"
+          },
+          "category_id": {
+            "type": "string",
+            "title": "Category Id"
+          },
+          "grams": {
+            "type": "number",
+            "title": "Grams"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "food",
+          "category_id",
+          "grams",
+          "nutrients"
+        ],
+        "title": "MealItemOut"
+      },
+      "MealOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "tag": {
+            "type": "string",
+            "title": "Tag"
+          },
+          "meal_times": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Meal Times"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "tag",
+          "meal_times",
+          "items",
+          "nutrients"
+        ],
+        "title": "MealOut"
+      },
+      "MealPatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "regular",
+                  "light",
+                  "occasional"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          },
+          "meal_times": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "breakfast",
+                    "lunch",
+                    "dinner"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meal Times"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MealItemIn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "title": "MealPatch"
+      },
       "MealTime": {
         "type": "string",
         "enum": [
@@ -2326,6 +3750,81 @@
           "extras"
         ],
         "title": "MealTime"
+      },
+      "NutrientsOut": {
+        "properties": {
+          "kcal": {
+            "type": "number",
+            "title": "Kcal"
+          },
+          "protein_g": {
+            "type": "number",
+            "title": "Protein G"
+          },
+          "fat_g": {
+            "type": "number",
+            "title": "Fat G"
+          },
+          "carb_g": {
+            "type": "number",
+            "title": "Carb G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kcal",
+          "protein_g",
+          "fat_g",
+          "carb_g"
+        ],
+        "title": "NutrientsOut"
+      },
+      "PlannedMealOut": {
+        "properties": {
+          "meal_time": {
+            "type": "string",
+            "title": "Meal Time"
+          },
+          "meal_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meal Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "eaten": {
+            "type": "boolean",
+            "title": "Eaten"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MealItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "nutrients": {
+            "$ref": "#/components/schemas/NutrientsOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meal_time",
+          "meal_id",
+          "name",
+          "eaten",
+          "items",
+          "nutrients"
+        ],
+        "title": "PlannedMealOut"
       },
       "ProfileIn": {
         "properties": {
@@ -2847,6 +4346,62 @@
           "set_index"
         ],
         "title": "SetLogIn"
+      },
+      "ShuffleIn": {
+        "properties": {
+          "meal_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "breakfast",
+                  "lunch",
+                  "dinner"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meal Time"
+          }
+        },
+        "type": "object",
+        "title": "ShuffleIn"
+      },
+      "SwapItemIn": {
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "title": "Item Id"
+          },
+          "to_food_id": {
+            "type": "string",
+            "title": "To Food Id"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "carb",
+                  "protein",
+                  "kcal"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "to_food_id"
+        ],
+        "title": "SwapItemIn"
       },
       "TargetsOut": {
         "properties": {
