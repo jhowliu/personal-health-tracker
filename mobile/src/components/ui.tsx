@@ -1,29 +1,58 @@
 /** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
 import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
+  type KeyboardTypeOptions,
   type TextInputProps,
   type ViewProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+/**
+ * nativeID of the accessory bar rendered once in the root layout.
+ *
+ * iOS numeric keypads have no return key, so without this there is no key that
+ * dismisses them. Tapping blank space works too, but a visible 完成 is what people
+ * reach for.
+ */
+export const NUMERIC_ACCESSORY_ID = 'numeric-done-bar';
+
+const NUMERIC_KEYBOARDS: KeyboardTypeOptions[] = ['numeric', 'decimal-pad', 'number-pad'];
+
 export function Screen({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
-      {scroll ? (
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-5 pb-8 pt-2 gap-4"
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View className="flex-1 px-5 pb-8 pt-2">{children}</View>
-      )}
+      <KeyboardAvoidingView
+        className="flex-1"
+        // Android already resizes the window; adding padding on top double-counts it.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {scroll ? (
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-5 pb-8 pt-2 gap-4"
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          // Not a ScrollView, so a tap on empty space is the only way out.
+          <Pressable
+            accessible={false}
+            onPress={Keyboard.dismiss}
+            className="flex-1 px-5 pb-8 pt-2"
+          >
+            {children}
+          </Pressable>
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -67,6 +96,9 @@ export function Field({
   className = '',
   ...props
 }: TextInputProps & { label?: string; suffix?: string; className?: string }) {
+  const needsDoneBar =
+    Platform.OS === 'ios' && NUMERIC_KEYBOARDS.includes(props.keyboardType as KeyboardTypeOptions);
+
   return (
     <View className="flex-1 gap-1">
       {label ? <Text className="text-sm text-muted">{label}</Text> : null}
@@ -74,6 +106,7 @@ export function Field({
         <TextInput
           className={`min-h-[44px] flex-1 text-base text-ink ${className}`}
           placeholderTextColor="#9C9599"
+          inputAccessoryViewID={needsDoneBar ? NUMERIC_ACCESSORY_ID : undefined}
           {...props}
         />
         {suffix ? <Text className="pl-2 text-sm text-muted">{suffix}</Text> : null}

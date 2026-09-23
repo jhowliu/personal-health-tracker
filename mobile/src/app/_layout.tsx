@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SessionProvider } from '@/auth/session';
+import { NumericDoneBar } from '@/components/NumericDoneBar';
 
 export default function RootLayout() {
   return (
@@ -14,6 +15,7 @@ export default function RootLayout() {
         <SessionProvider>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FBFAF7' } }} />
+          <NumericDoneBar />
         </SessionProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
