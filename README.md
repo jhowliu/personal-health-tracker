@@ -2,8 +2,12 @@
 
 把量身形、三餐和運動串成「今日流程」的 iPhone／Android App。規格書見 `spec.pdf`,畫面設計見 `wireframe.pdf`。
 
-目前完成第一階段(P1):帳號、個人資料與每日目標、身形追蹤、訓練課表與排程、今日流程、推播骨架。
-餐點內容(P2)與拍照辨識(P3)留下接口,尚未實作。
+目前完成到第二階段:
+
+- **P1** 帳號、個人資料與每日目標、身形追蹤、訓練課表與排程、今日流程、推播骨架
+- **P2** 食物庫、自建餐點、等量替換、每日自動分配、主食隨目標自動調整
+
+拍照辨識與 Jev 決策層(P3)留下接口,尚未實作。
 
 ## 架構
 
@@ -23,6 +27,9 @@ adapters/     SQLite、argon2/JWT、Google/Apple、Expo 推播 — 實作 ports
 | [`nutrition.py`](backend/app/domain/nutrition.py) | Mifflin-St Jeor、活動係數、減脂幅度、三大營養素、`carb_scale` |
 | [`daily_flow.py`](backend/app/domain/daily_flow.py) | 今日流程的步驟順序與目前位置(不存 DB,由當天事實推算) |
 | [`body_trend.py`](backend/app/domain/body_trend.py) | 7 天移動平均、本週與上週的差 |
+| [`exchange.py`](backend/app/domain/exchange.py) | 等量替換的換算、取整與份量上限 |
+| [`meals.py`](backend/app/domain/meals.py) | 營養合計,以及 carb_scale 只乘主食 |
+| [`planning.py`](backend/app/domain/planning.py) | 每日自動分配,午晚餐不重複 |
 
 它們是純函式,不碰 DB 也不碰 HTTP,所以測試直接呼叫就好。
 
@@ -39,6 +46,12 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ```bash
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m scripts.migrate
 ```
+
+```bash
+cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.foods
+```
+
+seed 可重複執行,用 id 做「有就更新、沒有就新增」。
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite JWT_SECRET=$(openssl rand -hex 32) .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
