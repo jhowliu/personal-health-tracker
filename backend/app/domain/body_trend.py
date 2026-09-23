@@ -37,7 +37,8 @@ def summarize(logs: Sequence[BodyLog], today: date) -> BodySummary:
 
     this_week = _mean(logs, week_start, today)
     last_week = _mean(logs, last_week_start, week_start - timedelta(days=1))
-    delta = round(this_week - last_week, 2) if this_week is not None and last_week is not None else None
+    both = this_week is not None and last_week is not None
+    delta = round(this_week - last_week, 2) if both else None
 
     waists = sorted((log for log in logs if log.waist_cm is not None), key=lambda log: log.date)
 

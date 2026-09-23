@@ -45,3 +45,6 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B"]
+# N818 要求例外類別以 Error 結尾。domain 的例外讀起來是 `raise NotFound("找不到這個課表")`,
+# 加上後綴反而囉嗦,而且基底類別 DomainError 已經帶了後綴。
+ignore = ["N818"]

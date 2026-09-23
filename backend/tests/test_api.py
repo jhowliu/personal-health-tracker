@@ -87,7 +87,9 @@ async def test_profile_is_required_before_targets(signed_in: AsyncClient):
 
 
 async def test_body_log_round_trip(with_profile: AsyncClient):
-    saved = await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1, "waist_cm": 72.0})
+    saved = await with_profile.put(
+        f"/body-logs/{TODAY}", json={"weight_kg": 56.1, "waist_cm": 72.0}
+    )
     assert saved.status_code == 200
 
     history = (await with_profile.get(f"/body-logs?from_=2026-09-01&to={TODAY}")).json()

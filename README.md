@@ -92,6 +92,13 @@ cd mobile && npm run typecheck && npm run lint
 cd backend && .venv/bin/python -m scripts.export_openapi && cd ../mobile && npm run api:types
 ```
 
+忘了跑的話,前端的 `tsc` 會看著舊的 `openapi.json` 安靜通過,錯誤要到 App 畫面上才出現。
+CI 會擋:
+
+```bash
+cd backend && .venv/bin/python -m scripts.check_openapi
+```
+
 ## 部署
 
 `docker compose up` 起 api 與 minio 兩個容器,各掛持久 volume。

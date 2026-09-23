@@ -5,7 +5,7 @@ from dataclasses import replace
 from app.application.ports import TrainingStore
 from app.domain.errors import NotFound
 from app.domain.ids import new_id
-from app.domain.models import Exercise, ScheduleEntry, TemplateItem, WorkoutTemplate
+from app.domain.models import Exercise, ScheduleEntry, WorkoutTemplate
 
 
 class TrainingService:
@@ -36,7 +36,9 @@ class TrainingService:
     async def remove_exercise(self, user_id: str, exercise_id: str) -> None:
         await self._store.archive_exercise(user_id, exercise_id)
 
-    async def templates(self, user_id: str, location: str | None = None) -> tuple[WorkoutTemplate, ...]:
+    async def templates(
+        self, user_id: str, location: str | None = None
+    ) -> tuple[WorkoutTemplate, ...]:
         return await self._store.list_templates(user_id, location)
 
     async def template(self, user_id: str, template_id: str) -> WorkoutTemplate:

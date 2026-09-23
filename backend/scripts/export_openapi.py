@@ -6,7 +6,8 @@ import pathlib
 from app.main import app
 
 TARGET = (
-    pathlib.Path(__file__).resolve().parent.parent.parent / "mobile" / "src" / "api" / "openapi.json"
+    pathlib.Path(__file__).resolve().parent.parent.parent
+    / "mobile" / "src" / "api" / "openapi.json"
 )
 
 
