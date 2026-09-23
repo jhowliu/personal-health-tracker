@@ -27,7 +27,7 @@ def build_profile(**overrides) -> Profile:
 
 
 def test_matches_spec_example():
-    """規格書範例:164 cm、56 kg、31 歲女、久坐、12%。"""
+    """The spec's worked example: 164 cm, 56 kg, 31-year-old female, sedentary, 12%."""
     targets = compute_targets(build_profile(), date(2026, 9, 22))
 
     assert targets.bmr == 1269

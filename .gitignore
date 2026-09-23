@@ -27,3 +27,7 @@ web-build/
 
 # 作業系統
 .DS_Store
+
+# 測試覆蓋率
+.coverage
+coverage.json

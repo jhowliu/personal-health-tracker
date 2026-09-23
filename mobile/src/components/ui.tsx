@@ -1,4 +1,4 @@
-/** 畫面共用的基礎元件。樣式集中在這裡,個別畫面不再重寫一次卡片與按鈕。 */
+/** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
 import {
   Pressable,
   ScrollView,

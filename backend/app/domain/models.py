@@ -117,7 +117,7 @@ class MealSlot:
 
 @dataclass(frozen=True, slots=True)
 class DayFacts:
-    """推算今日流程所需的全部事實,由 application 層從 store 組出來。"""
+    """Everything needed to derive today's flow, assembled by the application layer."""
 
     date: date
     body_logged: bool

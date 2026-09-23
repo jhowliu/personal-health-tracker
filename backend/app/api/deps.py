@@ -1,4 +1,4 @@
-"""把 adapter 接到 use case 上。所有 wiring 只發生在這一個檔案。"""
+"""Wires adapters into use cases. All wiring happens in this one file."""
 
 from functools import lru_cache
 from typing import Annotated

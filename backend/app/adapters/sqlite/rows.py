@@ -1,4 +1,4 @@
-"""SQLite 的 TEXT 欄位與 domain 型別之間的轉換。"""
+"""Conversions between SQLite TEXT columns and domain types."""
 
 from datetime import UTC, date, datetime
 

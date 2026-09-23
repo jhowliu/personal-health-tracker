@@ -1,4 +1,8 @@
-"""個人資料與每日目標。目標永遠即時算,不落 DB,避免和 profile 不同步。"""
+"""Profile and daily targets.
+
+Targets are always computed on the fly rather than stored, so they can never drift
+out of sync with the profile.
+"""
 
 from dataclasses import replace
 from datetime import date
@@ -21,7 +25,9 @@ class ProfileService:
         return profile
 
     async def create_or_replace(self, profile: Profile) -> tuple[Profile, Targets]:
-        """第一次建立資料時,以當下算出的碳水目標當作餐點基準克數。"""
+        """On first setup, the carb target computed right now becomes the baseline that
+        meal portions are stored against.
+        """
         today = self._clock.today(profile.timezone)
         if profile.carb_base_g <= 0:
             seeded = replace(profile, carb_base_g=0, auto_scale_carbs=False)
@@ -36,7 +42,9 @@ class ProfileService:
         return profile, compute_targets(profile, self._clock.today(profile.timezone))
 
     def preview(self, profile: Profile) -> Targets:
-        """還沒儲存前先算一次給畫面看,不碰 DB。公式仍然只有一份。"""
+        """Compute targets for the screen before anything is saved. Touches no DB, and the
+        formula still lives in exactly one place.
+        """
         return compute_targets(profile, self._clock.today(profile.timezone))
 
     async def targets(self, user_id: str, on: date | None = None) -> Targets:

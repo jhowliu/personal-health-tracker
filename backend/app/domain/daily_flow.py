@@ -1,4 +1,7 @@
-"""今日流程的步驟順序與目前位置。不存 DB,一律由當天事實推算。"""
+"""Step order and current position in today's flow.
+
+Never stored — always derived from what actually happened that day.
+"""
 
 from app.domain.models import DayFacts, DayFlow, FlowStep, MealTime, WorkoutTime
 
@@ -13,7 +16,7 @@ def _step_order(workout_time: WorkoutTime, has_workout: bool) -> tuple[FlowStep,
     meals = [FlowStep.BODY, FlowStep.BREAKFAST, FlowStep.LUNCH, FlowStep.DINNER]
     if not has_workout:
         return tuple(meals)
-    # 早上練 → 早餐後;傍晚練 → 晚餐前
+    # Morning workout goes after breakfast; evening workout goes before dinner.
     insert_at = 2 if workout_time is WorkoutTime.AM else 3
     return tuple(meals[:insert_at] + [FlowStep.WORKOUT] + meals[insert_at:])
 

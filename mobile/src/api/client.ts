@@ -1,9 +1,11 @@
 /**
- * 跟後端說話的唯一入口。
+ * The only way this app talks to the backend.
  *
- * 呼叫端只要給路徑和 body,不必知道:base URL、Authorization header、
- * access token 過期時自動用 refresh token 換新的再重送、錯誤訊息怎麼從回應裡挖出來。
- * token 怎麼存由 setTokenStore 注入,測試可以換成記憶體版本。
+ * Callers supply a path and a body. They never deal with the base URL, the Authorization
+ * header, swapping an expired access token for a fresh one and replaying the request, or
+ * digging the error message out of a response.
+ *
+ * Token storage is injected via setTokenStore, so tests can swap in an in-memory one.
  */
 import type { paths } from './types';
 
@@ -75,7 +77,7 @@ async function fail(response: Response): Promise<never> {
     if (typeof body?.detail === 'string') detail = body.detail;
     else if (Array.isArray(body?.detail)) detail = body.detail[0]?.msg ?? detail;
   } catch {
-    // 回應不是 JSON,用預設訊息
+    // Response was not JSON — keep the default message
   }
   throw new ApiError(response.status, detail);
 }

@@ -1,11 +1,12 @@
 /**
- * 登入狀態。畫面只看到 status、profile 和三個動作,不碰 SecureStore 也不碰 token。
+ * Sign-in state. Screens see only status, profile and three actions — never SecureStore,
+ * never a raw token.
  *
  * status:
- *   loading   — 還在讀本機存的 token
- *   signedOut — 要登入
- *   newUser   — 登入了但還沒建個人資料
- *   ready     — 可以用
+ *   loading   - still reading the locally stored token
+ *   signedOut - needs to sign in
+ *   newUser   - signed in but has not created a profile yet
+ *   ready     - good to go
  */
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
@@ -83,7 +84,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     try {
       await api.post('/auth/logout');
     } catch {
-      // 就算後端沒收到,本機還是要登出
+      // Sign out locally even when the backend never got the request
     }
     await store(null);
     setProfile(null);

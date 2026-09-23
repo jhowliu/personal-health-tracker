@@ -132,7 +132,9 @@ class SqliteDayStore:
         )
 
     async def streak_until(self, user_id: str, day: date) -> int:
-        """連續天數:從 day 往回數,每天都量了身形且三餐都標記吃完才算完成。"""
+        """Streak: count back from `day`. A day counts only when the body was logged
+        and all three meals were marked eaten.
+        """
         async with self._conn.execute(
             f"""
             SELECT d.date FROM days d
@@ -164,7 +166,8 @@ class SqliteDayStore:
             " VALUES (?, ?, ?, ?) ON CONFLICT (user_id, date) DO NOTHING",
             (user_id, to_day(day), profile.workout_time.value, profile.default_location.value),
         )
-        # 排程可能是開了今天之後才設的,或使用者改了地點,所以每次讀都補一次。
+        # The schedule may have been set after the day was opened, or the user may have
+        # changed location, so backfill the template on every read.
         await self._conn.execute(
             """
             UPDATE days SET template_id = (

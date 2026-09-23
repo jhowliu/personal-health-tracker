@@ -1,8 +1,9 @@
 /**
- * 註冊推播,讓後端每天早上提醒量體重。
+ * Registers for push so the backend can send the morning weigh-in reminder.
  *
- * 呼叫端只看到 registerPushToken():權限、Android 頻道、拿 Expo token、
- * 回報給 /devices 全包在裡面,失敗時安靜略過(沒有推播不影響其他功能)。
+ * Callers see only registerPushToken(). Permissions, the Android channel, fetching the
+ * Expo token and reporting it to /devices are all handled inside, and failures are
+ * swallowed — no push does not break anything else.
  */
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';

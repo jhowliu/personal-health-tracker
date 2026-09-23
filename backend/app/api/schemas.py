@@ -1,4 +1,7 @@
-"""HTTP 的請求與回應形狀。與 domain model 刻意分開,改 API 不會動到規則。"""
+"""Request and response shapes for HTTP.
+
+Deliberately separate from the domain models, so changing the API never touches the rules.
+"""
 
 from dataclasses import fields
 from datetime import date
@@ -22,7 +25,7 @@ from app.domain.models import (
 
 
 def _values(obj: Any) -> dict[str, Any]:
-    """dataclass 的欄位攤平成 dict(不遞迴,巢狀的 dataclass 各自轉)。"""
+    """Flatten a dataclass into a dict. Not recursive — nested dataclasses convert themselves."""
     return {f.name: getattr(obj, f.name) for f in fields(obj)}
 
 

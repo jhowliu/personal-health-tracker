@@ -1,7 +1,7 @@
-"""Use case 與外界之間的 seam。
+"""The seam between use cases and the outside world.
 
-每個 port 對應一個聚合,不是一張表 — adapter 內部愛 join 幾張表是它的事。
-目前各有一個 SQLite adapter 與一個測試用 in-memory adapter。
+Each port covers one aggregate, not one table — how many tables an adapter joins
+inside is its own business.
 """
 
 from dataclasses import dataclass
@@ -51,14 +51,14 @@ class TokenIssuer(Protocol):
     def issue_access(self, user_id: str) -> str: ...
 
     def issue_refresh(self) -> tuple[str, str, datetime]:
-        """回傳 (原始 token, 儲存用雜湊, 到期時間)。"""
+        """Returns (raw token, hash to store, expiry)."""
 
     def hash_refresh(self, raw: str) -> str: ...
 
 
 class IdentityVerifier(Protocol):
     async def verify(self, provider: str, id_token: str) -> tuple[str, str | None]:
-        """驗證第三方 ID token,回傳 (provider_subject, email)。"""
+        """Verify a third-party ID token. Returns (provider_subject, email)."""
 
 
 class PushSender(Protocol):
@@ -83,7 +83,7 @@ class AccountStore(Protocol):
     async def save_refresh(self, user_id: str, token_hash: str, expires_at: datetime) -> None: ...
 
     async def consume_refresh(self, token_hash: str, now: datetime) -> str | None:
-        """驗證並作廢一次性 refresh token,回傳 user_id;無效時 None。"""
+        """Validate and burn a single-use refresh token. Returns the user_id, or None."""
 
     async def revoke_all_refresh(self, user_id: str) -> None: ...
 
@@ -130,7 +130,7 @@ class TrainingStore(Protocol):
 
 class DayStore(Protocol):
     async def load_facts(self, user_id: str, day: date, profile: Profile) -> DayFacts:
-        """組出推算流程所需的全部事實(必要時建立當天的 days 列)。"""
+        """Assemble the facts needed to derive the flow, creating the day row if missing."""
 
     async def update_day(
         self,
@@ -168,4 +168,4 @@ class ReminderStore(Protocol):
     ) -> None: ...
 
     async def due_at(self, now: datetime) -> tuple[DueReminder, ...]:
-        """找出此刻正好到提醒時間、且今天還沒量體重的使用者。"""
+        """Users whose reminder time is right now and who have not logged a weight today."""

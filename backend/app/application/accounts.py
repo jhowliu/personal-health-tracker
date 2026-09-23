@@ -1,4 +1,4 @@
-"""帳號用例:註冊、登入(密碼與第三方)、換發 token、登出、刪除帳號。"""
+"""Account use cases: register, sign in (password and third-party), refresh, sign out, delete."""
 
 from dataclasses import dataclass
 
@@ -58,7 +58,9 @@ class AccountService:
         return await self._issue(found.user_id)
 
     async def login_with_provider(self, provider: str, id_token: str) -> TokenPair:
-        """Google／Apple 登入。沒有帳號就自動建一個;email 相同則綁到既有帳號。"""
+        """Google/Apple sign-in. Creates an account when there is none; links to the
+        existing account when the email already matches one.
+        """
         subject, email = await self._identities.verify(provider, id_token)
 
         user_id = await self._store.find_by_identity(provider, subject)

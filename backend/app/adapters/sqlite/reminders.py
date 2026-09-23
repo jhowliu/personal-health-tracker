@@ -28,7 +28,9 @@ class SqliteReminderStore:
         )
 
     async def due_at(self, now: datetime) -> tuple[DueReminder, ...]:
-        """提醒時間是各自時區的牆上時間,所以撈出有設定的人後在 Python 比對。"""
+        """Reminder times are wall-clock in each user's own timezone, so fetch everyone
+        who set one and compare in Python.
+        """
         async with self._conn.execute(
             """
             SELECT p.user_id, p.reminder_time, p.timezone, u.locale,

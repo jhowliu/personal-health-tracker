@@ -1,4 +1,6 @@
-"""UUID v7:前 48 bit 是毫秒時間戳,產生出來就依時間排序,適合當主鍵。"""
+"""UUID v7: the first 48 bits are a millisecond timestamp, so ids sort by creation
+time out of the box — which is what we want from a primary key.
+"""
 
 import os
 import time

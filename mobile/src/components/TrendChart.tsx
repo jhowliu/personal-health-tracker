@@ -1,7 +1,7 @@
 /**
- * 身形趨勢圖:灰點是每次紀錄,粗線是 7 天平均。
+ * Body trend chart: grey dots are individual entries, the thick line is the 7-day average.
  *
- * 只吃後端 /body-logs/summary 回傳的點,不在這裡算平均。
+ * Consumes the points returned by /body-logs/summary; no averaging happens here.
  */
 import { useState } from 'react';
 import { Text, View } from 'react-native';
@@ -37,7 +37,8 @@ export function TrendChart({
   const y = (value: number) =>
     HEIGHT - PADDING - ((value - min) / span) * (HEIGHT - PADDING * 2);
 
-  // x 用原本的索引,不能用過濾後的,否則缺平均值的點會讓整條線錯位。
+  // x uses the original index, not the filtered one — otherwise points without an
+  // average would shift the whole line.
   const average = points
     .map((p, index) => (p.average_7d === null ? null : `${x(index)},${y(p.average_7d)}`))
     .filter((point): point is string => point !== null)

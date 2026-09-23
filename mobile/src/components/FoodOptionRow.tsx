@@ -1,8 +1,9 @@
 /**
- * 加入食物、替換食物、辨識結果候選三處共用。
+ * Shared by three screens: add food, substitute food, and photo-recognition candidates.
  *
- * 規格書的元件規則:點整列選取、選中時淡主色背景、右側固定保留 24 px 的 ✓ 位置,
- * 所以選取與否都不會造成版面位移。
+ * The spec's component rules: the whole row is the tap target, selection paints a soft
+ * primary background, and 24 px is always reserved on the right for the checkmark — so
+ * selecting never shifts the layout.
  */
 import { Pressable, Text, View } from 'react-native';
 
@@ -10,7 +11,7 @@ const CHECK_SLOT = 24;
 
 export type FoodOptionRowProps = {
   name: string;
-  /** 替換頁用:克數緊接在食物名稱右側 */
+  /** Substitute screen: grams sit immediately right of the food name */
   grams?: string;
   detail?: string;
   badges?: { label: string; tone?: 'neutral' | 'primary' | 'good' | 'warm' }[];

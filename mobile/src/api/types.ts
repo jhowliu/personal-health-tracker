@@ -153,7 +153,7 @@ export interface paths {
         put?: never;
         /**
          * Preview Targets
-         * @description 建立資料的畫面邊填邊顯示目標,不儲存。
+         * @description The profile-setup screen shows targets as the user types. Nothing is stored.
          */
         post: operations["preview_targets_users_me_targets_preview_post"];
         delete?: never;
