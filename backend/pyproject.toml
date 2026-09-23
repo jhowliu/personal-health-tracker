@@ -38,6 +38,9 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# conftest 會 import scripts.migrate。`python -m pytest` 會自動把當前目錄放進
+# sys.path,但 `pytest` 這個 console script 不會 —— 明寫出來,兩種都能跑。
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
