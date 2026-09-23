@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
+import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { color } from '@/theme/tokens';
 
@@ -121,12 +121,14 @@ export default function Substitute() {
         <ActivityIndicator color={color.primary} />
       ) : (
         <Card className="px-0 py-0">
-          {options.map((option) => (
+          <Rows>
+            {options.map((option) => (
             <FoodOptionRow
               key={option.food.id}
               name={option.food.name}
               grams={`${Math.round(option.grams)} g`}
               badges={badgesFor(option, active)}
+              badgesBelow
               note={
                 option.capped
                   ? `已到常見份量上限,${BASIS_LABEL[active].replace('等', '')}會比原本少`
@@ -135,7 +137,8 @@ export default function Substitute() {
               selected={picked?.food.id === option.food.id}
               onPress={() => setPicked(option)}
             />
-          ))}
+            ))}
+          </Rows>
         </Card>
       )}
 

@@ -1,4 +1,5 @@
 /** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
+import { Children, Fragment, type ReactNode } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -25,7 +26,16 @@ export const NUMERIC_ACCESSORY_ID = 'numeric-done-bar';
 
 const NUMERIC_KEYBOARDS: KeyboardTypeOptions[] = ['numeric', 'decimal-pad', 'number-pad'];
 
-export function Screen({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
+export function Screen({
+  children,
+  scroll = true,
+  footer,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  /** Pinned below the scroll area — for a running total the user needs while editing. */
+  footer?: ReactNode;
+}) {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
       <KeyboardAvoidingView
@@ -52,8 +62,33 @@ export function Screen({ children, scroll = true }: { children: React.ReactNode;
             {children}
           </Pressable>
         )}
+
+        {/* Inside KeyboardAvoidingView so it rides up with the keyboard. */}
+        {footer ? (
+          <View className="gap-2 border-t border-line bg-surface px-5 pb-3 pt-3">{footer}</View>
+        ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Draws a hairline *between* children — never after the last one.
+ *
+ * Do not reach for `last:border-b-0` instead: NativeWind has no child-position variants
+ * on native, so that silently wipes every border on a device while looking right on web.
+ */
+export function Rows({ children }: { children: ReactNode }) {
+  const items = Children.toArray(children).filter(Boolean);
+  return (
+    <>
+      {items.map((child, index) => (
+        <Fragment key={index}>
+          {index > 0 ? <View className="h-px bg-line" /> : null}
+          {child}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -81,9 +116,9 @@ export function Card({ className = '', ...props }: ViewProps & { className?: str
   );
 }
 
-export function Row({ label, value }: { label: string; value: React.ReactNode }) {
+export function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <View className="flex-row items-center justify-between border-b border-line py-3 last:border-b-0">
+    <View className="flex-row items-center justify-between py-3">
       <Text className="text-base text-ink">{label}</Text>
       {typeof value === 'string' ? <Text className="text-base text-muted">{value}</Text> : value}
     </View>

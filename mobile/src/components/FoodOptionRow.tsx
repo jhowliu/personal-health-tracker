@@ -17,6 +17,12 @@ export type FoodOptionRowProps = {
   badges?: { label: string; tone?: 'neutral' | 'primary' | 'good' | 'warm' }[];
   trailing?: string;
   note?: string;
+  /**
+   * Substitute screen puts the badges on their own line under the name, because they
+   * describe the conversion. The food picker keeps them inline, where they are just a
+   * category tag. Explicit rather than inferred from `grams` — that rule would bite later.
+   */
+  badgesBelow?: boolean;
   selected?: boolean;
   onPress?: () => void;
 };
@@ -35,31 +41,37 @@ export function FoodOptionRow({
   badges = [],
   trailing,
   note,
+  badgesBelow = false,
   selected = false,
   onPress,
 }: FoodOptionRowProps) {
+  const chips = badges.map((badge) => {
+    const skin = BADGE_SKIN[badge.tone ?? 'neutral'];
+    return (
+      <View key={badge.label} className={`rounded-full px-2 py-0.5 ${skin.box}`}>
+        <Text className={`text-xs ${skin.text}`}>{badge.label}</Text>
+      </View>
+    );
+  });
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      className={`min-h-[44px] flex-row items-start gap-3 border-b border-line px-4 py-3 last:border-b-0 ${
+      className={`min-h-[44px] flex-row items-start gap-3 px-4 py-3 ${
         selected ? 'bg-primary-soft' : 'bg-surface'
       }`}
     >
-      <View className="flex-1 gap-1">
+      <View className="flex-1 gap-1.5">
         <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-base font-semibold text-ink">{name}</Text>
           {grams ? <Text className="text-base font-semibold text-primary">{grams}</Text> : null}
-          {badges.map((badge) => {
-            const skin = BADGE_SKIN[badge.tone ?? 'neutral'];
-            return (
-              <View key={badge.label} className={`rounded-full px-2 py-0.5 ${skin.box}`}>
-                <Text className={`text-xs ${skin.text}`}>{badge.label}</Text>
-              </View>
-            );
-          })}
+          {badgesBelow ? null : chips}
         </View>
+        {badgesBelow && chips.length ? (
+          <View className="flex-row flex-wrap gap-2">{chips}</View>
+        ) : null}
         {detail ? <Text className="text-sm text-muted">{detail}</Text> : null}
         {note ? <Text className="text-sm text-warm">{note}</Text> : null}
       </View>

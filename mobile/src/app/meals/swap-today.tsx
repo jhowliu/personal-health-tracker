@@ -10,7 +10,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
+import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Exchange = Schema<'ExchangeOut'>;
@@ -118,7 +118,8 @@ export default function SwapToday() {
         <ActivityIndicator color={color.primary} />
       ) : (
         <Card className="px-0 py-0">
-          {options.map((option) => (
+          <Rows>
+            {options.map((option) => (
             <FoodOptionRow
               key={option.food.id}
               name={option.food.name}
@@ -132,11 +133,13 @@ export default function SwapToday() {
                   tone: option.delta.kcal > 0 ? 'warm' : 'good',
                 },
               ]}
+              badgesBelow
               note={option.capped ? '已到常見份量上限' : undefined}
               selected={picked?.food.id === option.food.id}
               onPress={() => setPicked(option)}
             />
-          ))}
+            ))}
+          </Rows>
         </Card>
       )}
 

@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
-import { Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
 import { color } from '@/theme/tokens';
 
@@ -131,7 +131,33 @@ export default function EditMeal() {
   const autoScaled = profile?.profile.auto_scale_carbs && (profile?.targets.carb_scale ?? 1) !== 1;
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <>
+          <View className="flex-row items-baseline justify-between">
+            <Text className="text-base text-muted">整份餐點</Text>
+            <Text className="font-display text-2xl font-bold text-ink">
+              {shownTotals ? Math.round(shownTotals.kcal).toLocaleString() : '—'}{' '}
+              <Text className="text-sm font-normal text-muted">大卡</Text>
+            </Text>
+          </View>
+          {shownTotals ? (
+            <Hint>
+              蛋白質 {Math.round(shownTotals.protein_g)} g、脂肪 {Math.round(shownTotals.fat_g)} g、
+              碳水 {Math.round(shownTotals.carb_g)} g
+            </Hint>
+          ) : (
+            <Hint>加入食物後自動計算。</Hint>
+          )}
+          <PrimaryButton
+            onPress={save}
+            disabled={busy || !current.name || current.items.length === 0}
+          >
+            {busy ? '儲存中…' : '儲存餐點'}
+          </PrimaryButton>
+        </>
+      }
+    >
       <Pressable accessibilityRole="button" onPress={() => router.back()}>
         <Text className="text-base text-primary">‹ 我的餐點</Text>
       </Pressable>
@@ -175,33 +201,39 @@ export default function EditMeal() {
 
       <Text className="font-display text-xl font-bold text-ink">組成</Text>
 
-      {grouped.map((group) => (
-        <View key={group.category} className="gap-2">
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-2">
-              <Chip label={CATEGORY_LABEL[group.category]} tone="primary" />
-              <Text className="text-xs text-muted">{SWAP_NOTE[group.category]}</Text>
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push(`/meals/add-food?category=${group.category}`)}
-              className="min-h-[44px] justify-center"
-            >
-              <Text className="text-base text-primary underline">
-                ＋ {CATEGORY_LABEL[group.category]}
-              </Text>
-            </Pressable>
-          </View>
+      {grouped.length ? (
+        <Card className="px-4 py-0">
+          <Rows>
+            {grouped.map((group) => (
+              <View key={group.category} className="gap-2 py-3">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 flex-row items-center gap-2">
+                    <Chip label={CATEGORY_LABEL[group.category]} tone="primary" />
+                    <Text className="flex-1 text-xs text-muted">{SWAP_NOTE[group.category]}</Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push(`/meals/add-food?category=${group.category}`)}
+                    className="min-h-[44px] justify-center pl-2"
+                  >
+                    <Text className="text-base text-primary underline">
+                      ＋ {CATEGORY_LABEL[group.category]}
+                    </Text>
+                  </Pressable>
+                </View>
 
-          {group.items.map((item) => (
-            <ItemRow
-              key={item.key}
-              item={item}
-              scaled={Boolean(autoScaled) && group.category === 'staple'}
-            />
-          ))}
-        </View>
-      ))}
+                {group.items.map((item) => (
+                  <ItemRow
+                    key={item.key}
+                    item={item}
+                    scaled={Boolean(autoScaled) && group.category === 'staple'}
+                  />
+                ))}
+              </View>
+            ))}
+          </Rows>
+        </Card>
+      ) : null}
 
       <Pressable
         accessibilityRole="button"
@@ -210,26 +242,6 @@ export default function EditMeal() {
       >
         <Text className="text-base text-primary">＋ 加入食物</Text>
       </Pressable>
-
-      <Card className="gap-2">
-        <Text className="text-sm text-muted">整份餐點</Text>
-        <Text className="font-display text-4xl font-bold text-ink">
-          {shownTotals ? Math.round(shownTotals.kcal).toLocaleString() : '—'}{' '}
-          <Text className="text-base font-normal text-muted">大卡</Text>
-        </Text>
-        {shownTotals ? (
-          <Hint>
-            蛋白質 {Math.round(shownTotals.protein_g)} g、脂肪 {Math.round(shownTotals.fat_g)} g、碳水{' '}
-            {Math.round(shownTotals.carb_g)} g
-          </Hint>
-        ) : (
-          <Hint>加入食物後自動計算。</Hint>
-        )}
-      </Card>
-
-      <PrimaryButton onPress={save} disabled={busy || !current.name || current.items.length === 0}>
-        {busy ? '儲存中…' : '儲存餐點'}
-      </PrimaryButton>
 
       {isNew ? null : (
         <Pressable

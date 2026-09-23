@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { Card, Chip, Empty, Screen, Segmented, SectionHeading, Title } from '@/components/ui';
+import { Card, Chip, Empty, Rows, Screen, Segmented, SectionHeading, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Template = Schema<'TemplateOut'>;
@@ -78,7 +78,8 @@ export default function WorkoutsScreen() {
 
       <SectionHeading>一週排程</SectionHeading>
       <Card className="py-0">
-        {WEEKDAYS.map((label, index) => {
+        <Rows>
+          {WEEKDAYS.map((label, index) => {
           const entry = forLocation.find((e) => e.weekday === index);
           const template = entry ? byId.get(entry.template_id) : undefined;
           const category = template ? CATEGORY_TONE[template.category_id as keyof typeof CATEGORY_TONE] : undefined;
@@ -86,7 +87,7 @@ export default function WorkoutsScreen() {
           return (
             <View
               key={label}
-              className="flex-row items-center justify-between border-b border-line py-3 last:border-b-0"
+              className="flex-row items-center justify-between py-3"
             >
               <View className="gap-0.5">
                 <Text className="text-base font-semibold text-ink">{label}</Text>
@@ -95,7 +96,8 @@ export default function WorkoutsScreen() {
               <Chip label={category?.label ?? '休息'} tone={category?.tone ?? 'neutral'} />
             </View>
           );
-        })}
+          })}
+        </Rows>
       </Card>
 
       <SectionHeading>課表</SectionHeading>
@@ -103,12 +105,13 @@ export default function WorkoutsScreen() {
         <Empty>還沒有{location === 'gym' ? '健身房' : '在家'}的課表</Empty>
       ) : (
         <Card className="py-0">
-          {templates.map((template) => (
+          <Rows>
+            {templates.map((template) => (
             <Pressable
               key={template.id}
               accessibilityRole="button"
               onPress={() => router.push(`/workouts/${template.id}`)}
-              className="min-h-[44px] flex-row items-center justify-between border-b border-line py-3 last:border-b-0"
+              className="min-h-[44px] flex-row items-center justify-between py-3"
             >
               <View className="flex-1 gap-0.5">
                 <Text className="text-base font-semibold text-ink">{template.name}</Text>
@@ -119,7 +122,8 @@ export default function WorkoutsScreen() {
               </View>
               <Text className="text-base text-primary">編輯</Text>
             </Pressable>
-          ))}
+            ))}
+          </Rows>
         </Card>
       )}
     </Screen>

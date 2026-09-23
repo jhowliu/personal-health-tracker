@@ -61,7 +61,7 @@ export function MealCard({ meal, onPress }: { meal: Meal; onPress?: () => void }
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      className="gap-2 border-b border-line py-4 last:border-b-0"
+      className="gap-2 py-4"
     >
       <View className="flex-row items-baseline justify-between gap-3">
         <Text className="flex-1 text-base font-semibold text-ink">{meal.name}</Text>

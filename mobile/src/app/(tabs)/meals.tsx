@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-n
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { MealCard } from '@/components/MealCard';
-import { Card, Chip, Empty, Hint, Screen, Segmented, Title } from '@/components/ui';
+import { Card, Chip, Empty, Hint, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Meal = Schema<'MealOut'>;
@@ -129,7 +129,7 @@ function MyMeals() {
       ) : meals.length === 0 ? (
         <Empty>還沒有自己的餐點,按右上角新增一道</Empty>
       ) : (
-        <Card className="py-0">
+        <Rows>
           {meals.map((meal) => (
             <MealCard
               key={meal.id}
@@ -137,7 +137,7 @@ function MyMeals() {
               onPress={() => router.push(`/meals/${meal.id}`)}
             />
           ))}
-        </Card>
+        </Rows>
       )}
     </>
   );
@@ -213,21 +213,23 @@ function FoodLibrary() {
         <Empty>這個分類還沒有食物</Empty>
       ) : (
         <Card className="py-0">
-          {foods.map((food) => (
-            <View
-              key={food.id}
-              className="flex-row items-start justify-between gap-3 border-b border-line py-3 last:border-b-0"
-            >
-              <View className="flex-1 gap-0.5">
-                <Text className="text-base font-semibold text-ink">{food.name}</Text>
-                <Text className="text-sm text-muted">{describe(food)}</Text>
+          <Rows>
+            {foods.map((food) => (
+              <View
+                key={food.id}
+                className="flex-row items-start justify-between gap-3 py-3"
+              >
+                <View className="flex-1 gap-0.5">
+                  <Text className="text-base font-semibold text-ink">{food.name}</Text>
+                  <Text className="text-sm text-muted">{describe(food)}</Text>
+                </View>
+                <View className="items-end">
+                  <Text className="text-xs text-muted">常用</Text>
+                  <Text className="text-sm text-ink">{usualPortion(food)}</Text>
+                </View>
               </View>
-              <View className="items-end">
-                <Text className="text-xs text-muted">常用</Text>
-                <Text className="text-sm text-ink">{usualPortion(food)}</Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </Rows>
         </Card>
       )}
     </>

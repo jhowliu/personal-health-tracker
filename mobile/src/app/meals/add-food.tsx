@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { color } from '@/theme/tokens';
 
@@ -86,7 +86,8 @@ export default function AddFood() {
         </Card>
       ) : (
         <Card className="px-0 py-0">
-          {foods.map((food) => (
+          <Rows>
+            {foods.map((food) => (
             <FoodOptionRow
               key={food.id}
               name={food.name}
@@ -95,7 +96,8 @@ export default function AddFood() {
               selected={picked?.id === food.id}
               onPress={() => choose(food)}
             />
-          ))}
+            ))}
+          </Rows>
         </Card>
       )}
 
