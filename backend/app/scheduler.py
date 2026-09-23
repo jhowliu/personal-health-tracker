@@ -1,4 +1,4 @@
-"""定時工作。與 API 同一個程序,所以 Uvicorn 只能開一個 worker。"""
+"""Scheduled jobs. Same process as the API, which is why Uvicorn runs a single worker."""
 
 import logging
 
@@ -17,7 +17,9 @@ scheduler = AsyncIOScheduler()
 
 
 async def dispatch_reminders() -> None:
-    """每分鐘跑一次。這裡出事不該拖垮 API,所以記一行就好,不讓 traceback 洗版。"""
+    """Runs once a minute. A failure here must not take the API down, so log one line
+    rather than letting a traceback repeat every 60 seconds.
+    """
     try:
         async with get_conn() as conn:
             service = ReminderService(

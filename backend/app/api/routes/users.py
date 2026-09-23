@@ -60,7 +60,7 @@ def _to_profile(user_id: str, payload: ProfileIn) -> Profile:
 async def preview_targets(
     payload: ProfileIn, user_id: CurrentUserId, service: Profiles
 ) -> TargetsOut:
-    """建立資料的畫面邊填邊顯示目標,不儲存。"""
+    """The profile-setup screen shows targets as the user types. Nothing is stored."""
     return TargetsOut.of(service.preview(_to_profile(user_id, payload)))
 
 

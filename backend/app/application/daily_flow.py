@@ -1,4 +1,4 @@
-"""今日流程:目前走到哪一步、標記吃完、打勾組數。"""
+"""Today's flow: which step the user is on, marking meals eaten, logging sets."""
 
 from dataclasses import dataclass
 from datetime import date

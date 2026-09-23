@@ -1,4 +1,4 @@
-"""身形趨勢:7 天移動平均、本週平均與上週相比的變化。"""
+"""Body trends: 7-day moving average, and this week's average against last week's."""
 
 from collections.abc import Sequence
 from datetime import date, timedelta

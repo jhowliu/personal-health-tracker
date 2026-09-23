@@ -228,7 +228,7 @@ async def test_scheduled_workout_adds_a_step_to_the_day(with_profile: AsyncClien
         )
     ).json()
 
-    # 2026-09-22 是週二 → weekday 1
+    # 2026-09-22 is a Tuesday -> weekday 1
     await with_profile.put(
         "/workout-schedule",
         json=[{"weekday": 1, "location": "home", "template_id": template["id"]}],
@@ -241,7 +241,9 @@ async def test_scheduled_workout_adds_a_step_to_the_day(with_profile: AsyncClien
 async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     with_profile: AsyncClient,
 ):
-    """先開了今天,之後才排課表 — 今天的流程要補上運動那一步。"""
+    """The day is opened first, the schedule set afterwards — today's flow must still
+    pick up the workout step.
+    """
     before = (await with_profile.get(f"/days/{TODAY}")).json()
     assert "workout" not in before["flow"]["steps"]
 

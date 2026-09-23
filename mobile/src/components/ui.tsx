@@ -1,30 +1,94 @@
-/** 畫面共用的基礎元件。樣式集中在這裡,個別畫面不再重寫一次卡片與按鈕。 */
+/** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
+import { Children, Fragment, type ReactNode } from 'react';
 import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
+  type KeyboardTypeOptions,
   type TextInputProps,
   type ViewProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-export function Screen({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
+/**
+ * nativeID of the accessory bar rendered once in the root layout.
+ *
+ * iOS numeric keypads have no return key, so without this there is no key that
+ * dismisses them. Tapping blank space works too, but a visible 完成 is what people
+ * reach for.
+ */
+export const NUMERIC_ACCESSORY_ID = 'numeric-done-bar';
+
+const NUMERIC_KEYBOARDS: KeyboardTypeOptions[] = ['numeric', 'decimal-pad', 'number-pad'];
+
+export function Screen({
+  children,
+  scroll = true,
+  footer,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  /** Pinned below the scroll area — for a running total the user needs while editing. */
+  footer?: ReactNode;
+}) {
   return (
     <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
-      {scroll ? (
-        <ScrollView
-          className="flex-1"
-          contentContainerClassName="px-5 pb-8 pt-2 gap-4"
-          keyboardShouldPersistTaps="handled"
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View className="flex-1 px-5 pb-8 pt-2">{children}</View>
-      )}
+      <KeyboardAvoidingView
+        className="flex-1"
+        // Android already resizes the window; adding padding on top double-counts it.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {scroll ? (
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-5 pb-8 pt-2 gap-4"
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          // Not a ScrollView, so a tap on empty space is the only way out.
+          <Pressable
+            accessible={false}
+            onPress={Keyboard.dismiss}
+            className="flex-1 px-5 pb-8 pt-2"
+          >
+            {children}
+          </Pressable>
+        )}
+
+        {/* Inside KeyboardAvoidingView so it rides up with the keyboard. */}
+        {footer ? (
+          <View className="gap-2 border-t border-line bg-surface px-5 pb-3 pt-3">{footer}</View>
+        ) : null}
+      </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/**
+ * Draws a hairline *between* children — never after the last one.
+ *
+ * Do not reach for `last:border-b-0` instead: NativeWind has no child-position variants
+ * on native, so that silently wipes every border on a device while looking right on web.
+ */
+export function Rows({ children }: { children: ReactNode }) {
+  const items = Children.toArray(children).filter(Boolean);
+  return (
+    <>
+      {items.map((child, index) => (
+        <Fragment key={index}>
+          {index > 0 ? <View className="h-px bg-line" /> : null}
+          {child}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -48,13 +112,18 @@ export function SectionHeading({ children, action }: { children: React.ReactNode
 
 export function Card({ className = '', ...props }: ViewProps & { className?: string }) {
   return (
-    <View className={`rounded-card border border-line bg-surface p-4 ${className}`} {...props} />
+    <View
+      // overflow-hidden clips children to the radius. Without it a child that paints its
+      // own background (FoodOptionRow) covers the corners and the card renders square.
+      className={`overflow-hidden rounded-card border border-line bg-surface p-4 ${className}`}
+      {...props}
+    />
   );
 }
 
-export function Row({ label, value }: { label: string; value: React.ReactNode }) {
+export function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <View className="flex-row items-center justify-between border-b border-line py-3 last:border-b-0">
+    <View className="flex-row items-center justify-between py-3">
       <Text className="text-base text-ink">{label}</Text>
       {typeof value === 'string' ? <Text className="text-base text-muted">{value}</Text> : value}
     </View>
@@ -67,6 +136,9 @@ export function Field({
   className = '',
   ...props
 }: TextInputProps & { label?: string; suffix?: string; className?: string }) {
+  const needsDoneBar =
+    Platform.OS === 'ios' && NUMERIC_KEYBOARDS.includes(props.keyboardType as KeyboardTypeOptions);
+
   return (
     <View className="flex-1 gap-1">
       {label ? <Text className="text-sm text-muted">{label}</Text> : null}
@@ -74,6 +146,7 @@ export function Field({
         <TextInput
           className={`min-h-[44px] flex-1 text-base text-ink ${className}`}
           placeholderTextColor="#9C9599"
+          inputAccessoryViewID={needsDoneBar ? NUMERIC_ACCESSORY_ID : undefined}
           {...props}
         />
         {suffix ? <Text className="pl-2 text-sm text-muted">{suffix}</Text> : null}

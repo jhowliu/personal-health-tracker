@@ -1,4 +1,4 @@
-"""每天早上提醒量體重。排程器每分鐘呼叫 dispatch_due 一次。"""
+"""The morning weigh-in reminder. The scheduler calls dispatch_due once a minute."""
 
 from datetime import datetime
 

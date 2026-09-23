@@ -1,4 +1,7 @@
-"""驗 Google／Apple 的 ID token。兩家都是標準 OIDC,差在 issuer、JWKS 網址與 audience。"""
+"""Verify Google/Apple ID tokens.
+
+Both are standard OIDC; they differ only in issuer, JWKS URL and audience.
+"""
 
 import asyncio
 

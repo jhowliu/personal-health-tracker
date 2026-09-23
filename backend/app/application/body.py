@@ -1,4 +1,4 @@
-"""身形追蹤:紀錄體重與腰圍,以及圖表與週變化。"""
+"""Body tracking: record weight and waist, plus the chart series and weekly change."""
 
 from datetime import date, timedelta
 

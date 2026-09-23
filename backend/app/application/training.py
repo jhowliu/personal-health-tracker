@@ -1,4 +1,4 @@
-"""訓練:動作庫、課表與其動作、一週排程。"""
+"""Training: the exercise library, workout templates and their items, weekly schedule."""
 
 from dataclasses import replace
 

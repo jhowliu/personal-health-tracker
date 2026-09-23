@@ -1,4 +1,4 @@
-/** 今日流程頂端的進度列。已完成的步驟可以點回去改。 */
+/** The progress bar at the top of today's flow. Completed steps can be tapped to go back. */
 import { Pressable, Text, View } from 'react-native';
 
 export const STEP_LABEL: Record<string, string> = {

@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { TrendChart } from '@/components/TrendChart';
-import { Card, Field, Hint, PrimaryButton, Screen, SectionHeading, Title } from '@/components/ui';
+import { Card, Field, Hint, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Summary = Schema<'BodySummaryOut'>;
@@ -112,27 +112,29 @@ export default function BodyScreen() {
         {logs.length === 0 ? (
           <Text className="py-6 text-center text-base text-muted">還沒有紀錄</Text>
         ) : (
-          logs.map((log) => {
-            const parsed = new Date(`${log.date}T00:00:00`);
-            return (
-              <View
-                key={log.date}
-                className="flex-row items-center justify-between border-b border-line py-3 last:border-b-0"
-              >
-                <Text className="text-base text-ink">
-                  {parsed.getMonth() + 1}/{parsed.getDate()} {WEEKDAY[parsed.getDay()]}
-                </Text>
-                <Text className="text-base text-muted">
-                  {[
-                    log.weight_kg ? `${log.weight_kg.toFixed(1)} kg` : null,
-                    log.waist_cm ? `腰 ${log.waist_cm.toFixed(1)} cm` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(',')}
-                </Text>
-              </View>
-            );
-          })
+          <Rows>
+            {logs.map((log) => {
+              const parsed = new Date(`${log.date}T00:00:00`);
+              return (
+                <View
+                  key={log.date}
+                  className="flex-row items-center justify-between py-3"
+                >
+                  <Text className="text-base text-ink">
+                    {parsed.getMonth() + 1}/{parsed.getDate()} {WEEKDAY[parsed.getDay()]}
+                  </Text>
+                  <Text className="text-base text-muted">
+                    {[
+                      log.weight_kg ? `${log.weight_kg.toFixed(1)} kg` : null,
+                      log.waist_cm ? `腰 ${log.waist_cm.toFixed(1)} cm` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(',')}
+                  </Text>
+                </View>
+              );
+            })}
+          </Rows>
         )}
       </Card>
     </Screen>

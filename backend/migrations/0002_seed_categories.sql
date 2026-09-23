@@ -1,4 +1,4 @@
--- 固定資料:食物分類、運動分類與其翻譯
+-- Fixed data: food categories, exercise categories and their translations
 -- depends: 0001_init
 
 INSERT INTO food_categories (id, name_key, swap_by, sort_order) VALUES

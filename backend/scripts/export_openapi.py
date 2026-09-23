@@ -1,4 +1,4 @@
-"""把 OpenAPI 規格寫進 mobile/,前端據此產生 TypeScript 型別。"""
+"""Write the OpenAPI spec into mobile/, where the frontend generates its types from it."""
 
 import json
 import pathlib

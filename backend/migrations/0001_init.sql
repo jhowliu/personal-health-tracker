@@ -1,7 +1,7 @@
--- 每日減脂計畫:初始結構(23 張表)
+-- Daily fat-loss plan: initial schema (23 tables)
 -- depends:
 
--- ========= 共用 =========
+-- ========= shared =========
 CREATE TABLE translations (
   key    TEXT NOT NULL,
   locale TEXT NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE translations (
   PRIMARY KEY (key, locale)
 ) WITHOUT ROWID;
 
--- ========= 帳號與追蹤 =========
+-- ========= accounts and tracking =========
 CREATE TABLE users (
   id            TEXT PRIMARY KEY,
   email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -90,7 +90,7 @@ CREATE TABLE meal_photos (
 
 CREATE INDEX idx_meal_photos_user ON meal_photos(user_id, created_at);
 
--- ========= 食物與餐點 =========
+-- ========= foods and meals =========
 CREATE TABLE food_categories (
   id         TEXT PRIMARY KEY,
   name_key   TEXT NOT NULL,
@@ -163,7 +163,7 @@ CREATE TABLE meal_items (
 
 CREATE INDEX idx_meal_items_meal ON meal_items(meal_id, sort_order);
 
--- ========= 訓練 =========
+-- ========= training =========
 CREATE TABLE exercise_categories (
   id         TEXT PRIMARY KEY,
   name_key   TEXT NOT NULL,
@@ -219,7 +219,7 @@ CREATE TABLE workout_schedule (
   PRIMARY KEY (user_id, weekday, location)
 ) WITHOUT ROWID;
 
--- ========= 每日紀錄 =========
+-- ========= daily records =========
 CREATE TABLE days (
   user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   date            TEXT NOT NULL,

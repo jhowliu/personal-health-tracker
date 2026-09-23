@@ -30,10 +30,11 @@ async def db_dep() -> AsyncIterator[aiosqlite.Connection]:
 
 
 async def verify_schema() -> None:
-    """啟動時就確認 migration 跑過了。
+    """Fail at startup when the migrations have not been applied.
 
-    aiosqlite 連不存在的檔案會安靜地建一個空的,不擋在這裡的話,
-    第一個錯誤會是排程工作一分鐘後丟出來的 "no such table",看不出真正的原因。
+    aiosqlite quietly creates an empty file when the database is missing. Without this
+    guard the first symptom is a "no such table" thrown by a background job a minute
+    later, which says nothing about the real cause.
     """
     async with get_conn() as conn:
         async with conn.execute(

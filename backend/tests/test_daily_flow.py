@@ -67,7 +67,7 @@ def test_advances_past_completed_steps():
 
 
 def test_going_back_to_fix_a_skipped_step():
-    """晚餐先標記吃完,但還沒量體重 — 目前步驟回到量身形。"""
+    """Dinner marked eaten before the weigh-in — the current step falls back to body."""
     flow = resolve_flow(
         facts(
             slots=(

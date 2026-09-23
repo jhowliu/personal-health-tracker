@@ -1,5 +1,5 @@
 class DomainError(Exception):
-    """所有領域錯誤的基底。API 層據此對應 HTTP 狀態碼。"""
+    """Base for every domain error. The API layer maps these to HTTP status codes."""
 
 
 class NotFound(DomainError):

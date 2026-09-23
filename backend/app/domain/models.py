@@ -41,6 +41,27 @@ class FlowStep(StrEnum):
     DONE = "done"
 
 
+class SwapBasis(StrEnum):
+    """Which nutrient is held constant when swapping one food for another."""
+
+    CARB = "carb"
+    PROTEIN = "protein"
+    KCAL = "kcal"
+    NONE = "none"
+
+
+class MealTag(StrEnum):
+    REGULAR = "regular"
+    LIGHT = "light"
+    OCCASIONAL = "occasional"
+
+
+class FoodState(StrEnum):
+    RAW = "raw"
+    COOKED = "cooked"
+    NA = "na"
+
+
 @dataclass(frozen=True, slots=True)
 class Account:
     id: str
@@ -117,7 +138,7 @@ class MealSlot:
 
 @dataclass(frozen=True, slots=True)
 class DayFacts:
-    """推算今日流程所需的全部事實,由 application 層從 store 組出來。"""
+    """Everything needed to derive today's flow, assembled by the application layer."""
 
     date: date
     body_logged: bool
@@ -172,3 +193,143 @@ class ScheduleEntry:
     weekday: int
     location: Location
     template_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class Nutrients:
+    kcal: float
+    protein_g: float
+    fat_g: float
+    carb_g: float
+
+    def __add__(self, other: "Nutrients") -> "Nutrients":
+        return Nutrients(
+            kcal=self.kcal + other.kcal,
+            protein_g=self.protein_g + other.protein_g,
+            fat_g=self.fat_g + other.fat_g,
+            carb_g=self.carb_g + other.carb_g,
+        )
+
+    def rounded(self, places: int = 1) -> "Nutrients":
+        return Nutrients(
+            kcal=round(self.kcal, places),
+            protein_g=round(self.protein_g, places),
+            fat_g=round(self.fat_g, places),
+            carb_g=round(self.carb_g, places),
+        )
+
+
+ZERO_NUTRIENTS = Nutrients(0.0, 0.0, 0.0, 0.0)
+
+
+@dataclass(frozen=True, slots=True)
+class FoodCategory:
+    id: str
+    name: str
+    swap_by: SwapBasis
+    sort_order: int
+
+
+@dataclass(frozen=True, slots=True)
+class Food:
+    id: str
+    category_id: str
+    name: str
+    state: FoodState
+    per_100g: Nutrients
+    fiber_per_100g: float | None
+    unit: str
+    grams_per_unit: float | None
+    usual_grams: float
+    max_grams: float
+    aliases: tuple[str, ...] = ()
+    is_builtin: bool = True
+
+    def nutrients_for(self, grams: float) -> Nutrients:
+        factor = grams / 100.0
+        return Nutrients(
+            kcal=self.per_100g.kcal * factor,
+            protein_g=self.per_100g.protein_g * factor,
+            fat_g=self.per_100g.fat_g * factor,
+            carb_g=self.per_100g.carb_g * factor,
+        )
+
+    def amount_of(self, basis: SwapBasis) -> float:
+        """How much of the swap nutrient sits in 100 g of this food."""
+        return {
+            SwapBasis.CARB: self.per_100g.carb_g,
+            SwapBasis.PROTEIN: self.per_100g.protein_g,
+            SwapBasis.KCAL: self.per_100g.kcal,
+            SwapBasis.NONE: 0.0,
+        }[basis]
+
+
+@dataclass(frozen=True, slots=True)
+class MealItem:
+    """One food in a meal, at its baseline grams (before any carb_scale)."""
+
+    id: str
+    food: Food
+    grams: float
+    sort_order: int
+
+    @property
+    def category_id(self) -> str:
+        return self.food.category_id
+
+    @property
+    def nutrients(self) -> Nutrients:
+        return self.food.nutrients_for(self.grams)
+
+
+@dataclass(frozen=True, slots=True)
+class Meal:
+    id: str
+    name: str
+    tag: MealTag
+    meal_times: frozenset[MealTime]
+    items: tuple[MealItem, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedMeal:
+    """What is actually on the plate for one slot today.
+
+    A snapshot, not a pointer: grams already have carb_scale and any swaps baked in, so
+    editing the meal template later never rewrites history.
+    """
+
+    meal_time: MealTime
+    meal_id: str | None
+    name: str
+    eaten_at: datetime | None
+    items: tuple[MealItem, ...]
+
+    @property
+    def eaten(self) -> bool:
+        return self.eaten_at is not None
+
+
+@dataclass(frozen=True, slots=True)
+class DayPlan:
+    date: date
+    meals: tuple[PlannedMeal, ...]
+
+    def slot(self, meal_time: MealTime) -> PlannedMeal | None:
+        return next((m for m in self.meals if m.meal_time is meal_time), None)
+
+
+@dataclass(frozen=True, slots=True)
+class Exchange:
+    """One candidate when swapping a food for another in the same category."""
+
+    food: Food
+    grams: float
+    nutrients: Nutrients
+    delta: Nutrients
+    capped: bool
+
+    @property
+    def basis_matched(self) -> bool:
+        """False when max_grams stopped us short of an equal swap."""
+        return not self.capped

@@ -1,4 +1,4 @@
-/** 編輯課表的「組數」用:− N +。 */
+/** The set-count control on the template editor: - N +. */
 import { Pressable, Text, View } from 'react-native';
 
 export function NumberStepper({

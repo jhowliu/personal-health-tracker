@@ -1,7 +1,8 @@
-"""確認 commit 進去的 openapi.json 跟目前的路由一致。
+"""Check that the committed openapi.json still matches the current routes.
 
-後端改了欄位卻忘了重新產生型別時,前端的 tsc 會安靜地通過 —— 因為它看的是
-舊的 openapi.json。這支腳本就是要讓那件事在 CI 上爆掉,而不是在 App 畫面上。
+When the backend changes a field but nobody regenerates the types, the frontend's tsc
+passes in silence — it is reading the stale openapi.json. This script makes that fail in
+CI instead of on the App screen.
 """
 
 import difflib

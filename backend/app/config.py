@@ -10,7 +10,11 @@ class Settings(BaseSettings):
     jwt_access_ttl_min: int = 30
     jwt_refresh_ttl_days: int = 30
 
-    cors_origins: str = "http://localhost:19006,http://localhost:8081"
+    # Expo dev servers land on whichever of these is free, so allow the usual spread.
+    cors_origins: str = (
+        "http://localhost:19006,http://localhost:8081,"
+        "http://localhost:8082,http://localhost:8083"
+    )
 
     s3_endpoint: str = "http://minio:9000"
     s3_region: str = "us-east-1"

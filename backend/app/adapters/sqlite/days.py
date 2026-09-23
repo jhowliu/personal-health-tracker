@@ -2,17 +2,27 @@ from datetime import date, datetime, timedelta
 
 import aiosqlite
 
+from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.rows import from_day, from_iso, to_day, to_iso
 from app.domain.ids import new_id
-from app.domain.models import DayFacts, MealSlot, MealTime, Profile, WorkoutTime
+from app.domain.models import (
+    DayFacts,
+    MealItem,
+    MealSlot,
+    MealTime,
+    PlannedMeal,
+    Profile,
+    WorkoutTime,
+)
 
 PLANNED_MEALS = ("breakfast", "lunch", "dinner")
 STREAK_SCAN_DAYS = 400
 
 
 class SqliteDayStore:
-    def __init__(self, conn: aiosqlite.Connection) -> None:
+    def __init__(self, conn: aiosqlite.Connection, locale: str = "zh-TW") -> None:
         self._conn = conn
+        self._foods = SqliteFoodStore(conn, locale)
 
     async def load_facts(self, user_id: str, day: date, profile: Profile) -> DayFacts:
         await self._ensure_day(user_id, day, profile)
@@ -132,7 +142,9 @@ class SqliteDayStore:
         )
 
     async def streak_until(self, user_id: str, day: date) -> int:
-        """連續天數:從 day 往回數,每天都量了身形且三餐都標記吃完才算完成。"""
+        """Streak: count back from `day`. A day counts only when the body was logged
+        and all three meals were marked eaten.
+        """
         async with self._conn.execute(
             f"""
             SELECT d.date FROM days d
@@ -158,13 +170,130 @@ class SqliteDayStore:
             expected -= timedelta(days=1)
         return streak
 
+    async def load_plan(self, user_id: str, day: date) -> tuple[PlannedMeal, ...]:
+        async with self._conn.execute(
+            f"""
+            SELECT dm.meal_time, dm.meal_id, dm.eaten_at,
+                   COALESCE(m.name, '') AS meal_name
+            FROM day_meals dm
+            LEFT JOIN meals m ON m.id = dm.meal_id
+            WHERE dm.user_id = ? AND dm.date = ? AND dm.meal_time IN {PLANNED_MEALS}
+            ORDER BY dm.meal_time
+            """,
+            (user_id, to_day(day)),
+        ) as cursor:
+            slot_rows = await cursor.fetchall()
+
+        planned = []
+        for row in slot_rows:
+            items = await self._plan_items(user_id, day, row["meal_time"])
+            if not items and row["meal_id"] is None:
+                continue
+            planned.append(
+                PlannedMeal(
+                    meal_time=MealTime(row["meal_time"]),
+                    meal_id=row["meal_id"],
+                    name=row["meal_name"],
+                    eaten_at=from_iso(row["eaten_at"]),
+                    items=items,
+                )
+            )
+        return tuple(planned)
+
+    async def save_plan(
+        self,
+        user_id: str,
+        day: date,
+        meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
+        profile: Profile,
+    ) -> None:
+        # day_meals references days(user_id, date); planning may be the first thing
+        # that touches this date.
+        await self._ensure_day(user_id, day, profile)
+
+        for meal_time, (meal_id, _name, items) in meals.items():
+            async with self._conn.execute(
+                "SELECT eaten_at FROM day_meals"
+                " WHERE user_id = ? AND date = ? AND meal_time = ?",
+                (user_id, to_day(day), meal_time.value),
+            ) as cursor:
+                existing = await cursor.fetchone()
+
+            # What someone already ate is a fact; a reshuffle does not get to rewrite it.
+            if existing and existing["eaten_at"] is not None:
+                continue
+
+            await self._conn.execute(
+                "INSERT INTO day_meals (user_id, date, meal_time, meal_id)"
+                " VALUES (?, ?, ?, ?)"
+                " ON CONFLICT (user_id, date, meal_time) DO UPDATE SET meal_id = excluded.meal_id",
+                (user_id, to_day(day), meal_time.value, meal_id),
+            )
+            await self._conn.execute(
+                "DELETE FROM day_meal_items"
+                " WHERE user_id = ? AND date = ? AND meal_time = ?",
+                (user_id, to_day(day), meal_time.value),
+            )
+            await self._conn.executemany(
+                "INSERT INTO day_meal_items"
+                " (id, user_id, date, meal_time, food_id, grams, sort_order)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (item.id, user_id, to_day(day), meal_time.value, item.food.id,
+                     item.grams, index)
+                    for index, item in enumerate(items)
+                ],
+            )
+
+    async def replace_plan_item(
+        self,
+        user_id: str,
+        day: date,
+        meal_time: MealTime,
+        item_id: str,
+        food_id: str,
+        grams: float,
+    ) -> None:
+        await self._conn.execute(
+            "UPDATE day_meal_items SET food_id = ?, grams = ?"
+            " WHERE id = ? AND user_id = ? AND date = ? AND meal_time = ?",
+            (food_id, grams, item_id, user_id, to_day(day), meal_time.value),
+        )
+
+    async def _plan_items(
+        self, user_id: str, day: date, meal_time: str
+    ) -> tuple[MealItem, ...]:
+        async with self._conn.execute(
+            "SELECT id, food_id, grams, sort_order FROM day_meal_items"
+            " WHERE user_id = ? AND date = ? AND meal_time = ? AND food_id IS NOT NULL"
+            " ORDER BY sort_order",
+            (user_id, to_day(day), meal_time),
+        ) as cursor:
+            rows = await cursor.fetchall()
+
+        items = []
+        for row in rows:
+            food = await self._foods.load(user_id, row["food_id"])
+            if food is None:
+                continue
+            items.append(
+                MealItem(
+                    id=row["id"],
+                    food=food,
+                    grams=row["grams"],
+                    sort_order=row["sort_order"],
+                )
+            )
+        return tuple(items)
+
     async def _ensure_day(self, user_id: str, day: date, profile: Profile) -> None:
         await self._conn.execute(
             "INSERT INTO days (user_id, date, workout_time, location)"
             " VALUES (?, ?, ?, ?) ON CONFLICT (user_id, date) DO NOTHING",
             (user_id, to_day(day), profile.workout_time.value, profile.default_location.value),
         )
-        # 排程可能是開了今天之後才設的,或使用者改了地點,所以每次讀都補一次。
+        # The schedule may have been set after the day was opened, or the user may have
+        # changed location, so backfill the template on every read.
         await self._conn.execute(
             """
             UPDATE days SET template_id = (

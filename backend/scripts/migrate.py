@@ -1,4 +1,4 @@
-"""套用 migrations/ 下的 .sql 檔。部署時由 Dockerfile CMD 呼叫。"""
+"""Apply the .sql files under migrations/. Called by the Dockerfile CMD on deploy."""
 
 import pathlib
 import sys

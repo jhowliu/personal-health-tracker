@@ -1,4 +1,7 @@
-"""每日熱量與三大營養素目標。規格書「營養與計算規則」的唯一實作處。"""
+"""Daily calorie and macro targets.
+
+The single implementation of the spec's "nutrition and calculation rules" section.
+"""
 
 from datetime import date
 
@@ -21,9 +24,10 @@ MALE_KCAL_FLOOR = 1500
 
 
 def compute_targets(profile: Profile, today: date) -> Targets:
-    """由個人資料算出當日目標。純函式:同樣輸入永遠同樣輸出。
+    """Compute the day's targets from a profile. Pure: same input, same output, always.
 
-    carb_scale = 目前碳水目標 ÷ 餐點基準碳水;auto_scale_carbs 關閉時固定 1.0。
+    carb_scale = current carb target / the meal baseline carb target. Pinned to 1.0 when
+    auto_scale_carbs is off.
     """
     sex_offset = -161 if profile.sex is Sex.FEMALE else 5
     bmr = round(

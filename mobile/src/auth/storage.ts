@@ -1,8 +1,9 @@
 /**
- * Token 放哪裡。iOS／Android 用 Keychain／Keystore(expo-secure-store)。
+ * Where tokens live. On iOS/Android that is the Keychain/Keystore via expo-secure-store.
  *
- * Web 只是開發時用瀏覽器快速看畫面的路徑,不是上架目標,所以退回 localStorage;
- * 真正的使用者資料永遠走原生的安全儲存。
+ * Web exists only so the screens can be checked quickly in a browser during development.
+ * It is not a shipping target, so it falls back to localStorage; real user data always
+ * goes through native secure storage.
  */
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
