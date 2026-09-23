@@ -1,16 +1,17 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { formatGrams, groupByCategory } from '@/components/MealCard';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Today = Schema<'TodayOut'>;
+type DayPlan = Schema<'DayPlanOut'>;
 
 const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-const MEAL_STEPS = ['breakfast', 'lunch', 'dinner'] as const;
 
 function todayISO() {
   const now = new Date();
@@ -77,8 +78,10 @@ export default function TodayScreen() {
           <WeighInStep date={day.date} onSaved={load} />
         ) : step === 'done' ? (
           <DoneStep day={day} />
+        ) : step === 'workout' ? (
+          <WorkoutStep day={day} onDone={load} />
         ) : (
-          <PlaceholderStep step={step} day={day} onDone={load} />
+          <MealStep step={step} day={day} onDone={load} />
         )}
       </View>
     </Screen>
@@ -135,23 +138,132 @@ function WeighInStep({ date, onSaved }: { date: string; onSaved: () => void }) {
   );
 }
 
-function PlaceholderStep({
-  step,
-  day,
-  onDone,
-}: {
-  step: string;
-  day: Today;
-  onDone: () => void;
-}) {
+function MealStep({ step, day, onDone }: { step: string; day: Today; onDone: () => void }) {
+  const [plan, setPlan] = useState<DayPlan | null>(null);
   const [busy, setBusy] = useState(false);
-  const isMeal = (MEAL_STEPS as readonly string[]).includes(step);
+
+  const load = useCallback(async () => {
+    try {
+      setPlan(await api.get(`/days/${day.date}/plan`));
+    } catch (error) {
+      Alert.alert('讀不到今天的餐點', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  }, [day.date]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const meal = plan?.meals.find((m) => m.meal_time === step);
+
+  const act = async (run: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await run();
+      await load();
+    } catch (error) {
+      Alert.alert('沒有成功', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const markEaten = async () => {
+    await act(() => api.patch(`/days/${day.date}/meals/${step}`));
+    onDone();
+  };
+
+  if (!plan) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator color={color.primary} />
+      </View>
+    );
+  }
+
+  if (!meal) {
+    return (
+      <View className="flex-1 gap-4">
+        <Title sub="還沒有適合這個時段的餐點">{STEP_LABEL[step]}</Title>
+        <Card className="gap-2">
+          <Text className="text-base text-ink">
+            到「餐點」分頁新增一道標記為{STEP_LABEL[step]}的餐點,之後每天就會自動排進來。
+          </Text>
+        </Card>
+        <View className="flex-1" />
+        <PrimaryButton onPress={markEaten} disabled={busy}>
+          {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
+        </PrimaryButton>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 gap-4">
+      <View className="gap-1">
+        <Hint>今天的{STEP_LABEL[step]}</Hint>
+        <Title>{meal.name}</Title>
+      </View>
+
+      <Card className="gap-3">
+        {groupByCategory(meal.items).map((group) => (
+          <View key={group.category} className="gap-1">
+            <Text className="text-sm text-muted">{group.label}</Text>
+            {group.items.map((item) => (
+              <View key={item.id} className="flex-row items-center justify-between gap-2">
+                <Text className="flex-1 text-base text-ink">{formatGrams(item)}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`換掉${item.food.name}`}
+                  onPress={() =>
+                    router.push(
+                      `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${item.food.id}&grams=${item.grams}`,
+                    )
+                  }
+                  className="min-h-[44px] justify-center rounded-field bg-fill px-3"
+                >
+                  <Text className="text-base text-ink">換</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ))}
+
+        <View className="flex-row items-baseline justify-between border-t border-line pt-3">
+          <Text className="text-base font-semibold text-ink">整份</Text>
+          <Text className="text-base font-semibold text-ink">
+            {Math.round(meal.nutrients.kcal)} 大卡
+          </Text>
+        </View>
+      </Card>
+
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={() => act(() => api.post(`/days/${day.date}/plan/shuffle`, { meal_time: step }))}
+        className="min-h-[44px] items-center justify-center"
+      >
+        <Text className="text-base text-primary underline">整道換掉</Text>
+      </Pressable>
+
+      <View className="flex-1" />
+
+      <PrimaryButton onPress={markEaten} disabled={busy}>
+        {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
+      </PrimaryButton>
+    </View>
+  );
+}
+
+function WorkoutStep({ day, onDone }: { day: Today; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
 
   const complete = async () => {
     setBusy(true);
     try {
-      if (isMeal) await api.patch(`/days/${day.date}/meals/${step}`);
-      else await api.patch(`/days/${day.date}`, { workout_done: true });
+      await api.patch(`/days/${day.date}`, { workout_done: true });
       onDone();
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
@@ -162,22 +274,13 @@ function PlaceholderStep({
 
   return (
     <View className="flex-1 gap-4">
-      <Title sub={isMeal ? '第二階段會在這裡挑出今天的餐點' : '第一階段先記錄有沒有做完'}>
-        {STEP_LABEL[step]}
-      </Title>
-
+      <Title sub="課表逐組打勾會接在這裡">運動</Title>
       <Card className="gap-2">
-        <Text className="text-base text-ink">
-          {isMeal
-            ? '餐點自動分配與逐項替換屬於第二階段,目前先標記吃完讓流程往下走。'
-            : '課表逐組打勾會接在這裡,目前先標記運動完成。'}
-        </Text>
+        <Text className="text-base text-ink">目前先標記做完,讓流程往下走。</Text>
       </Card>
-
       <View className="flex-1" />
-
       <PrimaryButton onPress={complete} disabled={busy}>
-        {busy ? '處理中…' : isMeal ? `標記${STEP_LABEL[step]}吃完` : '標記運動完成'}
+        {busy ? '處理中…' : '標記運動完成'}
       </PrimaryButton>
     </View>
   );

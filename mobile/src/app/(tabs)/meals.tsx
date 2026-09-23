@@ -1,17 +1,50 @@
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
 
-import { Card, Chip, Empty, Screen, Segmented, Title } from '@/components/ui';
+import { ApiError, api, type Schema } from '@/api/client';
+import { useSession } from '@/auth/session';
+import { MealCard } from '@/components/MealCard';
+import { Card, Chip, Empty, Hint, Screen, Segmented, Title } from '@/components/ui';
+import { color } from '@/theme/tokens';
+
+type Meal = Schema<'MealOut'>;
+type Food = Schema<'FoodOut'>;
+type Category = Schema<'FoodCategoryOut'>;
 
 type Tab = 'mine' | 'library';
 
+const SLOT_FILTERS = [
+  { id: 'all', label: '全部' },
+  { id: 'breakfast', label: '早餐' },
+  { id: 'lunch', label: '午餐' },
+  { id: 'dinner', label: '晚餐' },
+];
+
+const SWAP_HINT: Record<string, string> = {
+  carb: '換成同分類食物時,會依「碳水」換算等量克數。',
+  protein: '換成同分類食物時,會依「蛋白質」換算等量克數。',
+  kcal: '換成同分類食物時,會依「熱量」換算等量克數。',
+  none: '這個分類不做等量換算。',
+};
+
 export default function MealsScreen() {
   const [tab, setTab] = useState<Tab>('mine');
-  const [category, setCategory] = useState('all');
 
   return (
     <Screen>
-      <Title>餐點</Title>
+      <View className="flex-row items-center justify-between">
+        <Title>餐點</Title>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(tab === 'mine' ? '/meals/new' : '/meals/add-food')}
+          className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+        >
+          <Text className="text-base font-semibold text-white">
+            {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
+          </Text>
+        </Pressable>
+      </View>
 
       <Segmented
         value={tab}
@@ -23,41 +56,202 @@ export default function MealsScreen() {
         ]}
       />
 
+      {tab === 'mine' ? <MyMeals /> : <FoodLibrary />}
+    </Screen>
+  );
+}
+
+function MyMeals() {
+  const { profile, reload } = useSession();
+  const [meals, setMeals] = useState<Meal[] | null>(null);
+  const [slot, setSlot] = useState('all');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const query = slot === 'all' ? '' : `?meal_time=${slot}`;
+      setMeals(await api.get(`/meals${query}`));
+    } catch (error) {
+      Alert.alert('讀不到餐點', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  }, [slot]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const toggleAutoAssign = async (next: boolean) => {
+    setBusy(true);
+    try {
+      await api.patch('/users/me/profile', { auto_assign_meals: next });
+      await reload();
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
       <View className="flex-row flex-wrap gap-2">
-        {(tab === 'mine'
-          ? [
-              { id: 'all', label: '全部' },
-              { id: 'breakfast', label: '早餐' },
-              { id: 'lunch', label: '午餐' },
-              { id: 'dinner', label: '晚餐' },
-            ]
-          : [
-              { id: 'all', label: '全部' },
-              { id: 'staple', label: '主食' },
-              { id: 'protein', label: '蛋白質' },
-              { id: 'vegetable', label: '蔬菜' },
-              { id: 'fruit', label: '水果' },
-              { id: 'fat_sauce', label: '油脂與醬料' },
-            ]
-        ).map((option) => (
+        {SLOT_FILTERS.map((option) => (
           <Chip
             key={option.id}
             label={option.label}
-            selected={category === option.id}
-            onPress={() => setCategory(option.id)}
+            selected={slot === option.id}
+            onPress={() => setSlot(option.id)}
           />
         ))}
       </View>
 
-      <Card className="gap-2">
-        <Text className="text-base font-semibold text-ink">第二階段開發</Text>
-        <Text className="text-base text-muted">
-          食物庫、自建餐點、等量替換與每日自動分配屬於 P2。畫面骨架、分類與共用的 FoodOptionRow
-          已經備好,接上 /foods 與 /meals 就能填內容。
-        </Text>
+      {profile?.profile.auto_scale_carbs ? <CarbScaleNotice /> : null}
+
+      <Card className="flex-row items-center justify-between">
+        <View className="flex-1 gap-0.5 pr-4">
+          <Text className="text-base font-semibold text-ink">每日自動分配</Text>
+          <Hint>
+            每天從你的餐點裡隨機排早午晚餐。想換其中一樣,在今日流程按「換」就好。
+          </Hint>
+        </View>
+        <Switch
+          value={profile?.profile.auto_assign_meals ?? true}
+          onValueChange={toggleAutoAssign}
+          disabled={busy}
+          trackColor={{ true: color.good, false: color.line }}
+        />
       </Card>
 
-      <Empty>{tab === 'mine' ? '還沒有自己的餐點' : '食物庫還沒有匯入資料'}</Empty>
-    </Screen>
+      {meals === null ? (
+        <ActivityIndicator color={color.primary} />
+      ) : meals.length === 0 ? (
+        <Empty>還沒有自己的餐點,按右上角新增一道</Empty>
+      ) : (
+        <Card className="py-0">
+          {meals.map((meal) => (
+            <MealCard
+              key={meal.id}
+              meal={meal}
+              onPress={() => router.push(`/meals/${meal.id}`)}
+            />
+          ))}
+        </Card>
+      )}
+    </>
   );
+}
+
+function CarbScaleNotice() {
+  const { profile } = useSession();
+  const scale = profile?.targets.carb_scale ?? 1;
+  if (Math.abs(scale - 1) < 0.02) return null;
+
+  const direction = scale < 1 ? '減少' : '增加';
+  const percent = Math.round(Math.abs(1 - scale) * 100);
+
+  return (
+    <Card className="gap-2 border-warm bg-warm-soft">
+      <Text className="text-base font-semibold text-ink">
+        熱量目標更新為 {profile?.targets.kcal.toLocaleString()} 大卡
+      </Text>
+      <Text className="text-base text-ink">
+        所有餐點的主食份量已自動{direction}約 {percent}%,蛋白質和蔬菜不變。
+      </Text>
+      <Hint>編輯餐點時看到的仍是基準克數。</Hint>
+    </Card>
+  );
+}
+
+function FoodLibrary() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [foods, setFoods] = useState<Food[] | null>(null);
+  const [category, setCategory] = useState('all');
+
+  const load = useCallback(async () => {
+    try {
+      const query = category === 'all' ? '' : `?category=${category}`;
+      const [list, cats] = await Promise.all([
+        api.get(`/foods${query}`),
+        api.get('/food-categories'),
+      ]);
+      setFoods(list);
+      setCategories(cats);
+    } catch (error) {
+      Alert.alert('讀不到食物庫', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  }, [category]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
+
+  const selected = categories.find((c) => c.id === category);
+
+  return (
+    <>
+      <View className="flex-row flex-wrap gap-2">
+        <Chip label="全部" selected={category === 'all'} onPress={() => setCategory('all')} />
+        {categories.map((c) => (
+          <Chip
+            key={c.id}
+            label={c.name}
+            selected={category === c.id}
+            onPress={() => setCategory(c.id)}
+          />
+        ))}
+      </View>
+
+      {selected ? <Hint>{SWAP_HINT[selected.swap_by]}</Hint> : null}
+
+      {foods === null ? (
+        <ActivityIndicator color={color.primary} />
+      ) : foods.length === 0 ? (
+        <Empty>這個分類還沒有食物</Empty>
+      ) : (
+        <Card className="py-0">
+          {foods.map((food) => (
+            <View
+              key={food.id}
+              className="flex-row items-start justify-between gap-3 border-b border-line py-3 last:border-b-0"
+            >
+              <View className="flex-1 gap-0.5">
+                <Text className="text-base font-semibold text-ink">{food.name}</Text>
+                <Text className="text-sm text-muted">{describe(food)}</Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-xs text-muted">常用</Text>
+                <Text className="text-sm text-ink">{usualPortion(food)}</Text>
+              </View>
+            </View>
+          ))}
+        </Card>
+      )}
+    </>
+  );
+}
+
+function describe(food: Food): string {
+  const per = food.grams_per_unit && food.unit === 'piece' ? `每顆 ${food.grams_per_unit} g` : '每 100 g';
+  const { kcal, protein_g, fat_g, carb_g } = food.per_100g;
+  const factor = food.grams_per_unit && food.unit === 'piece' ? food.grams_per_unit / 100 : 1;
+  const round = (n: number) => Math.round(n * factor);
+  return `${per} ${round(kcal)} 大卡,蛋白質 ${round(protein_g)}、脂肪 ${round(fat_g)}、碳水 ${round(carb_g)} g`;
+}
+
+function usualPortion(food: Food): string {
+  if (food.grams_per_unit && food.unit === 'piece') {
+    return `${Math.round(food.usual_grams / food.grams_per_unit)} 顆`;
+  }
+  if (food.grams_per_unit && food.unit === 'scoop') {
+    const scoops = food.usual_grams / food.grams_per_unit;
+    return scoops % 1 === 0 ? `${scoops} 匙` : `${scoops.toFixed(1)} 匙`;
+  }
+  if (food.unit === 'ml' && food.grams_per_unit) {
+    return `${Math.round(food.usual_grams / food.grams_per_unit)} ml`;
+  }
+  return `${Math.round(food.usual_grams)} g`;
 }

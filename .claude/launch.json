@@ -4,11 +4,11 @@
     {
       "name": "mobile-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "web", "--", "--port", "8081"],
+      "runtimeArgs": ["run", "web", "--", "--port", "8082"],
       "cwd": "mobile",
-      "port": 8081,
+      "port": 8082,
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://localhost:8010"
+        "EXPO_PUBLIC_API_URL": "http://localhost:8020"
       }
     }
   ]
