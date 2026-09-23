@@ -1,0 +1,53 @@
+[project]
+name = "pht-api"
+version = "0.1.0"
+description = "每日減脂計畫 API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "aiosqlite>=0.20",
+    "pydantic[email]>=2.9",
+    "pydantic-settings>=2.6",
+    "pyjwt>=2.9",
+    "argon2-cffi>=23.1",
+    "httpx>=0.27",
+    "cryptography>=43.0",
+    "apscheduler>=3.10",
+    "boto3>=1.35",
+    "yoyo-migrations>=8.2",
+    "python-multipart>=0.0.12",
+    "uuid7>=0.1",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.7",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+# conftest 會 import scripts.migrate。`python -m pytest` 會自動把當前目錄放進
+# sys.path,但 `pytest` 這個 console script 不會 —— 明寫出來,兩種都能跑。
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+# N818 要求例外類別以 Error 結尾。domain 的例外讀起來是 `raise NotFound("找不到這個課表")`,
+# 加上後綴反而囉嗦,而且基底類別 DomainError 已經帶了後綴。
+ignore = ["N818"]

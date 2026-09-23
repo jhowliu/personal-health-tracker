@@ -1,0 +1,35 @@
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    db_path: str = "/data/pht.sqlite"
+
+    jwt_secret: str = "dev-secret-change-me"
+    jwt_access_ttl_min: int = 30
+    jwt_refresh_ttl_days: int = 30
+
+    cors_origins: str = "http://localhost:19006,http://localhost:8081"
+
+    s3_endpoint: str = "http://minio:9000"
+    s3_region: str = "us-east-1"
+    s3_bucket: str = "meal-photos"
+    s3_access_key: str = "minioadmin"
+    s3_secret_key: str = "minioadmin"
+
+    google_client_id_ios: str = ""
+    google_client_id_android: str = ""
+    google_client_id_web: str = ""
+    apple_client_id: str = ""
+    apple_team_id: str = ""
+    apple_key_id: str = ""
+
+    expo_access_token: str = ""
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+
+settings = Settings()

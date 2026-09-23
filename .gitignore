@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# 資料庫與備份
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+dev.sqlite*
+
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.tsbuildinfo
+
+# 環境變數與金鑰
+.env
+.env.local
+*.pem
+*.p8
+
+# 作業系統
+.DS_Store

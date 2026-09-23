@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web", "--", "--port", "8081"],
+      "cwd": "mobile",
+      "port": 8081,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8010"
+      }
+    }
+  ]
+}
