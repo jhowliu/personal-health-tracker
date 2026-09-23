@@ -112,7 +112,12 @@ export function SectionHeading({ children, action }: { children: React.ReactNode
 
 export function Card({ className = '', ...props }: ViewProps & { className?: string }) {
   return (
-    <View className={`rounded-card border border-line bg-surface p-4 ${className}`} {...props} />
+    <View
+      // overflow-hidden clips children to the radius. Without it a child that paints its
+      // own background (FoodOptionRow) covers the corners and the card renders square.
+      className={`overflow-hidden rounded-card border border-line bg-surface p-4 ${className}`}
+      {...props}
+    />
   );
 }
 
