@@ -27,10 +27,12 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
     completed: set[FlowStep] = set()
     if facts.body_logged:
         completed.add(FlowStep.BODY)
-    if facts.workout_done_at is not None:
+    if facts.workout_done_at is not None or facts.workout_skipped_at is not None:
         completed.add(FlowStep.WORKOUT)
     for slot in facts.slots:
-        if slot.eaten_at is not None and slot.meal_time in _MEAL_STEP:
+        if (
+            slot.eaten_at is not None or slot.skipped_at is not None
+        ) and slot.meal_time in _MEAL_STEP:
             completed.add(_MEAL_STEP[slot.meal_time])
 
     current = next((s for s in steps if s not in completed), FlowStep.DONE)

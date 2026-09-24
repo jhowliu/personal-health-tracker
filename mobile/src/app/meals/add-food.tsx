@@ -12,7 +12,13 @@ type Food = Schema<'FoodOut'>;
 type Category = Schema<'FoodCategoryOut'>;
 
 export default function AddFood() {
-  const { category } = useLocalSearchParams<{ category?: string }>();
+  const { category, meal_id, destination = 'meal', date, slot } = useLocalSearchParams<{
+    category?: string;
+    meal_id?: string;
+    destination?: 'meal' | 'day';
+    date?: string;
+    slot?: string;
+  }>();
 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState(category ?? 'all');
@@ -20,6 +26,7 @@ export default function AddFood() {
   const [foods, setFoods] = useState<Food[] | null>(null);
   const [picked, setPicked] = useState<Food | null>(null);
   const [grams, setGrams] = useState('');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.get('/food-categories').then(setCategories).catch(() => setCategories([]));
@@ -47,10 +54,23 @@ export default function AddFood() {
     setGrams(String(Math.round(food.usual_grams)));
   };
 
-  const add = () => {
+  const add = async () => {
     if (!picked) return;
-    draft.addItem(picked, Number(grams) || picked.usual_grams);
-    router.back();
+    const portion = Number(grams) || picked.usual_grams;
+    setBusy(true);
+    try {
+      if (destination === 'day') {
+        if (!date || !slot) throw new Error('找不到要加入的日期或餐次。');
+        await api.post(`/days/${date}/plan/${slot}/items`, { food_id: picked.id, grams: portion });
+      } else {
+        draft.addItem(picked, portion);
+      }
+      router.back();
+    } catch (error) {
+      Alert.alert('加入失敗', error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const label = categories.find((c) => c.id === filter)?.name;
@@ -59,12 +79,22 @@ export default function AddFood() {
   return (
     <Screen>
       <Pressable accessibilityRole="button" onPress={() => router.back()}>
-        <Text className="text-base text-primary">‹ 編輯餐點</Text>
+        <Text className="text-base text-primary">‹ {destination === 'day' ? '今日流程' : '編輯餐點'}</Text>
       </Pressable>
 
-      <Title>{label ? `加入${label}` : '加入食物'}</Title>
+       <Title>{label ? `加入${label}` : '加入食物'}</Title>
 
-      <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
+        {destination === 'meal' ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(`/meals/photo?destination=meal&meal_id=${meal_id ?? 'new'}`)}
+            className="min-h-[44px] justify-center"
+          >
+            <Text className="text-base text-primary">⌁ 改用餐點照片辨識</Text>
+          </Pressable>
+        ) : null}
+
+       <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
 
       <View className="flex-row flex-wrap gap-2">
         <Chip label="全部" selected={filter === 'all'} onPress={() => setFilter('all')} />
@@ -114,8 +144,8 @@ export default function AddFood() {
             />
             <Text className="font-display text-3xl font-bold text-ink">{kcal} 大卡</Text>
           </View>
-          <PrimaryButton onPress={add} disabled={!grams}>
-            加入{label ?? '食物'}
+          <PrimaryButton onPress={add} disabled={!grams || busy}>
+            {busy ? '加入中…' : `加入${label ?? '食物'}`}
           </PrimaryButton>
         </Card>
       ) : null}

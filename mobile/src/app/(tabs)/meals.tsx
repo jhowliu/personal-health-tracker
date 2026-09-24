@@ -35,15 +35,27 @@ export default function MealsScreen() {
     <Screen>
       <View className="flex-row items-center justify-between">
         <Title>餐點</Title>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(tab === 'mine' ? '/meals/new' : '/meals/add-food')}
-          className="min-h-[44px] justify-center rounded-field bg-primary px-4"
-        >
-          <Text className="text-base font-semibold text-white">
-            {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
-          </Text>
-        </Pressable>
+        <View className="flex-row items-center gap-2">
+          {tab === 'mine' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="用照片記錄今天吃的食物"
+              onPress={() => router.push('/meals/photo?destination=today')}
+              className="h-11 w-11 items-center justify-center rounded-field bg-fill"
+            >
+              <Text className="text-xl text-primary">⌁</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(tab === 'mine' ? '/meals/new' : '/meals/add-food')}
+            className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+          >
+            <Text className="text-base font-semibold text-white">
+              {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <Segmented

@@ -12,8 +12,7 @@ class Settings(BaseSettings):
 
     # Expo dev servers land on whichever of these is free, so allow the usual spread.
     cors_origins: str = (
-        "http://localhost:19006,http://localhost:8081,"
-        "http://localhost:8082,http://localhost:8083"
+        "http://localhost:19006,http://localhost:8081,http://localhost:8082,http://localhost:8083"
     )
 
     s3_endpoint: str = "http://minio:9000"
@@ -21,6 +20,12 @@ class Settings(BaseSettings):
     s3_bucket: str = "meal-photos"
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
+    # Use this hostname in presigned URLs when MinIO is private to the API network.
+    s3_public_endpoint: str = ""
+
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
+    daily_ai_image_quota: int = 10
 
     google_client_id_ios: str = ""
     google_client_id_android: str = ""

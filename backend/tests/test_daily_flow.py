@@ -12,12 +12,13 @@ def facts(**overrides) -> DayFacts:
         date=TODAY,
         body_logged=False,
         slots=(
-            MealSlot(MealTime.BREAKFAST, None, None, 0),
-            MealSlot(MealTime.LUNCH, None, None, 0),
-            MealSlot(MealTime.DINNER, None, None, 0),
+            MealSlot(MealTime.BREAKFAST, None, None, None, 0),
+            MealSlot(MealTime.LUNCH, None, None, None, 0),
+            MealSlot(MealTime.DINNER, None, None, None, 0),
         ),
         workout_time=WorkoutTime.PM,
         workout_done_at=None,
+        workout_skipped_at=None,
         has_workout_planned=True,
     )
     return DayFacts(**{**defaults, **overrides})
@@ -56,9 +57,9 @@ def test_advances_past_completed_steps():
         facts(
             body_logged=True,
             slots=(
-                MealSlot(MealTime.BREAKFAST, "m1", NOON, 440),
-                MealSlot(MealTime.LUNCH, None, None, 0),
-                MealSlot(MealTime.DINNER, None, None, 0),
+                MealSlot(MealTime.BREAKFAST, "m1", NOON, None, 440),
+                MealSlot(MealTime.LUNCH, None, None, None, 0),
+                MealSlot(MealTime.DINNER, None, None, None, 0),
             ),
         )
     )
@@ -71,9 +72,9 @@ def test_going_back_to_fix_a_skipped_step():
     flow = resolve_flow(
         facts(
             slots=(
-                MealSlot(MealTime.BREAKFAST, None, None, 0),
-                MealSlot(MealTime.LUNCH, None, None, 0),
-                MealSlot(MealTime.DINNER, "m3", NOON, 490),
+                MealSlot(MealTime.BREAKFAST, None, None, None, 0),
+                MealSlot(MealTime.LUNCH, None, None, None, 0),
+                MealSlot(MealTime.DINNER, "m3", NOON, None, 490),
             )
         )
     )
@@ -87,9 +88,9 @@ def test_everything_done():
             body_logged=True,
             workout_done_at=NOON,
             slots=(
-                MealSlot(MealTime.BREAKFAST, "m1", NOON, 440),
-                MealSlot(MealTime.LUNCH, "m2", NOON, 430),
-                MealSlot(MealTime.DINNER, "m3", NOON, 490),
+                MealSlot(MealTime.BREAKFAST, "m1", NOON, None, 440),
+                MealSlot(MealTime.LUNCH, "m2", NOON, None, 430),
+                MealSlot(MealTime.DINNER, "m3", NOON, None, 490),
             ),
         )
     )
@@ -101,12 +102,28 @@ def test_extras_count_toward_kcal_but_are_not_a_step():
     flow = resolve_flow(
         facts(
             slots=(
-                MealSlot(MealTime.BREAKFAST, None, None, 0),
-                MealSlot(MealTime.LUNCH, None, None, 0),
-                MealSlot(MealTime.DINNER, None, None, 0),
-                MealSlot(MealTime.EXTRAS, None, NOON, 120),
+                MealSlot(MealTime.BREAKFAST, None, None, None, 0),
+                MealSlot(MealTime.LUNCH, None, None, None, 0),
+                MealSlot(MealTime.DINNER, None, None, None, 0),
+                MealSlot(MealTime.EXTRAS, None, NOON, None, 120),
             )
         )
     )
     assert flow.eaten_kcal == 120
     assert FlowStep.BODY is flow.current
+
+
+def test_skipped_meals_and_workout_complete_their_flow_steps_without_adding_kcal():
+    flow = resolve_flow(
+        facts(
+            body_logged=True,
+            workout_skipped_at=NOON,
+            slots=(
+                MealSlot(MealTime.BREAKFAST, "m1", None, NOON, 440),
+                MealSlot(MealTime.LUNCH, "m2", NOON, None, 430),
+                MealSlot(MealTime.DINNER, "m3", None, NOON, 490),
+            ),
+        )
+    )
+    assert flow.current is FlowStep.DONE
+    assert flow.eaten_kcal == 430

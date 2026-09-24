@@ -53,5 +53,6 @@ select = ["E", "F", "W", "I", "N", "UP", "B"]
 ignore = ["N818"]
 
 [tool.ruff.lint.per-file-ignores]
-# Seed rows are tabular data. One food per line reads far better than wrapped tuples.
+# Seed rows are tabular data. One catalog entry per line reads far better than wrapped tuples.
 "seeds/foods.py" = ["E501"]
+"seeds/exercises.py" = ["E501"]

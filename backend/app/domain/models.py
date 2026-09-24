@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.domain.meal_photos import ExtraItem
 
 
 class Sex(StrEnum):
@@ -133,6 +137,7 @@ class MealSlot:
     meal_time: MealTime
     meal_id: str | None
     eaten_at: datetime | None
+    skipped_at: datetime | None
     kcal: float
 
 
@@ -145,6 +150,7 @@ class DayFacts:
     slots: tuple[MealSlot, ...]
     workout_time: WorkoutTime
     workout_done_at: datetime | None
+    workout_skipped_at: datetime | None
     has_workout_planned: bool
 
 
@@ -162,6 +168,14 @@ class Exercise:
     category_id: str
     name: str
     description: str | None
+    body_region: str | None
+    equipment: str | None
+    # 'home' | 'gym' | 'both'. Stated, not derived from equipment. Null on custom
+    # exercises until someone answers for them.
+    location: str | None
+    # Metabolic equivalent, set only on built-ins. Drives a displayed burn estimate and
+    # nothing else — the profile's activity factor already prices training into TDEE.
+    met: float | None
     is_builtin: bool
 
 
@@ -172,7 +186,10 @@ class TemplateItem:
     exercise_name: str
     sort_order: int
     sets: int | None
-    reps: str
+    # Either a rep prescription or a duration, never neither: cardio is timed, lifts are
+    # counted. The database carries the same CHECK.
+    reps: str | None
+    duration_sec: int | None
     weight_kg: float | None
     rest_sec: int
     note: str | None
@@ -191,7 +208,6 @@ class WorkoutTemplate:
 @dataclass(frozen=True, slots=True)
 class ScheduleEntry:
     weekday: int
-    location: Location
     template_id: str
 
 
@@ -303,17 +319,48 @@ class PlannedMeal:
     meal_id: str | None
     name: str
     eaten_at: datetime | None
-    items: tuple[MealItem, ...]
+    skipped_at: datetime | None
+    items: tuple["PlannedItem", ...]
 
     @property
     def eaten(self) -> bool:
         return self.eaten_at is not None
+
+    @property
+    def skipped(self) -> bool:
+        return self.skipped_at is not None
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedItem:
+    """An item in a day snapshot, either a library food or fixed custom nutrition."""
+
+    id: str
+    food: Food | None
+    custom_name: str | None
+    grams: float | None
+    custom_nutrients: Nutrients | None
+    photo_id: str | None
+    sort_order: int
+
+    @property
+    def nutrients(self) -> Nutrients:
+        if self.food is not None:
+            assert self.grams is not None
+            return self.food.nutrients_for(self.grams)
+        assert self.custom_nutrients is not None
+        return self.custom_nutrients
+
+    @property
+    def category_id(self) -> str | None:
+        return self.food.category_id if self.food else None
 
 
 @dataclass(frozen=True, slots=True)
 class DayPlan:
     date: date
     meals: tuple[PlannedMeal, ...]
+    extras: tuple["ExtraItem", ...] = ()
 
     def slot(self, meal_time: MealTime) -> PlannedMeal | None:
         return next((m for m in self.meals if m.meal_time is meal_time), None)

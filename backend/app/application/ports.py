@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
+from app.domain.decisions import DecisionRequest, DecisionResult
+from app.domain.meal_photos import ExtraItem, MealPhoto, Recognition
 from app.domain.models import (
     Account,
     BodyLog,
@@ -18,12 +20,14 @@ from app.domain.models import (
     Meal,
     MealItem,
     MealTime,
+    PlannedItem,
     PlannedMeal,
     Profile,
     ScheduleEntry,
     TemplateItem,
     WorkoutTemplate,
 )
+from app.domain.workout_execution import DayWorkoutItem, SetLog, WorkoutExecution
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,9 +75,7 @@ class PushSender(Protocol):
 
 
 class AccountStore(Protocol):
-    async def create_account(
-        self, account: Account, password_hash: str | None
-    ) -> None: ...
+    async def create_account(self, account: Account, password_hash: str | None) -> None: ...
 
     async def find_credentials(self, email: str) -> Credentials | None: ...
 
@@ -106,11 +108,23 @@ class BodyStore(Protocol):
 
 
 class TrainingStore(Protocol):
-    async def list_exercises(self, user_id: str) -> tuple[Exercise, ...]: ...
+    async def search_exercises(
+        self,
+        user_id: str,
+        *,
+        query: str | None,
+        category_id: str | None,
+        body_region: str | None,
+        equipment: str | None,
+    ) -> tuple[Exercise, ...]: ...
+
+    async def load_exercise(self, user_id: str, exercise_id: str) -> Exercise | None: ...
 
     async def save_exercise(self, user_id: str, exercise: Exercise) -> None: ...
 
     async def archive_exercise(self, user_id: str, exercise_id: str) -> None: ...
+
+    async def exercise_categories(self) -> tuple[tuple[str, str], ...]: ...
 
     async def list_templates(
         self, user_id: str, location: str | None
@@ -128,9 +142,34 @@ class TrainingStore(Protocol):
 
     async def load_schedule(self, user_id: str) -> tuple[ScheduleEntry, ...]: ...
 
-    async def replace_schedule(
-        self, user_id: str, entries: tuple[ScheduleEntry, ...]
+    async def replace_schedule(self, user_id: str, entries: tuple[ScheduleEntry, ...]) -> None: ...
+
+
+class WorkoutExecutionStore(Protocol):
+    async def load(self, user_id: str, day: date, profile: Profile) -> WorkoutExecution: ...
+
+    async def load_visible_exercise(self, user_id: str, exercise_id: str) -> Exercise | None: ...
+
+    async def add_item(
+        self, user_id: str, day: date, profile: Profile, item: DayWorkoutItem
     ) -> None: ...
+
+    async def update_item(
+        self,
+        user_id: str,
+        day: date,
+        item: DayWorkoutItem,
+        *,
+        replacing: bool,
+    ) -> bool: ...
+
+    async def delete_item(self, user_id: str, day: date, item_id: str) -> bool: ...
+
+    async def log_set(self, user_id: str, day: date, profile: Profile, log: SetLog) -> None: ...
+
+    async def apply_template_weight(
+        self, user_id: str, template_id: str, item_id: str, weight_kg: float
+    ) -> bool: ...
 
 
 class DayStore(Protocol):
@@ -141,15 +180,23 @@ class DayStore(Protocol):
         self,
         user_id: str,
         day: date,
+        profile: Profile,
         *,
         workout_time: str | None = None,
         location: str | None = None,
         steps: int | None = None,
-        workout_done_at: datetime | None = None,
+        workout_state: str | None = None,
+        workout_state_at: datetime | None = None,
     ) -> None: ...
 
-    async def mark_eaten(
-        self, user_id: str, day: date, meal_time: MealTime, eaten_at: datetime
+    async def set_meal_state(
+        self,
+        user_id: str,
+        day: date,
+        meal_time: MealTime,
+        state: str,
+        at: datetime,
+        profile: Profile,
     ) -> None: ...
 
     async def log_set(
@@ -190,6 +237,26 @@ class DayStore(Protocol):
     ) -> None:
         """Swap one food in today's plate, keeping its position in the meal."""
 
+    async def add_plan_item(
+        self, user_id: str, day: date, meal_time: MealTime, item: PlannedItem, profile: Profile
+    ) -> None: ...
+
+    async def update_plan_item(
+        self, user_id: str, day: date, meal_time: MealTime, item_id: str, grams: float
+    ) -> bool: ...
+
+    async def delete_plan_item(
+        self, user_id: str, day: date, meal_time: MealTime, item_id: str
+    ) -> bool: ...
+
+    async def load_extras(self, user_id: str, day: date) -> tuple[ExtraItem, ...]: ...
+
+    async def add_extra(
+        self, user_id: str, day: date, item: ExtraItem, profile: Profile
+    ) -> None: ...
+
+    async def delete_extra(self, user_id: str, day: date, item_id: str) -> bool: ...
+
 
 class FoodStore(Protocol):
     async def categories(self) -> tuple[FoodCategory, ...]: ...
@@ -222,6 +289,39 @@ class MealStore(Protocol):
         """Upsert the meal along with its slots and items."""
 
     async def archive(self, user_id: str, meal_id: str) -> None: ...
+
+
+class MealPhotoStore(Protocol):
+    async def create(self, photo: MealPhoto) -> None: ...
+
+    async def load(self, user_id: str, photo_id: str) -> MealPhoto | None: ...
+
+    async def begin_analysis(
+        self, user_id: str, photo_id: str, now: datetime
+    ) -> MealPhoto | None: ...
+
+    async def finish_analysis(
+        self, user_id: str, photo_id: str, status: str, result_json: str
+    ) -> None: ...
+
+    async def analyses_on(self, user_id: str, day: date) -> int: ...
+
+
+class ObjectStorage(Protocol):
+    async def create_upload_url(
+        self, user_id: str, photo_id: str, content_type: str
+    ) -> tuple[str, str]:
+        """Return the user-scoped object key and a short-lived PUT URL."""
+
+    async def create_download_url(self, object_key: str) -> str: ...
+
+
+class ImageRecognizer(Protocol):
+    async def recognize(self, image_url: str) -> tuple[Recognition, ...]: ...
+
+
+class DecisionEngine(Protocol):
+    async def decide(self, request: DecisionRequest) -> DecisionResult: ...
 
 
 class ReminderStore(Protocol):

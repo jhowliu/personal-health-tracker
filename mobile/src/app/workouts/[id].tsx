@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
 import { NumberStepper } from '@/components/NumberStepper';
 import {
   Card,
@@ -10,21 +11,21 @@ import {
   Hint,
   PrimaryButton,
   Screen,
-  SectionHeading,
   Segmented,
+  SectionHeading,
   Title,
 } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { replacement } from '@/workouts/replacement';
 
 type Template = Schema<'TemplateOut'>;
-type Exercise = Schema<'ExerciseOut'>;
-
 type Draft = {
   id: string | null;
   exercise_id: string;
   exercise_name: string;
   sets: number | null;
-  reps: string;
+  reps: string | null;
+  duration_sec: number | null;
   weight_kg: number | null;
   rest_sec: number;
   note: string | null;
@@ -35,22 +36,19 @@ export default function EditTemplate() {
   const isNew = id === 'new';
 
   const [name, setName] = useState('');
-  const [location, setLocation] = useState<'home' | 'gym'>('gym');
   const [duration, setDuration] = useState('');
   const [items, setItems] = useState<Draft[]>([]);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        setExercises(await api.get('/exercises'));
         if (!isNew) {
           const template: Template = await api.get(`/workout-templates/${id}`);
           setName(template.name);
-          setLocation(template.location === 'home' ? 'home' : 'gym');
           setDuration(template.duration_min ? String(template.duration_min) : '');
           setItems(template.items.map((item) => ({ ...item })));
         }
@@ -61,6 +59,22 @@ export default function EditTemplate() {
       }
     })();
   }, [id, isNew]);
+
+  useEffect(
+    () =>
+      replacement.subscribe(() => {
+        const selected = replacement.take();
+        if (!selected) return;
+        setItems((current) =>
+          current.map((item, index) =>
+            index === selected.index
+              ? { ...item, exercise_id: selected.exercise_id, exercise_name: selected.exercise_name }
+              : item,
+          ),
+        );
+      }),
+    [],
+  );
 
   const move = (index: number, delta: number) => {
     const next = [...items];
@@ -74,26 +88,20 @@ export default function EditTemplate() {
   const patch = (index: number, changes: Partial<Draft>) =>
     setItems(items.map((item, i) => (i === index ? { ...item, ...changes } : item)));
 
-  const addFromLibrary = () => {
-    const unused = exercises.find((e) => !items.some((item) => item.exercise_id === e.id));
-    if (!unused) {
-      Alert.alert('動作庫空了', '先到動作庫新增動作,或這個課表已經包含全部動作。');
-      return;
-    }
+  const addFromLibrary = (exercise: Exercise) => {
+    const defaults = defaultExercisePrescription(exercise.category_id);
     setItems([
       ...items,
       {
         id: null,
-        exercise_id: unused.id,
-        exercise_name: unused.name,
-        sets: 3,
-        reps: '10-12',
-        weight_kg: null,
-        rest_sec: 60,
+        exercise_id: exercise.id,
+        exercise_name: exercise.name,
+        ...defaults,
         note: null,
       },
     ]);
     setEditing(items.length);
+    setLibraryOpen(false);
   };
 
   const save = async () => {
@@ -101,13 +109,13 @@ export default function EditTemplate() {
     const body = {
       category_id: 'strength',
       name,
-      location,
       duration_min: duration ? Number(duration) : null,
       items: items.map((item) => ({
         id: item.id,
         exercise_id: item.exercise_id,
         sets: item.sets,
         reps: item.reps,
+        duration_sec: item.duration_sec,
         weight_kg: item.weight_kg,
         rest_sec: item.rest_sec,
         note: item.note,
@@ -144,26 +152,14 @@ export default function EditTemplate() {
 
       <Field label="課表名稱" value={name} onChangeText={setName} placeholder="健身房:下肢" />
 
-      <View className="flex-row gap-3">
-        <View className="flex-1 gap-1">
-          <Text className="text-sm text-muted">地點</Text>
-          <Segmented
-            value={location}
-            onChange={setLocation}
-            options={[
-              { value: 'home', label: '在家' },
-              { value: 'gym', label: '健身房' },
-            ]}
-          />
-        </View>
-        <Field
-          label="大約時間"
-          suffix="分鐘"
-          value={duration}
-          onChangeText={setDuration}
-          keyboardType="numeric"
-        />
-      </View>
+      <Field
+        label="大約時間"
+        suffix="分鐘"
+        value={duration}
+        onChangeText={setDuration}
+        keyboardType="numeric"
+      />
+      <Hint>地點依動作用到的器材自動判定:出現槓鈴、機械、滑輪或跑步機就算健身房。</Hint>
 
       <SectionHeading action={<Text className="text-sm text-muted">{items.length} 個</Text>}>
         動作
@@ -187,28 +183,56 @@ export default function EditTemplate() {
               </Pressable>
             </View>
 
-            <View className="flex-row items-end gap-3">
-              <View className="gap-1">
-                <Text className="text-sm text-muted">組數</Text>
-                <NumberStepper
-                  value={item.sets ?? 1}
-                  onChange={(sets) => patch(index, { sets })}
+            <Segmented
+              value={item.duration_sec === null ? 'reps' : 'time'}
+              onChange={(mode) =>
+                patch(
+                  index,
+                  mode === 'time'
+                    ? { duration_sec: item.duration_sec ?? 1200, reps: null, sets: null }
+                    : { duration_sec: null, reps: item.reps ?? '10-12', sets: item.sets ?? 3 },
+                )
+              }
+              options={[
+                { value: 'reps', label: '次數' },
+                { value: 'time', label: '時間' },
+              ]}
+            />
+
+            {item.duration_sec === null ? (
+              <View className="flex-row items-end gap-3">
+                <View className="gap-1">
+                  <Text className="text-sm text-muted">組數</Text>
+                  <NumberStepper
+                    value={item.sets ?? 1}
+                    onChange={(sets) => patch(index, { sets })}
+                  />
+                </View>
+                <Field
+                  label="次數"
+                  value={item.reps ?? ''}
+                  onChangeText={(reps) => patch(index, { reps })}
+                  placeholder="10-12"
+                />
+                <Field
+                  label="重量"
+                  suffix="kg"
+                  value={item.weight_kg === null ? '' : String(item.weight_kg)}
+                  onChangeText={(text) => patch(index, { weight_kg: text ? Number(text) : null })}
+                  keyboardType="decimal-pad"
                 />
               </View>
+            ) : (
               <Field
-                label="次數"
-                value={item.reps}
-                onChangeText={(reps) => patch(index, { reps })}
-                placeholder="10-12"
+                label="時間"
+                suffix="分鐘"
+                value={String(Math.round(item.duration_sec / 60))}
+                onChangeText={(text) =>
+                  patch(index, { duration_sec: Math.max(1, Number(text) || 1) * 60 })
+                }
+                keyboardType="numeric"
               />
-              <Field
-                label="重量"
-                suffix="kg"
-                value={item.weight_kg === null ? '' : String(item.weight_kg)}
-                onChangeText={(text) => patch(index, { weight_kg: text ? Number(text) : null })}
-                keyboardType="decimal-pad"
-              />
-            </View>
+            )}
 
             <Field
               label="做法說明"
@@ -216,6 +240,25 @@ export default function EditTemplate() {
               onChangeText={(note) => patch(index, { note: note || null })}
               placeholder="腳與肩同寬,膝蓋不要完全打直"
             />
+
+            <Field
+              label="休息"
+              value={String(item.rest_sec)}
+              onChangeText={(text) => patch(index, { rest_sec: Number(text) || 0 })}
+              suffix="秒"
+              keyboardType="numeric"
+            />
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push(
+                  `/workouts/alternatives?exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
+                )
+              }
+            >
+              <Text className="text-base text-primary">找替代動作</Text>
+            </Pressable>
 
             <Pressable accessibilityRole="button" onPress={() => setEditing(null)}>
               <Text className="text-center text-base text-muted">收起</Text>
@@ -233,7 +276,11 @@ export default function EditTemplate() {
                 {index + 1}. {item.exercise_name}
               </Text>
               <Text className="text-sm text-muted">
-                {item.sets ? `${item.sets} 組 × ${item.reps}` : item.reps}
+                {item.duration_sec
+                  ? `${Math.round(item.duration_sec / 60)} 分鐘`
+                  : item.sets
+                    ? `${item.sets} 組 × ${item.reps}`
+                    : item.reps}
                 {item.weight_kg ? `,${item.weight_kg} kg` : ''}
               </Text>
             </View>
@@ -250,13 +297,11 @@ export default function EditTemplate() {
 
       {items.length === 0 ? <Hint>還沒有動作,從下面加入。</Hint> : null}
 
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <PrimaryButton tone="plain" onPress={addFromLibrary}>
-            + 從動作庫加入
-          </PrimaryButton>
-        </View>
-      </View>
+       <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
+         {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
+       </PrimaryButton>
+
+        {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
 
       <PrimaryButton onPress={save} disabled={busy || !name || items.length === 0}>
         {busy ? '儲存中…' : '儲存課表'}

@@ -1,7 +1,14 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUserId, Foods
-from app.api.schemas import ExchangeOut, FoodCategoryOut, FoodIn, FoodOut
+from app.api.deps import CurrentUserId, Decisions, Foods
+from app.api.schemas import (
+    CategorySuggestionOut,
+    ExchangeOut,
+    FoodCategoryOut,
+    FoodIn,
+    FoodOut,
+    SuggestionIn,
+)
 from app.domain.models import Food, FoodState, Nutrients, SwapBasis
 
 router = APIRouter(tags=["foods"])
@@ -20,6 +27,13 @@ async def search_foods(
     category: str | None = None,
 ) -> list[FoodOut]:
     return [FoodOut.of(f) for f in await service.search(user_id, q, category)]
+
+
+@router.post("/foods/suggest-category", response_model=CategorySuggestionOut)
+async def suggest_category(
+    payload: SuggestionIn, user_id: CurrentUserId, service: Decisions
+) -> CategorySuggestionOut:
+    return CategorySuggestionOut.of(await service.food_category(payload.subject))
 
 
 @router.post("/foods", response_model=FoodOut, status_code=status.HTTP_201_CREATED)

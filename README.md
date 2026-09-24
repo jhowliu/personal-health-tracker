@@ -2,12 +2,14 @@
 
 把量身形、三餐和運動串成「今日流程」的 iPhone／Android App。規格書見 `spec.pdf`,畫面設計見 `wireframe.pdf`。
 
-目前完成到第二階段:
+目前完成到第三階段:
 
 - **P1** 帳號、個人資料與每日目標、身形追蹤、訓練課表與排程、今日流程、推播骨架
 - **P2** 食物庫、自建餐點、等量替換、每日自動分配、主食隨目標自動調整
+- **P3** 餐點拍照辨識與確認、額外食物、AI 分類建議、今日替代動作與重量回饋
 
-拍照辨識與 Jev 決策層(P3)留下接口,尚未實作。
+P3 以 OpenAI 做圖片辨識與限定候選的決策；營養、換算與訓練重量規則仍由程式處理。未設定
+`OPENAI_API_KEY` 時，辨識與建議端點會明確回傳服務未設定，不會產生虛構結果。
 
 ## 架構
 
@@ -51,13 +53,17 @@ cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m scripts.migrate
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.foods
 ```
 
+```bash
+cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.exercises
+```
+
 可選的範例餐點,讓新帳號一進來今日流程就有東西可排:
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.sample_meals
 ```
 
-兩個 seed 都可重複執行:食物用 id 做「有就更新、沒有就新增」,範例餐點會跳過已經有餐點的使用者。
+內建食物與動作 seed 都可重複執行:只會更新同 id 的內建資料；範例餐點會跳過已經有餐點的使用者。
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite JWT_SECRET=$(openssl rand -hex 32) .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010

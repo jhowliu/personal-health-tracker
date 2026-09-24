@@ -213,7 +213,7 @@ export default function EditMeal() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => router.push(`/meals/add-food?category=${group.category}`)}
+                     onPress={() => router.push(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
                     className="min-h-[44px] justify-center pl-2"
                   >
                     <Text className="text-base text-primary underline">
@@ -235,13 +235,21 @@ export default function EditMeal() {
         </Card>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push('/meals/add-food')}
+       <Pressable
+         accessibilityRole="button"
+         onPress={() => router.push(`/meals/add-food?meal_id=${id}`)}
         className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
       >
-        <Text className="text-base text-primary">＋ 加入食物</Text>
-      </Pressable>
+         <Text className="text-base text-primary">＋ 加入食物</Text>
+       </Pressable>
+
+       <Pressable
+         accessibilityRole="button"
+         onPress={() => router.push(`/meals/photo?destination=meal&meal_id=${id}`)}
+         className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
+       >
+         <Text className="text-base text-primary">⌁ 用照片加入食物</Text>
+       </Pressable>
 
       {isNew ? null : (
         <Pressable

@@ -20,3 +20,11 @@ class PermissionDenied(DomainError):
 
 class ValidationFailed(DomainError):
     pass
+
+
+class ServiceUnavailable(DomainError):
+    """A required external capability is not configured or currently unavailable."""
+
+
+class QuotaExceeded(DomainError):
+    pass
