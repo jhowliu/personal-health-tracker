@@ -1,5 +1,5 @@
 /** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
-import { Children, Fragment, type ReactNode } from 'react';
+import { Children, Fragment, type ReactNode, useId } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -29,20 +29,30 @@ const NUMERIC_KEYBOARDS: KeyboardTypeOptions[] = ['numeric', 'decimal-pad', 'num
 export function Screen({
   children,
   scroll = true,
+  pinnedHeader,
   footer,
+  footerSafeArea = true,
 }: {
   children: ReactNode;
   scroll?: boolean;
+  /** Fixed above the scroll area for controls that must remain available while browsing. */
+  pinnedHeader?: ReactNode;
   /** Pinned below the scroll area — for a running total the user needs while editing. */
   footer?: ReactNode;
+  /** Disable when the screen is already above a tab bar that owns the bottom safe area. */
+  footerSafeArea?: boolean;
 }) {
   return (
-    <SafeAreaView className="flex-1 bg-bg" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-bg"
+      edges={footerSafeArea && !footer ? ['top', 'bottom'] : ['top']}
+    >
       <KeyboardAvoidingView
         className="flex-1"
         // Android already resizes the window; adding padding on top double-counts it.
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {pinnedHeader ? <View className="gap-3 bg-bg px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
         {scroll ? (
           <ScrollView
             className="flex-1"
@@ -65,7 +75,12 @@ export function Screen({
 
         {/* Inside KeyboardAvoidingView so it rides up with the keyboard. */}
         {footer ? (
-          <View className="gap-2 border-t border-line bg-surface px-5 pb-3 pt-3">{footer}</View>
+          <SafeAreaView
+            edges={footerSafeArea ? ['bottom'] : []}
+            className="gap-2 border-t border-line bg-surface px-5 pb-3 pt-3"
+          >
+            {footer}
+          </SafeAreaView>
         ) : null}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -95,7 +110,9 @@ export function Rows({ children }: { children: ReactNode }) {
 export function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
   return (
     <View className="gap-1">
-      <Text className="font-display text-3xl font-bold text-ink">{children}</Text>
+      <Text accessibilityRole="header" className="font-display text-3xl font-bold text-ink">
+        {children}
+      </Text>
       {sub ? <Text className="text-base text-muted">{sub}</Text> : null}
     </View>
   );
@@ -104,7 +121,9 @@ export function Title({ children, sub }: { children: React.ReactNode; sub?: stri
 export function SectionHeading({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="font-display text-xl font-bold text-ink">{children}</Text>
+      <Text accessibilityRole="header" className="font-display text-xl font-bold text-ink">
+        {children}
+      </Text>
       {action}
     </View>
   );
@@ -136,17 +155,24 @@ export function Field({
   className = '',
   ...props
 }: TextInputProps & { label?: string; suffix?: string; className?: string }) {
+  const labelId = useId();
   const needsDoneBar =
     Platform.OS === 'ios' && NUMERIC_KEYBOARDS.includes(props.keyboardType as KeyboardTypeOptions);
 
   return (
     <View className="flex-1 gap-1">
-      {label ? <Text className="text-sm text-muted">{label}</Text> : null}
+      {label ? (
+        <Text nativeID={labelId} className="text-sm text-muted">
+          {label}
+        </Text>
+      ) : null}
       <View className="flex-row items-center rounded-field border border-line bg-surface px-3">
         <TextInput
           className={`min-h-[44px] flex-1 text-base text-ink ${className}`}
           placeholderTextColor="#9C9599"
           inputAccessoryViewID={needsDoneBar ? NUMERIC_ACCESSORY_ID : undefined}
+          accessibilityLabel={props.accessibilityLabel ?? label}
+          accessibilityLabelledBy={props.accessibilityLabelledBy ?? (label ? labelId : undefined)}
           {...props}
         />
         {suffix ? <Text className="pl-2 text-sm text-muted">{suffix}</Text> : null}
@@ -159,13 +185,16 @@ export function PrimaryButton({
   children,
   onPress,
   disabled,
+  busy,
   tone = 'primary',
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
+  busy?: boolean;
   tone?: 'primary' | 'dark' | 'plain';
 }) {
+  const unavailable = disabled || busy;
   const skin = {
     primary: 'bg-primary',
     dark: 'bg-ink',
@@ -176,10 +205,11 @@ export function PrimaryButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ busy: Boolean(busy), disabled: Boolean(unavailable) }}
       onPress={onPress}
-      disabled={disabled}
+      disabled={unavailable}
       className={`min-h-[52px] items-center justify-center rounded-field ${skin} ${
-        disabled ? 'opacity-40' : 'active:opacity-80'
+        unavailable ? 'opacity-40' : 'active:opacity-80'
       }`}
     >
       <Text className={`text-base font-semibold ${label}`}>{children}</Text>
@@ -249,7 +279,12 @@ export function Chip({
   );
 
   return onPress ? (
-    <Pressable accessibilityRole="button" onPress={onPress} className="min-h-[44px] justify-center">
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: Boolean(selected) }}
+      onPress={onPress}
+      className="min-h-[44px] justify-center"
+    >
       {content}
     </Pressable>
   ) : (

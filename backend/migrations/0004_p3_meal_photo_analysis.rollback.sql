@@ -1,0 +1,1 @@
+DROP INDEX idx_meal_photos_analysis_quota;

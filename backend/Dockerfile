@@ -22,4 +22,4 @@ RUN mkdir -p /data
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python -m scripts.migrate && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]
+CMD ["sh", "-c", "python -m scripts.migrate && python -m seeds.foods && python -m seeds.exercises && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1"]

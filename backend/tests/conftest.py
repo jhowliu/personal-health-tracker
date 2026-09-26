@@ -6,7 +6,14 @@ from httpx import ASGITransport, AsyncClient
 from app.config import settings
 from app.main import app
 from scripts.migrate import apply
+from seeds.exercises import seed as seed_exercises
 from seeds.foods import seed as seed_foods
+
+
+@pytest.fixture(autouse=True)
+def isolate_ai_settings(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "jev_api_key", "")
 
 
 @pytest.fixture
@@ -53,6 +60,13 @@ async def with_foods(with_profile: AsyncClient) -> AsyncClient:
     """A profile plus the built-in food library — the starting point for P2 tests."""
     await seed_foods()
     return with_profile
+
+
+@pytest.fixture
+async def with_exercises(signed_in: AsyncClient) -> AsyncClient:
+    """An authenticated user plus the built-in exercise catalog."""
+    await seed_exercises()
+    return signed_in
 
 
 @pytest.fixture

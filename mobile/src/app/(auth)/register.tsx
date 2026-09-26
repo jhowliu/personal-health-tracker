@@ -1,13 +1,16 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { backOrReplace } from '@/navigation/back';
+import { safeReturnTo } from '@/navigation/return-to';
 
 export default function Register() {
   const { signIn } = useSession();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,7 +19,7 @@ export default function Register() {
     setBusy(true);
     try {
       await signIn('/auth/register', { email, password });
-      router.replace('/');
+      router.replace(safeReturnTo(returnTo));
     } catch (error) {
       Alert.alert('註冊失敗', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -27,7 +30,12 @@ export default function Register() {
   return (
     <Screen>
       <View className="gap-6 pt-16">
-        <Pressable accessibilityRole="button" onPress={() => router.back()}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            backOrReplace({ pathname: '/login', params: { returnTo } })
+          }
+        >
           <Text className="text-base text-primary">‹ 返回</Text>
         </Pressable>
 
