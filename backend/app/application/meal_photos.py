@@ -82,6 +82,8 @@ class MealPhotoService:
             raise ValidationFailed("這張照片目前不能辨識")
 
         try:
+            if not await self._objects.exists(photo.object_key):
+                raise ValidationFailed("照片尚未完成上傳，請重新選擇照片")
             recognized = await self._recognizer.recognize(
                 await self._objects.create_download_url(photo.object_key)
             )
@@ -92,9 +94,20 @@ class MealPhotoService:
                         {
                             "label": item.label,
                             "grams": item.grams,
-                            "confidence": item.confidence,
-                            "label_confidence": source.confidence,
+                            "recognition_confidence": item.recognition_confidence,
+                            "match_confidence": item.match_confidence,
                             "food_id": item.food_id,
+                            "estimate": (
+                                {
+                                    "category_id": item.estimate.category_id,
+                                    "kcal_per_100g": item.estimate.per_100g.kcal,
+                                    "protein_per_100g": item.estimate.per_100g.protein_g,
+                                    "fat_per_100g": item.estimate.per_100g.fat_g,
+                                    "carb_per_100g": item.estimate.per_100g.carb_g,
+                                }
+                                if item.estimate
+                                else None
+                            ),
                             "alternatives": [
                                 alternative.food_id for alternative in item.alternatives
                             ],
@@ -137,11 +150,13 @@ class MealPhotoService:
                     food_id=selected.id if selected else None,
                     category_id=selected.category_id if selected else None,
                     grams=item.grams,
-                    confidence=confidence,
+                    recognition_confidence=item.confidence,
+                    match_confidence=confidence,
                     alternatives=tuple(
                         RecognizedFood(food.id, food.category_id, food.name)
                         for food in ordered[:_ALTERNATIVE_LIMIT]
                     ),
+                    estimate=item.estimate if selected is None else None,
                 )
             )
         return tuple(items)
@@ -167,6 +182,15 @@ class MealPhotoService:
         """
         if not candidates:
             return None, 0.0
+        normalized_label = label.strip().casefold()
+        exact = tuple(
+            food
+            for food in candidates
+            if normalized_label
+            in {food.name.strip().casefold(), *(alias.strip().casefold() for alias in food.aliases)}
+        )
+        if len(exact) == 1:
+            return exact[0], 1.0
         try:
             result = await self._decisions.food_match(label, candidates)
         except ServiceUnavailable:

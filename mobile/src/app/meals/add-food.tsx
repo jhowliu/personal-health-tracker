@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
+import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Food = Schema<'FoodOut'>;
@@ -27,17 +28,33 @@ export default function AddFood() {
   const [picked, setPicked] = useState<Food | null>(null);
   const [grams, setGrams] = useState('');
   const [busy, setBusy] = useState(false);
+  const searchVersion = useRef(0);
+
+  const parentRoute =
+    destination === 'day'
+      ? '/today'
+      : ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const);
+
+  useEffect(() => {
+    if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
+      Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。', [
+        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      ]);
+    }
+  }, [destination, meal_id]);
 
   useEffect(() => {
     api.get('/food-categories').then(setCategories).catch(() => setCategories([]));
   }, []);
 
   const search = useCallback(async () => {
+    const version = ++searchVersion.current;
     try {
       const params = new URLSearchParams();
       if (query) params.set('q', query);
       if (filter !== 'all') params.set('category', filter);
-      setFoods(await api.get(`/foods?${params}`));
+      const result = await api.get(`/foods?${params}`);
+      if (version === searchVersion.current) setFoods(result);
     } catch (error) {
       Alert.alert('搜尋失敗', error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -63,9 +80,10 @@ export default function AddFood() {
         if (!date || !slot) throw new Error('找不到要加入的日期或餐次。');
         await api.post(`/days/${date}/plan/${slot}/items`, { food_id: picked.id, grams: portion });
       } else {
-        draft.addItem(picked, portion);
+        if (!meal_id || !draft.has(meal_id)) throw new Error('找不到目前餐點草稿，請重新開啟餐點。');
+        draft.addItem(meal_id, picked, portion);
       }
-      router.back();
+      backOrReplace(parentRoute);
     } catch (error) {
       Alert.alert('加入失敗', error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試');
     } finally {
@@ -77,8 +95,34 @@ export default function AddFood() {
   const kcal = picked ? Math.round((picked.per_100g.kcal * (Number(grams) || 0)) / 100) : 0;
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+    <Screen
+      footer={
+        picked ? (
+          <>
+            <View className="flex-row items-end gap-3">
+              <View className="flex-1 gap-0.5">
+                <Text className="text-sm text-muted">已選擇</Text>
+                <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+                  {picked.name}
+                </Text>
+              </View>
+              <Text className="font-display text-2xl font-bold text-ink">{kcal} 大卡</Text>
+            </View>
+            <Field
+              label="份量"
+              value={grams}
+              onChangeText={setGrams}
+              suffix="g"
+              keyboardType="decimal-pad"
+            />
+            <PrimaryButton onPress={add} disabled={!grams} busy={busy}>
+              {busy ? '加入中…' : `加入${label ?? '食物'}`}
+            </PrimaryButton>
+          </>
+        ) : undefined
+      }
+    >
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)} disabled={busy}>
         <Text className="text-base text-primary">‹ {destination === 'day' ? '今日流程' : '編輯餐點'}</Text>
       </Pressable>
 
@@ -87,7 +131,7 @@ export default function AddFood() {
         {destination === 'meal' ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push(`/meals/photo?destination=meal&meal_id=${meal_id ?? 'new'}`)}
+            onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${meal_id ?? 'new'}`)}
             className="min-h-[44px] justify-center"
           >
             <Text className="text-base text-primary">⌁ 改用餐點照片辨識</Text>
@@ -131,24 +175,6 @@ export default function AddFood() {
         </Card>
       )}
 
-      {picked ? (
-        <Card className="gap-3 border-primary">
-          <Text className="text-base font-semibold text-ink">{picked.name}</Text>
-          <View className="flex-row items-end gap-3">
-            <Field
-              label="份量"
-              value={grams}
-              onChangeText={setGrams}
-              suffix="g"
-              keyboardType="decimal-pad"
-            />
-            <Text className="font-display text-3xl font-bold text-ink">{kcal} 大卡</Text>
-          </View>
-          <PrimaryButton onPress={add} disabled={!grams || busy}>
-            {busy ? '加入中…' : `加入${label ?? '食物'}`}
-          </PrimaryButton>
-        </Card>
-      ) : null}
     </Screen>
   );
 }

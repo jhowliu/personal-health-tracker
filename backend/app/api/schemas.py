@@ -191,7 +191,7 @@ class DayFlowOut(BaseModel):
     steps: list[str]
     completed: list[str]
     current: str
-    eaten_kcal: float
+    eaten: "NutrientsOut"
 
     @classmethod
     def of(cls, flow: DayFlow) -> "DayFlowOut":
@@ -199,7 +199,7 @@ class DayFlowOut(BaseModel):
             steps=[s.value for s in flow.steps],
             completed=[s.value for s in flow.steps if s in flow.completed],
             current=flow.current.value,
-            eaten_kcal=flow.eaten_kcal,
+            eaten=NutrientsOut.of(flow.eaten),
         )
 
 
@@ -765,13 +765,23 @@ class RecognizedFoodOut(BaseModel):
     label: str
 
 
+class EstimatedFoodOut(BaseModel):
+    category_id: str
+    kcal_per_100g: float
+    protein_per_100g: float
+    fat_per_100g: float
+    carb_per_100g: float
+
+
 class RecognizedItemOut(BaseModel):
     label: str
     category_id: str | None
     food_id: str | None
     grams: float
-    confidence: float
+    recognition_confidence: float
+    match_confidence: float
     alternatives: list[RecognizedFoodOut]
+    estimate: EstimatedFoodOut | None
 
     @classmethod
     def of(cls, item: RecognizedItem) -> "RecognizedItemOut":
@@ -780,8 +790,20 @@ class RecognizedItemOut(BaseModel):
             category_id=item.category_id,
             food_id=item.food_id,
             grams=item.grams,
-            confidence=item.confidence,
+            recognition_confidence=item.recognition_confidence,
+            match_confidence=item.match_confidence,
             alternatives=[RecognizedFoodOut(**_values(option)) for option in item.alternatives],
+            estimate=(
+                EstimatedFoodOut(
+                    category_id=item.estimate.category_id,
+                    kcal_per_100g=item.estimate.per_100g.kcal,
+                    protein_per_100g=item.estimate.per_100g.protein_g,
+                    fat_per_100g=item.estimate.per_100g.fat_g,
+                    carb_per_100g=item.estimate.per_100g.carb_g,
+                )
+                if item.estimate
+                else None
+            ),
         )
 
 

@@ -40,7 +40,14 @@ class SqliteDayStore:
         async with self._conn.execute(
             """
             SELECT dm.meal_time, dm.meal_id, dm.eaten_at, dm.skipped_at,
-                   COALESCE(SUM(COALESCE(i.kcal, f.kcal_per_100g * i.grams / 100.0)), 0) AS kcal
+                   COALESCE(SUM(COALESCE(i.kcal, f.kcal_per_100g * i.grams / 100.0)), 0) AS kcal,
+                   COALESCE(
+                       SUM(COALESCE(i.protein_g, f.protein_per_100g * i.grams / 100.0)), 0
+                   ) AS protein_g,
+                   COALESCE(SUM(COALESCE(i.fat_g, f.fat_per_100g * i.grams / 100.0)), 0) AS fat_g,
+                   COALESCE(
+                       SUM(COALESCE(i.carb_g, f.carb_per_100g * i.grams / 100.0)), 0
+                   ) AS carb_g
             FROM day_meals dm
             LEFT JOIN day_meal_items i
                    ON i.user_id = dm.user_id AND i.date = dm.date AND i.meal_time = dm.meal_time
@@ -66,7 +73,12 @@ class SqliteDayStore:
                     meal_id=row["meal_id"],
                     eaten_at=from_iso(row["eaten_at"]),
                     skipped_at=from_iso(row["skipped_at"]),
-                    kcal=row["kcal"],
+                    nutrients=Nutrients(
+                        kcal=row["kcal"],
+                        protein_g=row["protein_g"],
+                        fat_g=row["fat_g"],
+                        carb_g=row["carb_g"],
+                    ),
                 )
                 for row in slot_rows
             ),

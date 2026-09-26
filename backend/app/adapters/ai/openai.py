@@ -1,13 +1,15 @@
 """OpenAI implementations of image recognition and bounded decisions."""
 
 import json
+from typing import Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.domain.decisions import DecisionRequest, DecisionResult
 from app.domain.errors import ServiceUnavailable
-from app.domain.meal_photos import Recognition
+from app.domain.meal_photos import EstimatedFood, Recognition
+from app.domain.models import Nutrients
 
 
 class _RecognizedImageItem(BaseModel):
@@ -16,6 +18,11 @@ class _RecognizedImageItem(BaseModel):
     label: str = Field(min_length=1, max_length=120)
     grams: float = Field(gt=0, le=5000)
     confidence: float = Field(ge=0, le=1)
+    category_id: Literal["staple", "protein", "vegetable", "fruit", "fat_sauce"]
+    kcal_per_100g: float = Field(ge=0, le=1000)
+    protein_per_100g: float = Field(ge=0, le=100)
+    fat_per_100g: float = Field(ge=0, le=100)
+    carb_per_100g: float = Field(ge=0, le=100)
 
 
 class _ImageOutput(BaseModel):
@@ -103,7 +110,11 @@ class OpenAIImageRecognizer(OpenAIDecisionEngine):
             [
                 {
                     "role": "system",
-                    "content": "Identify visible food items. Estimate edible grams conservatively.",
+                    "content": (
+                        "Identify visible food items. Return food labels in Traditional Chinese "
+                        "as commonly used in Taiwan. Estimate edible grams conservatively. "
+                        "Also estimate the closest allowed category and macronutrients per 100g."
+                    ),
                 },
                 {
                     "role": "user",
@@ -115,4 +126,20 @@ class OpenAIImageRecognizer(OpenAIDecisionEngine):
             ],
         )
         assert isinstance(output, _ImageOutput)
-        return tuple(Recognition(item.label, item.grams, item.confidence) for item in output.items)
+        return tuple(
+            Recognition(
+                item.label,
+                item.grams,
+                item.confidence,
+                EstimatedFood(
+                    item.category_id,
+                    Nutrients(
+                        item.kcal_per_100g,
+                        item.protein_per_100g,
+                        item.fat_per_100g,
+                        item.carb_per_100g,
+                    ),
+                ),
+            )
+            for item in output.items
+        )

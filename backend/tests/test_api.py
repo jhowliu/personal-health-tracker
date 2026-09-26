@@ -153,7 +153,7 @@ async def test_meal_states_complete_flow_and_skips_count_toward_streak(with_prof
     skipped = await with_profile.patch(f"/days/{TODAY}/meals/breakfast", json={"state": "skipped"})
     assert skipped.status_code == 200
     assert skipped.json()["flow"]["current"] == "lunch"
-    assert skipped.json()["flow"]["eaten_kcal"] == 0
+    assert skipped.json()["flow"]["eaten"]["kcal"] == 0
 
     planned = await with_profile.patch(f"/days/{TODAY}/meals/breakfast", json={"state": "planned"})
     assert planned.json()["flow"]["current"] == "breakfast"

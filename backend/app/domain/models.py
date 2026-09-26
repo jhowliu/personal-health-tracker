@@ -133,12 +133,39 @@ class BodySummary:
 
 
 @dataclass(frozen=True, slots=True)
+class Nutrients:
+    kcal: float
+    protein_g: float
+    fat_g: float
+    carb_g: float
+
+    def __add__(self, other: "Nutrients") -> "Nutrients":
+        return Nutrients(
+            kcal=self.kcal + other.kcal,
+            protein_g=self.protein_g + other.protein_g,
+            fat_g=self.fat_g + other.fat_g,
+            carb_g=self.carb_g + other.carb_g,
+        )
+
+    def rounded(self, places: int = 1) -> "Nutrients":
+        return Nutrients(
+            kcal=round(self.kcal, places),
+            protein_g=round(self.protein_g, places),
+            fat_g=round(self.fat_g, places),
+            carb_g=round(self.carb_g, places),
+        )
+
+
+ZERO_NUTRIENTS = Nutrients(0.0, 0.0, 0.0, 0.0)
+
+
+@dataclass(frozen=True, slots=True)
 class MealSlot:
     meal_time: MealTime
     meal_id: str | None
     eaten_at: datetime | None
     skipped_at: datetime | None
-    kcal: float
+    nutrients: Nutrients
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,7 +186,7 @@ class DayFlow:
     steps: tuple[FlowStep, ...]
     completed: frozenset[FlowStep]
     current: FlowStep
-    eaten_kcal: float
+    eaten: Nutrients
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,33 +236,6 @@ class WorkoutTemplate:
 class ScheduleEntry:
     weekday: int
     template_id: str
-
-
-@dataclass(frozen=True, slots=True)
-class Nutrients:
-    kcal: float
-    protein_g: float
-    fat_g: float
-    carb_g: float
-
-    def __add__(self, other: "Nutrients") -> "Nutrients":
-        return Nutrients(
-            kcal=self.kcal + other.kcal,
-            protein_g=self.protein_g + other.protein_g,
-            fat_g=self.fat_g + other.fat_g,
-            carb_g=self.carb_g + other.carb_g,
-        )
-
-    def rounded(self, places: int = 1) -> "Nutrients":
-        return Nutrients(
-            kcal=round(self.kcal, places),
-            protein_g=round(self.protein_g, places),
-            fat_g=round(self.fat_g, places),
-            carb_g=round(self.carb_g, places),
-        )
-
-
-ZERO_NUTRIENTS = Nutrients(0.0, 0.0, 0.0, 0.0)
 
 
 @dataclass(frozen=True, slots=True)

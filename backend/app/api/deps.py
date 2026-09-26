@@ -6,7 +6,8 @@ from typing import Annotated
 import aiosqlite
 from fastapi import Depends, Header, HTTPException, status
 
-from app.adapters.ai.openai import OpenAIDecisionEngine, OpenAIImageRecognizer
+from app.adapters.ai.jev import JevDecisionEngine
+from app.adapters.ai.openai import OpenAIImageRecognizer
 from app.adapters.auth.identities import OidcIdentityVerifier
 from app.adapters.auth.passwords import Argon2Hasher
 from app.adapters.auth.tokens import JwtTokenIssuer
@@ -85,8 +86,8 @@ def object_storage() -> S3MealPhotoStorage:
 
 
 @lru_cache(maxsize=1)
-def decision_engine() -> OpenAIDecisionEngine:
-    return OpenAIDecisionEngine(settings.openai_api_key, settings.openai_model)
+def decision_engine() -> JevDecisionEngine:
+    return JevDecisionEngine(settings.jev_api_key, settings.jev_model)
 
 
 @lru_cache(maxsize=1)

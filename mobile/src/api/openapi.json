@@ -4281,9 +4281,8 @@
             "type": "string",
             "title": "Current"
           },
-          "eaten_kcal": {
-            "type": "number",
-            "title": "Eaten Kcal"
+          "eaten": {
+            "$ref": "#/components/schemas/NutrientsOut"
           }
         },
         "type": "object",
@@ -4291,7 +4290,7 @@
           "steps",
           "completed",
           "current",
-          "eaten_kcal"
+          "eaten"
         ],
         "title": "DayFlowOut"
       },
@@ -4549,6 +4548,39 @@
           "platform"
         ],
         "title": "DeviceIn"
+      },
+      "EstimatedFoodOut": {
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "title": "Category Id"
+          },
+          "kcal_per_100g": {
+            "type": "number",
+            "title": "Kcal Per 100G"
+          },
+          "protein_per_100g": {
+            "type": "number",
+            "title": "Protein Per 100G"
+          },
+          "fat_per_100g": {
+            "type": "number",
+            "title": "Fat Per 100G"
+          },
+          "carb_per_100g": {
+            "type": "number",
+            "title": "Carb Per 100G"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category_id",
+          "kcal_per_100g",
+          "protein_per_100g",
+          "fat_per_100g",
+          "carb_per_100g"
+        ],
+        "title": "EstimatedFoodOut"
       },
       "ExchangeOut": {
         "properties": {
@@ -6088,9 +6120,13 @@
             "type": "number",
             "title": "Grams"
           },
-          "confidence": {
+          "recognition_confidence": {
             "type": "number",
-            "title": "Confidence"
+            "title": "Recognition Confidence"
+          },
+          "match_confidence": {
+            "type": "number",
+            "title": "Match Confidence"
           },
           "alternatives": {
             "items": {
@@ -6098,6 +6134,16 @@
             },
             "type": "array",
             "title": "Alternatives"
+          },
+          "estimate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EstimatedFoodOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6106,8 +6152,10 @@
           "category_id",
           "food_id",
           "grams",
-          "confidence",
-          "alternatives"
+          "recognition_confidence",
+          "match_confidence",
+          "alternatives",
+          "estimate"
         ],
         "title": "RecognizedItemOut"
       },

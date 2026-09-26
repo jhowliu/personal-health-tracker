@@ -3,7 +3,7 @@
 Never stored — always derived from what actually happened that day.
 """
 
-from app.domain.models import DayFacts, DayFlow, FlowStep, MealTime, WorkoutTime
+from app.domain.models import DayFacts, DayFlow, FlowStep, MealTime, Nutrients, WorkoutTime
 
 _MEAL_STEP: dict[MealTime, FlowStep] = {
     MealTime.BREAKFAST: FlowStep.BREAKFAST,
@@ -36,11 +36,22 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
             completed.add(_MEAL_STEP[slot.meal_time])
 
     current = next((s for s in steps if s not in completed), FlowStep.DONE)
-    eaten_kcal = sum(s.kcal for s in facts.slots if s.eaten_at is not None)
+
+    eaten = Nutrients(0, 0, 0, 0)
+    for slot in facts.slots:
+        # Extras are only ever recorded after the fact, so there is nothing to mark: a
+        # photographed snack counts the moment it is saved.
+        if slot.eaten_at is not None or slot.meal_time is MealTime.EXTRAS:
+            eaten += slot.nutrients
 
     return DayFlow(
         steps=steps,
         completed=frozenset(completed),
         current=current,
-        eaten_kcal=round(eaten_kcal, 1),
+        eaten=Nutrients(
+            kcal=round(eaten.kcal, 1),
+            protein_g=round(eaten.protein_g, 1),
+            fat_g=round(eaten.fat_g, 1),
+            carb_g=round(eaten.carb_g, 1),
+        ),
     )

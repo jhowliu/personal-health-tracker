@@ -26,10 +26,17 @@ class MealPhoto:
 
 
 @dataclass(frozen=True, slots=True)
+class EstimatedFood:
+    category_id: str
+    per_100g: Nutrients
+
+
+@dataclass(frozen=True, slots=True)
 class Recognition:
     label: str
     grams: float
     confidence: float
+    estimate: EstimatedFood | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,8 +52,10 @@ class RecognizedItem:
     category_id: str | None
     food_id: str | None
     grams: float
-    confidence: float
+    recognition_confidence: float
+    match_confidence: float
     alternatives: tuple[RecognizedFood, ...]
+    estimate: EstimatedFood | None = None
 
 
 @dataclass(frozen=True, slots=True)

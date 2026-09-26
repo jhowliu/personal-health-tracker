@@ -914,8 +914,7 @@ export interface components {
             completed: string[];
             /** Current */
             current: string;
-            /** Eaten Kcal */
-            eaten_kcal: number;
+            eaten: components["schemas"]["NutrientsOut"];
         };
         /** DayPatch */
         DayPatch: {
@@ -989,6 +988,19 @@ export interface components {
              * @enum {string}
              */
             platform: "ios" | "android";
+        };
+        /** EstimatedFoodOut */
+        EstimatedFoodOut: {
+            /** Category Id */
+            category_id: string;
+            /** Kcal Per 100G */
+            kcal_per_100g: number;
+            /** Protein Per 100G */
+            protein_per_100g: number;
+            /** Fat Per 100G */
+            fat_per_100g: number;
+            /** Carb Per 100G */
+            carb_per_100g: number;
         };
         /** ExchangeOut */
         ExchangeOut: {
@@ -1462,10 +1474,13 @@ export interface components {
             food_id: string | null;
             /** Grams */
             grams: number;
-            /** Confidence */
-            confidence: number;
+            /** Recognition Confidence */
+            recognition_confidence: number;
+            /** Match Confidence */
+            match_confidence: number;
             /** Alternatives */
             alternatives: components["schemas"]["RecognizedFoodOut"][];
+            estimate: components["schemas"]["EstimatedFoodOut"] | null;
         };
         /** RefreshIn */
         RefreshIn: {

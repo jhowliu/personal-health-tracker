@@ -1,4 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
@@ -16,6 +17,7 @@ import {
   Title,
 } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { backOrReplace } from '@/navigation/back';
 import { replacement } from '@/workouts/replacement';
 
 type Template = Schema<'TemplateOut'>;
@@ -34,47 +36,92 @@ type Draft = {
 export default function EditTemplate() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
+  const navigation = useNavigation();
+  const [allowLeave, setAllowLeave] = useState(false);
 
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
   const [items, setItems] = useState<Draft[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
+  const [baseline, setBaseline] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    let live = true;
+    if (!id) {
+      backOrReplace('/workouts');
+      return;
+    }
     (async () => {
       try {
-        if (!isNew) {
+        if (isNew) {
+          if (!live) return;
+          setName('');
+          setDuration('');
+          setItems([]);
+          setBaseline(serialiseTemplate('', '', []));
+          setLoadedId(id);
+        } else {
           const template: Template = await api.get(`/workout-templates/${id}`);
+          if (!live) return;
           setName(template.name);
           setDuration(template.duration_min ? String(template.duration_min) : '');
-          setItems(template.items.map((item) => ({ ...item })));
+          const loadedItems = template.items.map((item) => ({ ...item }));
+          setItems(loadedItems);
+          setBaseline(serialiseTemplate(
+            template.name,
+            template.duration_min ? String(template.duration_min) : '',
+            loadedItems,
+          ));
+          setLoadedId(id);
         }
       } catch (error) {
-        Alert.alert('讀不到課表', error instanceof ApiError ? error.message : '請稍後再試');
-      } finally {
-        setReady(true);
+        Alert.alert('讀不到課表', error instanceof ApiError ? error.message : '請稍後再試', [
+          { text: '返回訓練', onPress: () => backOrReplace('/workouts') },
+        ]);
       }
     })();
+    return () => {
+      live = false;
+    };
   }, [id, isNew]);
 
-  useEffect(
-    () =>
-      replacement.subscribe(() => {
-        const selected = replacement.take();
-        if (!selected) return;
-        setItems((current) =>
-          current.map((item, index) =>
-            index === selected.index
-              ? { ...item, exercise_id: selected.exercise_id, exercise_name: selected.exercise_name }
-              : item,
-          ),
-        );
-      }),
-    [],
-  );
+  const ready = loadedId === id;
+  const dirty = ready && baseline !== serialiseTemplate(name, duration, items);
+
+  useEffect(() => {
+    if (!ready) return;
+    const consumeReplacement = () => {
+      const selected = replacement.take(id);
+      if (!selected) return;
+      setItems((current) =>
+        current.map((item, index) =>
+          index === selected.index
+            ? { ...item, exercise_id: selected.exercise_id, exercise_name: selected.exercise_name }
+            : item,
+        ),
+      );
+    };
+    consumeReplacement();
+    return replacement.subscribe(consumeReplacement);
+  }, [id, ready]);
+
+  usePreventRemove(dirty && !allowLeave, ({ data }) => {
+    if (busy) return;
+    Alert.alert('放棄未儲存的修改？', '這次編輯的課表內容將不會保留。', [
+      { text: '繼續編輯', style: 'cancel' },
+      {
+        text: '放棄',
+        style: 'destructive',
+        onPress: () => {
+          setAllowLeave(true);
+          requestAnimationFrame(() => navigation.dispatch(data.action));
+        },
+      },
+    ]);
+  });
 
   const move = (index: number, delta: number) => {
     const next = [...items];
@@ -124,7 +171,8 @@ export default function EditTemplate() {
     try {
       if (isNew) await api.post('/workout-templates', body);
       else await api.put(`/workout-templates/${id}`, body);
-      router.back();
+      setAllowLeave(true);
+      requestAnimationFrame(() => backOrReplace('/workouts'));
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -143,8 +191,23 @@ export default function EditTemplate() {
   }
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+    <Screen
+      footer={
+        <View className="flex-row items-center gap-3">
+          <Text className="text-sm text-muted">{items.length} 個動作</Text>
+          <View className="flex-1">
+            <PrimaryButton
+              onPress={save}
+              disabled={!name || items.length === 0}
+              busy={busy}
+            >
+              {busy ? '儲存中…' : '儲存課表'}
+            </PrimaryButton>
+          </View>
+        </View>
+      }
+    >
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/workouts')} disabled={busy}>
         <Text className="text-base text-primary">‹ 訓練</Text>
       </Pressable>
 
@@ -252,8 +315,8 @@ export default function EditTemplate() {
             <Pressable
               accessibilityRole="button"
               onPress={() =>
-                router.push(
-                  `/workouts/alternatives?exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
+                router.navigate(
+                  `/workouts/alternatives?template_id=${id}&exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
                 )
               }
             >
@@ -297,17 +360,17 @@ export default function EditTemplate() {
 
       {items.length === 0 ? <Hint>還沒有動作,從下面加入。</Hint> : null}
 
-       <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
-         {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
-       </PrimaryButton>
-
-        {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
-
-      <PrimaryButton onPress={save} disabled={busy || !name || items.length === 0}>
-        {busy ? '儲存中…' : '儲存課表'}
+      <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
+        {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
       </PrimaryButton>
+
+      {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
     </Screen>
   );
+}
+
+function serialiseTemplate(name: string, duration: string, items: Draft[]) {
+  return JSON.stringify({ name, duration, items });
 }
 
 function Arrow({

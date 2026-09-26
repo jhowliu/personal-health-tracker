@@ -1,10 +1,11 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { backOrReplace } from '@/navigation/back';
 
 type Reason = 'equipment_occupied' | 'knee_discomfort' | 'missing_equipment' | 'variety';
 type Alternative = {
@@ -30,11 +31,23 @@ export default function ReplaceTodayWorkout() {
   const [reason, setReason] = useState<Reason>('equipment_occupied');
   const [alternatives, setAlternatives] = useState<Alternative[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const loadVersion = useRef(0);
+
+  useEffect(() => {
+    if (!date || !itemId || !exerciseId) {
+      Alert.alert('找不到今日動作', '請回到今日流程重新選擇動作。', [
+        { text: '返回今天', onPress: () => router.replace('/today') },
+      ]);
+    }
+  }, [date, exerciseId, itemId]);
 
   const load = useCallback(async () => {
+    if (!exerciseId) return;
+    const version = ++loadVersion.current;
     try {
       setAlternatives(null);
-      setAlternatives(await api.get(`/exercises/${exerciseId}/alternatives?reason=${reason}`));
+      const result = await api.get(`/exercises/${exerciseId}/alternatives?reason=${reason}`);
+      if (version === loadVersion.current) setAlternatives(result);
     } catch (error) {
       Alert.alert('讀不到替代動作', error instanceof ApiError ? error.message : '請稍後再試');
       setAlternatives([]);
@@ -54,7 +67,7 @@ export default function ReplaceTodayWorkout() {
         exercise_id: exerciseId,
         replacement_reason: reason,
       });
-      router.back();
+      backOrReplace('/today');
     } catch (error) {
       Alert.alert('換不了動作', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -64,7 +77,7 @@ export default function ReplaceTodayWorkout() {
 
   return (
     <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/today')} disabled={busy}>
         <Text className="text-base text-primary">‹ 今日流程</Text>
       </Pressable>
       <Title sub="只換今天這一次，不會改到原本課表。">替代 {name ?? '動作'}</Title>

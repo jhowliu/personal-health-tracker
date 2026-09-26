@@ -10,6 +10,12 @@ from seeds.exercises import seed as seed_exercises
 from seeds.foods import seed as seed_foods
 
 
+@pytest.fixture(autouse=True)
+def isolate_ai_settings(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "jev_api_key", "")
+
+
 @pytest.fixture
 async def api(tmp_path, monkeypatch) -> AsyncIterator[AsyncClient]:
     db_path = str(tmp_path / "test.sqlite")

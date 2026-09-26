@@ -1,11 +1,13 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
+import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -43,27 +45,59 @@ const TAGS = [
 export default function EditMeal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
-  const current = useDraft();
+  const current = useDraft(id ?? '');
+  const navigation = useNavigation();
   const { profile } = useSession();
+  const [allowLeave, setAllowLeave] = useState(false);
 
-  const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [totals, setTotals] = useState<Nutrients | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      // Only load once per visit; coming back from add-food must not discard the draft.
-      if (ready) return;
-      (async () => {
-        try {
-          draft.start(isNew ? null : await api.get(`/meals/${id}`));
-        } catch (error) {
-          Alert.alert('讀不到餐點', error instanceof ApiError ? error.message : '請稍後再試');
-        } finally {
-          setReady(true);
-        }
-      })();
-    }, [id, isNew, ready]),
+  useEffect(() => {
+    let live = true;
+    if (!id) {
+      backOrReplace('/meals');
+      return;
+    }
+    if (draft.has(id)) return;
+    void (async () => {
+      try {
+        const meal = isNew ? null : await api.get(`/meals/${id}`);
+        if (live) draft.start(id, meal);
+      } catch (error) {
+        Alert.alert('讀不到餐點', error instanceof ApiError ? error.message : '請稍後再試', [
+          { text: '返回餐點', onPress: () => backOrReplace('/meals') },
+        ]);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [id, isNew]);
+
+  const ready = Boolean(id && draft.has(id));
+
+  usePreventRemove(Boolean(id && draft.isDirty(id) && !allowLeave), ({ data }) => {
+    if (busy || !id) return;
+    Alert.alert('放棄未儲存的修改？', '這次編輯的內容將不會保留。', [
+      { text: '繼續編輯', style: 'cancel' },
+      {
+        text: '放棄',
+        style: 'destructive',
+        onPress: () => {
+          setAllowLeave(true);
+          draft.clear(id);
+          requestAnimationFrame(() => navigation.dispatch(data.action));
+        },
+      },
+    ]);
+  });
+
+  useEffect(
+    () => () => {
+      if (id && !draft.isDirty(id)) draft.clear(id);
+    },
+    [id],
   );
 
   // The running total comes from the server so it matches the saved meal exactly.
@@ -89,9 +123,11 @@ export default function EditMeal() {
   const save = async () => {
     setBusy(true);
     try {
-      if (isNew) await api.post('/meals', draft.payload());
-      else await api.patch(`/meals/${id}`, draft.payload());
-      router.back();
+      if (isNew) await api.post('/meals', draft.payload(id));
+      else await api.patch(`/meals/${id}`, draft.payload(id));
+      setAllowLeave(true);
+      draft.clear(id);
+      requestAnimationFrame(() => backOrReplace('/meals'));
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -105,9 +141,11 @@ export default function EditMeal() {
       {
         text: '刪除',
         style: 'destructive',
-        onPress: async () => {
-          await api.delete(`/meals/${id}`);
-          router.back();
+          onPress: async () => {
+            await api.delete(`/meals/${id}`);
+            setAllowLeave(true);
+            draft.clear(id);
+            requestAnimationFrame(() => backOrReplace('/meals'));
         },
       },
     ]);
@@ -158,7 +196,7 @@ export default function EditMeal() {
         </>
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/meals')} disabled={busy}>
         <Text className="text-base text-primary">‹ 我的餐點</Text>
       </Pressable>
 
@@ -167,7 +205,7 @@ export default function EditMeal() {
       <Field
         label="餐點名稱"
         value={current.name}
-        onChangeText={(name) => draft.set({ name })}
+              onChangeText={(name) => draft.set(id, { name })}
         placeholder="乾煎雞腿＋蛋花湯"
       />
 
@@ -179,7 +217,7 @@ export default function EditMeal() {
               key={slot.id}
               label={slot.label}
               selected={current.mealTimes.includes(slot.id)}
-              onPress={() => draft.toggleMealTime(slot.id)}
+              onPress={() => draft.toggleMealTime(id, slot.id)}
             />
           ))}
         </View>
@@ -193,7 +231,7 @@ export default function EditMeal() {
               key={tag.id}
               label={tag.label}
               selected={current.tag === tag.id}
-              onPress={() => draft.set({ tag: tag.id })}
+              onPress={() => draft.set(id, { tag: tag.id })}
             />
           ))}
         </View>
@@ -213,7 +251,7 @@ export default function EditMeal() {
                   </View>
                   <Pressable
                     accessibilityRole="button"
-                     onPress={() => router.push(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
+                     onPress={() => router.navigate(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
                     className="min-h-[44px] justify-center pl-2"
                   >
                     <Text className="text-base text-primary underline">
@@ -225,7 +263,8 @@ export default function EditMeal() {
                 {group.items.map((item) => (
                   <ItemRow
                     key={item.key}
-                    item={item}
+                     item={item}
+                     draftKey={id}
                     scaled={Boolean(autoScaled) && group.category === 'staple'}
                   />
                 ))}
@@ -237,7 +276,7 @@ export default function EditMeal() {
 
        <Pressable
          accessibilityRole="button"
-         onPress={() => router.push(`/meals/add-food?meal_id=${id}`)}
+         onPress={() => router.navigate(`/meals/add-food?meal_id=${id}`)}
         className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
       >
          <Text className="text-base text-primary">＋ 加入食物</Text>
@@ -245,7 +284,7 @@ export default function EditMeal() {
 
        <Pressable
          accessibilityRole="button"
-         onPress={() => router.push(`/meals/photo?destination=meal&meal_id=${id}`)}
+         onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${id}`)}
          className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
        >
          <Text className="text-base text-primary">⌁ 用照片加入食物</Text>
@@ -264,7 +303,7 @@ export default function EditMeal() {
   );
 }
 
-function ItemRow({ item, scaled }: { item: DraftItem; scaled: boolean }) {
+function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string; scaled: boolean }) {
   const unitLabel =
     item.food.unit === 'piece' ? '顆' : item.food.unit === 'scoop' ? '匙' : item.food.unit;
   const display =
@@ -279,7 +318,7 @@ function ItemRow({ item, scaled }: { item: DraftItem; scaled: boolean }) {
       item.food.grams_per_unit && item.food.unit !== 'g'
         ? value * item.food.grams_per_unit
         : value;
-    draft.setGrams(item.key, grams);
+    draft.setGrams(draftKey, item.key, grams);
   };
 
   const kcal = Math.round((item.food.per_100g.kcal * item.grams) / 100);
@@ -298,7 +337,9 @@ function ItemRow({ item, scaled }: { item: DraftItem; scaled: boolean }) {
         <Pressable
           accessibilityRole="button"
           onPress={() =>
-            router.push(`/meals/substitute?key=${item.key}&food=${item.food.id}&grams=${item.grams}`)
+            router.navigate(
+              `/meals/substitute?meal_id=${draftKey}&key=${item.key}&food=${item.food.id}&grams=${item.grams}`,
+            )
           }
           className="min-h-[44px] justify-center rounded-field bg-fill px-4"
         >
@@ -307,7 +348,7 @@ function ItemRow({ item, scaled }: { item: DraftItem; scaled: boolean }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`移除${item.food.name}`}
-          onPress={() => draft.removeItem(item.key)}
+          onPress={() => draft.removeItem(draftKey, item.key)}
           className="h-11 w-11 items-center justify-center"
         >
           <Text className="text-lg text-muted">✕</Text>

@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { ApiError, api } from '@/api/client';
 import { Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { backOrReplace } from '@/navigation/back';
 import { replacement } from '@/workouts/replacement';
 
 type Alternative = {
@@ -20,13 +21,22 @@ const REASONS = [
 ] as const;
 
 export default function WorkoutAlternatives() {
-  const { exercise_id, item_index, name } = useLocalSearchParams<{
+  const { template_id: templateId, exercise_id, item_index, name } = useLocalSearchParams<{
+    template_id: string;
     exercise_id: string;
     item_index?: string;
     name?: string;
   }>();
   const [reason, setReason] = useState<(typeof REASONS)[number]['id']>('equipment');
   const [alternatives, setAlternatives] = useState<Alternative[] | null>(null);
+
+  useEffect(() => {
+    if (!templateId || !exercise_id || item_index === undefined || !Number.isInteger(Number(item_index))) {
+      Alert.alert('找不到課表動作', '請回到課表重新選擇要替換的動作。', [
+        { text: '返回訓練', onPress: () => router.replace('/workouts') },
+      ]);
+    }
+  }, [exercise_id, item_index, templateId]);
 
   useEffect(() => {
     api
@@ -37,7 +47,12 @@ export default function WorkoutAlternatives() {
 
   return (
     <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          backOrReplace({ pathname: '/workouts/[id]', params: { id: templateId ?? 'new' } })
+        }
+      >
         <Text className="text-base text-primary">‹ 課表</Text>
       </Pressable>
       <Title sub="選擇後只會更新目前課表草稿；不會改動已排定的當日訓練。">替代 {name ?? '動作'}</Title>
@@ -66,11 +81,12 @@ export default function WorkoutAlternatives() {
                     accessibilityRole="button"
                     onPress={() => {
                       replacement.choose({
+                        templateId,
                         index: Number(item_index),
                         exercise_id: alternative.exercise.id,
                         exercise_name: alternative.exercise.name,
                       });
-                      router.back();
+                       backOrReplace({ pathname: '/workouts/[id]', params: { id: templateId } });
                     }}
                     className="min-h-[44px] justify-center"
                   >

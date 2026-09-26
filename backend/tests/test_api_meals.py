@@ -189,4 +189,4 @@ async def test_planned_meals_show_up_in_the_day_calorie_count(with_meals: AsyncC
     await with_meals.patch(f"/days/{TODAY}/meals/breakfast")
 
     day = (await with_meals.get(f"/days/{TODAY}")).json()
-    assert day["flow"]["eaten_kcal"] > 0
+    assert day["flow"]["eaten"]["kcal"] > 0

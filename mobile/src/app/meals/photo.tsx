@@ -1,15 +1,14 @@
-import * as ImagePicker from 'expo-image-picker';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
 
-import { ApiError, api } from '@/api/client';
+import { ApiError } from '@/api/client';
 import { Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
-import { photoDraft, type PhotoAnalysis } from '@/meals/photo-draft';
+import { draft } from '@/meals/draft';
+import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
+import { photoDraft } from '@/meals/photo-draft';
+import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
-
-type PhotoCreate = { id: string; upload_url: string; status: string };
 
 export default function MealPhotoCapture() {
   const { destination = 'today', meal_id } = useLocalSearchParams<{
@@ -18,47 +17,29 @@ export default function MealPhotoCapture() {
   }>();
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const parentRoute =
+    destination === 'meal'
+      ? ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const)
+      : '/meals';
 
-  const choose = async (source: 'camera' | 'library') => {
-    const permission =
-      source === 'camera'
-        ? await ImagePicker.requestCameraPermissionsAsync()
-        : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('需要照片權限', source === 'camera' ? '請允許相機權限以拍攝餐點。' : '請允許相簿權限以選擇餐點照片。');
-      return;
+  useEffect(() => {
+    if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
+      Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。', [
+        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      ]);
     }
+  }, [destination, meal_id]);
 
-    const result =
-      source === 'camera'
-        ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.9 })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    setPreview(asset.uri);
-    await uploadAndAnalyze(asset.uri, asset.width, asset.height);
-  };
-
-  const uploadAndAnalyze = async (uri: string, width: number, height: number) => {
+  const choose = async () => {
     setBusy(true);
     try {
-      const resized = await manipulateAsync(
-        uri,
-        [{ resize: width >= height ? { width: 1024 } : { height: 1024 } }],
-        { compress: 0.8, format: SaveFormat.JPEG },
-      );
-      const photo: PhotoCreate = await api.post('/meal-photos', { content_type: 'image/jpeg' });
-      const image = await fetch(resized.uri);
-      const upload = await fetch(photo.upload_url, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'image/jpeg' },
-        body: await image.blob(),
-      });
-      if (!upload.ok) throw new Error('照片上傳失敗，請確認網路後再試。');
-      const analysis: PhotoAnalysis = await api.post(`/meal-photos/${photo.id}/analyze`);
+      const analysis = await pickAndAnalyzeMealPhoto(setPreview);
+      if (!analysis) return;
       photoDraft.set(analysis);
-      router.push({ pathname: '/meals/photo-results', params: { destination, meal_id } });
+      router.replace({
+        pathname: '/meals/photo-results',
+        params: { destination, meal_id, analysis_id: analysis.id },
+      });
     } catch (error) {
       const message =
         error instanceof ApiError && error.status >= 500
@@ -73,8 +54,14 @@ export default function MealPhotoCapture() {
   };
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()} disabled={busy}>
+    <Screen
+      footer={
+        <PrimaryButton onPress={choose} busy={busy}>
+          {busy ? '辨識中…' : '選擇餐點照片'}
+        </PrimaryButton>
+      }
+    >
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)} disabled={busy}>
         <Text className="text-base text-primary">‹ 返回</Text>
       </Pressable>
       <Title sub="拍一張清楚、光線足夠的餐點照，我們會找出食物與估計份量。">辨識餐點照片</Title>
@@ -97,14 +84,7 @@ export default function MealPhotoCapture() {
             <Hint>正在縮小、上傳並分析餐點。</Hint>
           </View>
         </Card>
-      ) : (
-        <View className="gap-3">
-          <PrimaryButton onPress={() => choose('camera')}>拍照辨識</PrimaryButton>
-          <PrimaryButton tone="plain" onPress={() => choose('library')}>
-            從相簿選擇
-          </PrimaryButton>
-        </View>
-      )}
+      ) : null}
     </Screen>
   );
 }

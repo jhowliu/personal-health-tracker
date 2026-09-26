@@ -1,8 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { DaySummary } from '@/components/DaySummary';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
@@ -43,13 +44,14 @@ function todayISO() {
 export default function TodayScreen() {
   const [day, setDay] = useState<Today | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [weighIn, setWeighIn] = useState({ weight: '', waist: '' });
   const date = todayISO();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (resetStep = false) => {
     try {
       const fresh = await api.get(`/days/${date}`);
       setDay(fresh);
-      setViewing(null);
+      if (resetStep) setViewing(null);
     } catch (error) {
       Alert.alert('讀不到今天的資料', error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -69,13 +71,13 @@ export default function TodayScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      void load();
     }, [load]),
   );
 
   if (!day) {
     return (
-      <Screen scroll={false}>
+      <Screen scroll={false} footerSafeArea={false}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={color.primary} />
         </View>
@@ -84,48 +86,95 @@ export default function TodayScreen() {
   }
 
   const step = viewing ?? day.flow.current;
-  const parsed = new Date(`${day.date}T00:00:00`);
+  const header = <TodayHeader day={day} step={step} onSelect={setViewing} />;
 
+  if (step === 'body') {
+    return (
+      <WeighInStep
+        header={header}
+        date={day.date}
+        value={weighIn}
+        onChange={setWeighIn}
+        onSaved={() => {
+          setWeighIn({ weight: '', waist: '' });
+          return load(true);
+        }}
+      />
+    );
+  }
+  if (step === 'done') {
+    return (
+      <Screen footerSafeArea={false}>
+        {header}
+        <DoneStep day={day} />
+      </Screen>
+    );
+  }
+  if (step === 'workout') {
+    return (
+      <WorkoutStep
+        header={header}
+        date={day.date}
+        onDone={() => load(true)}
+        onStateChanged={() => refreshAt('workout')}
+      />
+    );
+  }
   return (
-    <Screen scroll={step === 'workout'}>
-      <View className="gap-3 pb-3">
-        <View className="items-center">
-          <Text className="font-display text-lg font-bold text-ink">
-            {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
-          </Text>
-          <Text className="text-sm text-muted">
-            已吃 {Math.round(day.flow.eaten_kcal).toLocaleString()} / {day.targets.kcal.toLocaleString()} 大卡
-            {day.streak > 0 ? ` · 連續 ${day.streak} 天` : ''}
-          </Text>
-        </View>
-
-        <StepIndicator
-          steps={day.flow.steps}
-          completed={day.flow.completed}
-          current={day.flow.current}
-          onSelect={setViewing}
-        />
-      </View>
-
-      <View className="flex-1">
-        {step === 'body' ? (
-          <WeighInStep date={day.date} onSaved={load} />
-        ) : step === 'done' ? (
-          <DoneStep day={day} />
-        ) : step === 'workout' ? (
-          <WorkoutStep date={day.date} onDone={load} onStateChanged={() => refreshAt('workout')} />
-        ) : (
-          <MealStep step={step} day={day} onDone={load} onStateChanged={() => refreshAt(step)} />
-        )}
-      </View>
-    </Screen>
+    <MealStep
+      header={header}
+      step={step}
+      day={day}
+      onDone={() => load(true)}
+      onStateChanged={() => refreshAt(step)}
+    />
   );
 }
 
-function WeighInStep({ date, onSaved }: { date: string; onSaved: () => void }) {
-  const [weight, setWeight] = useState('');
-  const [waist, setWaist] = useState('');
+function TodayHeader({
+  day,
+  step,
+  onSelect,
+}: {
+  day: Today;
+  step: string;
+  onSelect: (step: string) => void;
+}) {
+  const parsed = new Date(`${day.date}T00:00:00`);
+  return (
+    <View className="gap-3 pb-3">
+      <View className="items-center">
+        <Text className="font-display text-lg font-bold text-ink">
+          {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
+        </Text>
+        {day.streak > 0 ? <Text className="text-sm text-muted">連續 {day.streak} 天</Text> : null}
+      </View>
+      <DaySummary eaten={day.flow.eaten} targets={day.targets} />
+      <StepIndicator
+        steps={day.flow.steps}
+        completed={day.flow.completed}
+        current={step}
+        onSelect={onSelect}
+      />
+    </View>
+  );
+}
+
+function WeighInStep({
+  header,
+  date,
+  value,
+  onChange,
+  onSaved,
+}: {
+  header: ReactNode;
+  date: string;
+  value: { weight: string; waist: string };
+  onChange: (value: { weight: string; waist: string }) => void;
+  onSaved: () => void;
+}) {
   const [busy, setBusy] = useState(false);
+  const { weight, waist } = value;
 
   const save = async () => {
     setBusy(true);
@@ -143,7 +192,16 @@ function WeighInStep({ date, onSaved }: { date: string; onSaved: () => void }) {
   };
 
   return (
-    <View className="flex-1 gap-4">
+    <Screen
+      footerSafeArea={false}
+      footer={
+        <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
+          {busy ? '儲存中…' : '儲存,下一步:早餐'}
+        </PrimaryButton>
+      }
+    >
+      {header}
+      <View className="gap-4">
       <View className="gap-1">
         <Hint>起床、上完廁所、還沒吃喝前</Hint>
         <Title>早安,先量一下</Title>
@@ -151,33 +209,37 @@ function WeighInStep({ date, onSaved }: { date: string; onSaved: () => void }) {
 
       <Card className="gap-3">
         <View className="flex-row gap-3">
-          <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
+          <Field
+            label="體重"
+            suffix="kg"
+            value={weight}
+            onChangeText={(next) => onChange({ ...value, weight: next })}
+            keyboardType="decimal-pad"
+          />
           <Field
             label="腰圍(選填)"
             suffix="cm"
             value={waist}
-            onChangeText={setWaist}
+            onChangeText={(next) => onChange({ ...value, waist: next })}
             keyboardType="decimal-pad"
           />
         </View>
         <Hint>腰圍量肚臍那一圈,自然吐氣時讀數字。一週量一次就好。</Hint>
       </Card>
 
-      <View className="flex-1" />
-
-      <PrimaryButton onPress={save} disabled={busy || (!weight && !waist)}>
-        {busy ? '儲存中…' : '儲存,下一步:早餐'}
-      </PrimaryButton>
-    </View>
+      </View>
+    </Screen>
   );
 }
 
 function MealStep({
+  header,
   step,
   day,
   onDone,
   onStateChanged,
 }: {
+  header: ReactNode;
   step: string;
   day: Today;
   onDone: () => void;
@@ -228,43 +290,91 @@ function MealStep({
 
   if (!plan) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator color={color.primary} />
-      </View>
+      <Screen footerSafeArea={false}>
+        {header}
+        <View className="items-center py-12">
+          <ActivityIndicator color={color.primary} />
+        </View>
+      </Screen>
     );
   }
 
   if (!meal) {
     return (
-      <View className="flex-1 gap-4">
-        <Title sub="還沒有適合這個時段的餐點">{STEP_LABEL[step]}</Title>
-        <Card className="gap-2">
-          <Text className="text-base text-ink">
-            可以直接加入今天吃的已知食物，或到「餐點」分頁新增標記為{STEP_LABEL[step]}的餐點，之後每天會自動排進來。
-          </Text>
-        </Card>
-        <View className="flex-1" />
-        <View className="gap-2">
+      <Screen
+        footerSafeArea={false}
+        footer={
+          <>
+            <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
+              {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
+            </PrimaryButton>
+            <PrimaryButton tone="plain" onPress={() => setMealState('skipped')} disabled={busy}>
+              今天略過這餐
+            </PrimaryButton>
+          </>
+        }
+      >
+        {header}
+        <View className="gap-4">
+          <Title sub="還沒有適合這個時段的餐點">{STEP_LABEL[step]}</Title>
+          <Card className="gap-2">
+            <Text className="text-base text-ink">
+              可以直接加入今天吃的已知食物，或到「餐點」分頁新增標記為{STEP_LABEL[step]}的餐點，之後每天會自動排進來。
+            </Text>
+          </Card>
           <PrimaryButton
             tone="plain"
-            onPress={() => router.push(`/meals/add-food?destination=day&date=${day.date}&slot=${step}`)}
+            onPress={() => router.navigate(`/meals/add-food?destination=day&date=${day.date}&slot=${step}`)}
             disabled={busy}
           >
             ＋ 加入食物
           </PrimaryButton>
-          <PrimaryButton onPress={() => setMealState('eaten')} disabled={busy}>
+        </View>
+      </Screen>
+    );
+  }
+
+  const footer = (
+    <>
+      <View className="flex-row items-baseline justify-between">
+        <Text className="text-sm text-muted">本餐</Text>
+        <Text className="font-display text-xl font-bold text-ink">
+          {meal.skipped ? '未計入' : `${Math.round(meal.nutrients.kcal)} 大卡`}
+        </Text>
+      </View>
+      {meal.skipped ? (
+        <>
+          <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
+            {busy ? '處理中…' : '仍要標記吃完'}
+          </PrimaryButton>
+          <PrimaryButton tone="plain" onPress={() => setMealState('planned')} disabled={busy}>
+            改回未吃
+          </PrimaryButton>
+        </>
+      ) : meal.eaten ? (
+        <>
+          <Hint>這餐已標記吃完。</Hint>
+          <PrimaryButton tone="plain" onPress={() => setMealState('planned')} disabled={busy}>
+            改回未吃
+          </PrimaryButton>
+        </>
+      ) : (
+        <>
+          <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
             {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
           </PrimaryButton>
           <PrimaryButton tone="plain" onPress={() => setMealState('skipped')} disabled={busy}>
             今天略過這餐
           </PrimaryButton>
-        </View>
-      </View>
-    );
-  }
+        </>
+      )}
+    </>
+  );
 
   return (
-    <View className="flex-1 gap-4">
+    <Screen footerSafeArea={false} footer={footer}>
+      {header}
+      <View className="gap-4">
       <View className="gap-1">
         <Hint>今天的{STEP_LABEL[step]}</Hint>
         <Title>{meal.name}</Title>
@@ -294,7 +404,7 @@ function MealStep({
                             accessibilityRole="button"
                             accessibilityLabel={`換掉${itemName}`}
                             onPress={() =>
-                              router.push(
+                              router.navigate(
                                 `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${food.id}&grams=${item.grams}`,
                               )
                             }
@@ -365,7 +475,7 @@ function MealStep({
           <Pressable
             accessibilityRole="button"
             disabled={busy}
-            onPress={() => router.push(`/meals/add-food?destination=day&date=${day.date}&slot=${step}`)}
+            onPress={() => router.navigate(`/meals/add-food?destination=day&date=${day.date}&slot=${step}`)}
             className="min-h-[44px] items-center justify-center"
           >
             <Text className="text-base text-primary underline">＋ 加入食物</Text>
@@ -373,35 +483,8 @@ function MealStep({
         </>
       )}
 
-      <View className="flex-1" />
-
-      {meal.skipped ? (
-        <View className="gap-2">
-          <PrimaryButton onPress={() => setMealState('eaten')} disabled={busy}>
-            {busy ? '處理中…' : '仍要標記吃完'}
-          </PrimaryButton>
-          <PrimaryButton tone="plain" onPress={() => setMealState('planned')} disabled={busy}>
-            改回未吃
-          </PrimaryButton>
-        </View>
-      ) : meal.eaten ? (
-        <View className="gap-2">
-          <Hint>這餐已標記吃完。</Hint>
-          <PrimaryButton tone="plain" onPress={() => setMealState('planned')} disabled={busy}>
-            改回未吃
-          </PrimaryButton>
-        </View>
-      ) : (
-        <View className="gap-2">
-          <PrimaryButton onPress={() => setMealState('eaten')} disabled={busy}>
-            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
-          </PrimaryButton>
-          <PrimaryButton tone="plain" onPress={() => setMealState('skipped')} disabled={busy}>
-            今天略過這餐
-          </PrimaryButton>
-        </View>
-      )}
-    </View>
+      </View>
+    </Screen>
   );
 }
 
@@ -439,10 +522,12 @@ function formatPlanItem(item: PlannedMealItem) {
 }
 
 function WorkoutStep({
+  header,
   date,
   onDone,
   onStateChanged,
 }: {
+  header: ReactNode;
   date: string;
   onDone: () => void;
   onStateChanged: () => void;
@@ -606,18 +691,51 @@ function WorkoutStep({
 
   if (!workout) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator color={color.primary} />
-      </View>
+      <Screen footerSafeArea={false}>
+        {header}
+        <View className="items-center py-12">
+          <ActivityIndicator color={color.primary} />
+        </View>
+      </Screen>
     );
   }
 
   const allComplete = workout.items.every((entry) => completedSetCount(entry) >= (entry.item.sets ?? 1));
+  const completedExercises = workout.items.filter(
+    (entry) => completedSetCount(entry) >= (entry.item.sets ?? 1),
+  ).length;
   const templateName = workout.template?.name;
 
   return (
-    <View className="flex-1 gap-4">
-      <Title sub={templateName ? `今天的課表：${templateName}` : '今天沒有排定訓練'}>運動</Title>
+    <Screen
+      footerSafeArea={false}
+      footer={
+        <>
+          <View className="flex-row items-baseline justify-between">
+            <Text className="text-sm text-muted">完成進度</Text>
+            <Text className="text-base font-semibold text-ink">
+              {completedExercises} / {workout.items.length} 個動作
+            </Text>
+          </View>
+          {workoutSkipped ? (
+            <PrimaryButton onPress={complete} busy={busy}>
+              仍要完成今日訓練
+            </PrimaryButton>
+          ) : allComplete && workout.items.length > 0 ? (
+            <PrimaryButton onPress={complete} busy={busy}>
+              {busy ? '處理中…' : '完成今日訓練'}
+            </PrimaryButton>
+          ) : (
+            <PrimaryButton tone="plain" onPress={skipWorkout} busy={busy}>
+              {busy ? '處理中…' : '今天不練'}
+            </PrimaryButton>
+          )}
+        </>
+      }
+    >
+      {header}
+      <View className="gap-4">
+        <Title sub={templateName ? `今天的課表：${templateName}` : '今天沒有排定訓練'}>運動</Title>
 
       {workoutSkipped ? (
         <Card className="gap-3 bg-fill">
@@ -625,7 +743,6 @@ function WorkoutStep({
             <Text className="text-base font-semibold text-ink">今天已略過訓練</Text>
             <Hint>略過已儲存。若後來完成了訓練，可直接標記完成。</Hint>
           </View>
-          <PrimaryButton onPress={complete} disabled={busy}>仍要完成今日訓練</PrimaryButton>
         </Card>
       ) : (
         <>
@@ -741,7 +858,7 @@ function WorkoutStep({
               accessibilityRole="button"
               disabled={busy}
               onPress={() =>
-                router.push(
+                router.navigate(
                   `/workouts/replace-today?date=${date}&item_id=${prescribed.id}&exercise_id=${prescribed.exercise_id}&name=${encodeURIComponent(prescribed.exercise_name)}`,
                 )
               }
@@ -824,22 +941,13 @@ function WorkoutStep({
 
           {workout.items.length === 0 ? <Hint>今天沒有安排訓練。</Hint> : null}
 
-          <PrimaryButton tone="plain" onPress={() => router.push(`/workouts/add-today?date=${date}`)} disabled={busy}>
+          <PrimaryButton tone="plain" onPress={() => router.navigate(`/workouts/add-today?date=${date}`)} disabled={busy}>
             ＋ 加入動作
           </PrimaryButton>
-
-          {allComplete && workout.items.length > 0 ? (
-            <PrimaryButton onPress={complete} disabled={busy}>
-              {busy ? '處理中…' : '完成今日訓練'}
-            </PrimaryButton>
-          ) : (
-            <PrimaryButton tone="plain" onPress={skipWorkout} disabled={busy}>
-              {busy ? '處理中…' : '今天不練'}
-            </PrimaryButton>
-          )}
         </>
       )}
-    </View>
+      </View>
+    </Screen>
   );
 }
 
@@ -848,7 +956,7 @@ function completedSetCount(item: WorkoutItem) {
 }
 
 function DoneStep({ day }: { day: Today }) {
-  const remaining = day.targets.kcal - day.flow.eaten_kcal;
+  const remaining = day.targets.kcal - day.flow.eaten.kcal;
 
   return (
     <View className="flex-1 gap-4">
@@ -856,7 +964,7 @@ function DoneStep({ day }: { day: Today }) {
 
       <Card className="gap-3">
         <Text className="font-display text-4xl font-bold text-ink">
-          {Math.round(day.flow.eaten_kcal).toLocaleString()}{' '}
+          {Math.round(day.flow.eaten.kcal).toLocaleString()}{' '}
           <Text className="text-base font-normal text-muted">
             / {day.targets.kcal.toLocaleString()} 大卡
           </Text>

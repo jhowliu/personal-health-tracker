@@ -1,6 +1,7 @@
 """S3-compatible object storage adapter; boto3 stays entirely in this module."""
 
 import boto3
+from botocore.exceptions import ClientError
 
 from app.domain.errors import ServiceUnavailable, ValidationFailed
 
@@ -62,6 +63,18 @@ class S3MealPhotoStorage:
         except Exception as exc:
             raise ServiceUnavailable("照片儲存服務暫時不可用") from exc
         return url
+
+    async def exists(self, object_key: str) -> bool:
+        await self._ensure_bucket()
+        try:
+            self._client.head_object(Bucket=self._bucket, Key=object_key)
+            return True
+        except ClientError as exc:
+            if exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+                return False
+            raise ServiceUnavailable("照片儲存服務暫時不可用") from exc
+        except Exception as exc:
+            raise ServiceUnavailable("照片儲存服務暫時不可用") from exc
 
     async def _ensure_bucket(self) -> None:
         if self._ready:

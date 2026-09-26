@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PROJECT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_PROJECT_ENV_FILE, extra="ignore")
 
     db_path: str = "/data/pht.sqlite"
 
@@ -24,7 +28,9 @@ class Settings(BaseSettings):
     s3_public_endpoint: str = ""
 
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-5-mini"
+    jev_api_key: str = ""
+    jev_model: str = "typesafe-ai/jev"
     daily_ai_image_quota: int = 10
 
     google_client_id_ios: str = ""

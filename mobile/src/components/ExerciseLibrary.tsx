@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
@@ -20,8 +20,10 @@ export function ExerciseLibrary({
   const [category, setCategory] = useState('all');
   const [bodyRegion, setBodyRegion] = useState('all');
   const [equipment, setEquipment] = useState('all');
+  const loadVersion = useRef(0);
 
   useEffect(() => {
+    const version = ++loadVersion.current;
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
@@ -31,11 +33,14 @@ export function ExerciseLibrary({
         if (bodyRegion !== 'all') params.set('body_region', bodyRegion);
         if (equipment !== 'all') params.set('equipment', equipment);
         const suffix = params.size ? `?${params}` : '';
-        setExercises(await api.get(`/exercises${suffix}`));
+        const result = await api.get(`/exercises${suffix}`);
+        if (version === loadVersion.current) setExercises(result);
       } catch (error) {
-        Alert.alert('讀不到動作庫', error instanceof ApiError ? error.message : '請稍後再試');
+        if (version === loadVersion.current) {
+          Alert.alert('讀不到動作庫', error instanceof ApiError ? error.message : '請稍後再試');
+        }
       } finally {
-        setLoading(false);
+        if (version === loadVersion.current) setLoading(false);
       }
     }, 200);
     return () => clearTimeout(timer);

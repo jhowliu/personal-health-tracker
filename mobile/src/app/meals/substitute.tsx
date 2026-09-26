@@ -1,11 +1,12 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
+import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Exchange = Schema<'ExchangeOut'>;
@@ -26,7 +27,8 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export default function Substitute() {
-  const { key, food: foodId, grams } = useLocalSearchParams<{
+  const { meal_id: mealId, key, food: foodId, grams } = useLocalSearchParams<{
+    meal_id: string;
     key: string;
     food: string;
     grams: string;
@@ -37,6 +39,16 @@ export default function Substitute() {
   const [basis, setBasis] = useState<string | null>(null);
   const [options, setOptions] = useState<Exchange[] | null>(null);
   const [picked, setPicked] = useState<Exchange | null>(null);
+  const loadVersion = useRef(0);
+  const parentRoute = { pathname: '/meals/[id]', params: { id: mealId ?? 'new' } } as const;
+
+  useEffect(() => {
+    if (!mealId || !key || !foodId || !grams || !draft.has(mealId)) {
+      Alert.alert('找不到餐點草稿', '請回到餐點頁重新選擇要替換的食物。', [
+        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      ]);
+    }
+  }, [foodId, grams, key, mealId]);
 
   useEffect(() => {
     (async () => {
@@ -58,10 +70,14 @@ export default function Substitute() {
   }, [foodId]);
 
   const load = useCallback(async () => {
+    if (!foodId || !grams) return;
+    const version = ++loadVersion.current;
+    setOptions(null);
+    setPicked(null);
     try {
       const chosen = basis ?? defaultBasis;
-      setOptions(await api.get(`/foods/${foodId}/exchanges?grams=${grams}&match=${chosen}`));
-      setPicked(null);
+      const result = await api.get(`/foods/${foodId}/exchanges?grams=${grams}&match=${chosen}`);
+      if (version === loadVersion.current) setOptions(result);
     } catch (error) {
       Alert.alert('讀不到替換選項', error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -74,17 +90,31 @@ export default function Substitute() {
   );
 
   const confirm = () => {
-    if (!picked) return;
-    draft.replaceItem(key, picked.food, picked.grams);
-    router.back();
+    if (!picked || !mealId || !draft.has(mealId)) return;
+    draft.replaceItem(mealId, key, picked.food, picked.grams);
+    backOrReplace(parentRoute);
   };
 
   const active = basis ?? defaultBasis;
   const alternatives = defaultBasis === 'kcal' ? ['kcal'] : [defaultBasis, 'kcal'];
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+    <Screen
+      footer={
+        picked ? (
+          <>
+            <View className="flex-row items-baseline justify-between gap-3">
+              <Text className="flex-1 text-base font-semibold text-ink" numberOfLines={1}>
+                {picked.food.name}
+              </Text>
+              <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>
+            </View>
+            <PrimaryButton onPress={confirm}>確認替換</PrimaryButton>
+          </>
+        ) : undefined
+      }
+    >
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)}>
         <Text className="text-base text-primary">‹ 編輯餐點</Text>
       </Pressable>
 
@@ -142,9 +172,6 @@ export default function Substitute() {
         </Card>
       )}
 
-      <PrimaryButton onPress={confirm} disabled={!picked}>
-        確認替換
-      </PrimaryButton>
     </Screen>
   );
 }

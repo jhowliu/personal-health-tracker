@@ -4,7 +4,8 @@ from httpx import AsyncClient
 import app.api.deps as deps
 from app.config import settings
 from app.domain.decisions import DecisionResult
-from app.domain.meal_photos import Recognition
+from app.domain.meal_photos import EstimatedFood, Recognition
+from app.domain.models import Nutrients
 
 
 class FakeStorage:
@@ -17,6 +18,14 @@ class FakeStorage:
 
     async def create_download_url(self, object_key: str) -> str:
         return f"https://storage.test/{object_key}"
+
+    async def exists(self, object_key: str) -> bool:
+        return True
+
+
+class MissingObjectStorage(FakeStorage):
+    async def exists(self, object_key: str) -> bool:
+        return False
 
 
 class FakeRecognizer:
@@ -55,6 +64,18 @@ async def test_photo_ownership_and_missing_ai_key_return_safe_errors(
     )
     signed_in.headers["Authorization"] = f"Bearer {other.json()['access_token']}"
     assert (await signed_in.post(f"/meal-photos/{photo_id}/analyze")).status_code == 404
+
+
+async def test_photo_analysis_rejects_an_upload_that_never_reached_storage(
+    signed_in: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: MissingObjectStorage())
+    created = await signed_in.post("/meal-photos", json={"content_type": "image/jpeg"})
+
+    analyzed = await signed_in.post(f"/meal-photos/{created.json()['id']}/analyze")
+
+    assert analyzed.status_code == 422
+    assert analyzed.json()["detail"] == "照片尚未完成上傳，請重新選擇照片"
 
 
 async def test_photo_recognition_matches_visible_food_candidates(
@@ -222,6 +243,67 @@ class UnsureDecisionEngine:
         return DecisionResult(request.options[0].id, 0.3, "not sure")
 
 
+class UnexpectedDecisionEngine:
+    async def decide(self, request) -> DecisionResult:
+        raise AssertionError("exact local matches must not call the decision engine")
+
+
+class ExactRecognizer:
+    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+        return (Recognition("香蕉", 120, 0.91),)
+
+
+class NewFoodRecognizer:
+    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+        return (
+            Recognition(
+                "火龍果",
+                180,
+                0.88,
+                EstimatedFood("fruit", Nutrients(50, 1.1, 0.2, 11)),
+            ),
+        )
+
+
+async def test_photo_exact_local_match_skips_the_decision_layer(
+    with_foods: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    monkeypatch.setattr(deps, "image_recognizer", lambda: ExactRecognizer())
+    monkeypatch.setattr(deps, "decision_engine", lambda: UnexpectedDecisionEngine())
+
+    photo = await with_foods.post("/meal-photos", json={"content_type": "image/png"})
+    analyzed = await with_foods.post(f"/meal-photos/{photo.json()['id']}/analyze")
+
+    assert analyzed.status_code == 200
+    item = analyzed.json()["items"][0]
+    assert item["food_id"] == "banana"
+    assert item["recognition_confidence"] == 0.91
+    assert item["match_confidence"] == 1.0
+
+
+async def test_photo_unmatched_food_returns_an_estimate_for_confirmation(
+    with_foods: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    monkeypatch.setattr(deps, "image_recognizer", lambda: NewFoodRecognizer())
+
+    photo = await with_foods.post("/meal-photos", json={"content_type": "image/png"})
+    analyzed = await with_foods.post(f"/meal-photos/{photo.json()['id']}/analyze")
+
+    assert analyzed.status_code == 200
+    item = analyzed.json()["items"][0]
+    assert item["food_id"] is None
+    assert item["recognition_confidence"] == 0.88
+    assert item["estimate"] == {
+        "category_id": "fruit",
+        "kcal_per_100g": 50.0,
+        "protein_per_100g": 1.1,
+        "fat_per_100g": 0.2,
+        "carb_per_100g": 11.0,
+    }
+
+
 async def test_photo_match_follows_the_decision_layer_not_the_first_search_hit(
     with_foods: AsyncClient, monkeypatch
 ):
@@ -238,8 +320,8 @@ async def test_photo_match_follows_the_decision_layer_not_the_first_search_hit(
     item = analyzed.json()["items"][0]
     assert item["food_id"] == candidates[:10][-1]["id"]
     assert item["food_id"] != candidates[0]["id"]
-    # Confidence now describes the food match, not the image model's 0.91 for the label.
-    assert item["confidence"] == 0.93
+    assert item["recognition_confidence"] == 0.91
+    assert item["match_confidence"] == 0.93
     # The screen looks the selected food up inside alternatives, so it has to lead them.
     assert item["alternatives"][0]["food_id"] == item["food_id"]
 
@@ -259,7 +341,8 @@ async def test_photo_match_falls_back_to_the_best_hit_when_the_pick_is_unusable(
     item = analyzed.json()["items"][0]
     # Still pre-filled, but at zero confidence so the screen asks the user to confirm.
     assert item["food_id"] == candidates[0]["id"]
-    assert item["confidence"] == 0.0
+    assert item["recognition_confidence"] == 0.91
+    assert item["match_confidence"] == 0.0
     assert item["alternatives"]
 
 
@@ -291,3 +374,21 @@ async def test_unsure_alternatives_keep_the_deterministic_order(
     assert alternatives[0]["exercise"]["body_region"] == "lower_body"
     # The same-region rule flags several, unlike a decision which flags exactly one.
     assert sum(1 for item in alternatives if item["recommended"]) > 1
+
+
+async def test_photographed_extras_count_towards_what_was_eaten(
+    with_foods: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    before = (await with_foods.get("/days/2026-09-23")).json()["flow"]["eaten"]
+
+    added = await with_foods.post(
+        "/days/2026-09-23/meals/extras/items",
+        json={"food_id": "chicken-breast-cooked", "grams": 100},
+    )
+    assert added.status_code == 201
+
+    after = (await with_foods.get("/days/2026-09-23")).json()["flow"]["eaten"]
+    # Extras are recorded after the fact, so there is no "mark eaten" step to wait for.
+    assert after["kcal"] - before["kcal"] == 165
+    assert after["protein_g"] - before["protein_g"] == 31

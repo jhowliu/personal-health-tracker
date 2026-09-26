@@ -7,12 +7,21 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SessionProvider } from '@/auth/session';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
+import { draft } from '@/meals/draft';
+import { photoDraft } from '@/meals/photo-draft';
+import { replacement } from '@/workouts/replacement';
+
+function clearUserState() {
+  draft.clearAll();
+  photoDraft.clearAll();
+  replacement.clear();
+}
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SessionProvider>
+        <SessionProvider onSignedOut={clearUserState}>
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FBFAF7' } }} />
           <NumericDoneBar />

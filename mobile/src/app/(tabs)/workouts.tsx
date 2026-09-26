@@ -1,6 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Card, Chip, Empty, Hint, Rows, Screen, SectionHeading, Title } from '@/components/ui';
@@ -52,7 +53,7 @@ export default function WorkoutsScreen() {
     setBusy(true);
     try {
       setSchedule(await api.put('/workout-schedule', next));
-      setEditingDay(null);
+      setEditingDay((current) => (current === weekday ? null : current));
     } catch (error) {
       Alert.alert('排程存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -62,7 +63,7 @@ export default function WorkoutsScreen() {
 
   if (!templates) {
     return (
-      <Screen scroll={false}>
+      <Screen scroll={false} footerSafeArea={false}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={color.primary} />
         </View>
@@ -71,20 +72,25 @@ export default function WorkoutsScreen() {
   }
 
   const byId = new Map(templates.map((template) => [template.id, template]));
+  const editingEntry = schedule.find((item) => item.weekday === editingDay);
+  const editingTemplate = editingEntry ? byId.get(editingEntry.template_id) : undefined;
 
   return (
-    <Screen>
-      <View className="flex-row items-center justify-between">
-        <Title>訓練</Title>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/workouts/new')}
-          className="min-h-[44px] justify-center rounded-field bg-primary px-4"
-        >
-          <Text className="text-base font-semibold text-white">+ 新增課表</Text>
-        </Pressable>
-      </View>
-
+    <Screen
+      footerSafeArea={false}
+      pinnedHeader={
+        <View className="flex-row items-center justify-between">
+          <Title>訓練</Title>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.navigate('/workouts/new')}
+            className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+          >
+            <Text className="text-base font-semibold text-white">+ 新增課表</Text>
+          </Pressable>
+        </View>
+      }
+    >
       <SectionHeading>一週排程</SectionHeading>
       {templates.length === 0 ? (
         <Hint>先新增一份課表,才排得進星期幾。</Hint>
@@ -104,8 +110,9 @@ export default function WorkoutsScreen() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityState={{ expanded: open }}
+                  disabled={busy}
                   onPress={() => setEditingDay(open ? null : weekday)}
-                  className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
+                  className={`min-h-[44px] flex-row items-center justify-between gap-3 py-3 ${busy ? 'opacity-40' : ''}`}
                 >
                   <View className="flex-1 gap-0.5">
                     <Text className="text-base font-semibold text-ink">{label}</Text>
@@ -115,26 +122,6 @@ export default function WorkoutsScreen() {
                   <Text className="text-base text-primary">{open ? '收起' : '更改'}</Text>
                 </Pressable>
 
-                {open ? (
-                  <View className="gap-2 pb-3">
-                    <ScheduleOption
-                      label="休息日"
-                      selected={!entry}
-                      disabled={busy}
-                      onPress={() => assign(weekday, null)}
-                    />
-                    {templates.map((option) => (
-                      <ScheduleOption
-                        key={option.id}
-                        label={option.name}
-                        detail={describe(option)}
-                        selected={entry?.template_id === option.id}
-                        disabled={busy}
-                        onPress={() => assign(weekday, option.id)}
-                      />
-                    ))}
-                  </View>
-                ) : null}
               </View>
             );
           })}
@@ -151,7 +138,7 @@ export default function WorkoutsScreen() {
               <Pressable
                 key={template.id}
                 accessibilityRole="button"
-                onPress={() => router.push(`/workouts/${template.id}`)}
+                onPress={() => router.navigate(`/workouts/${template.id}`)}
                 className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
               >
                 <View className="flex-1 gap-0.5">
@@ -168,6 +155,63 @@ export default function WorkoutsScreen() {
           </Rows>
         </Card>
       )}
+
+      <Modal
+        visible={editingDay !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!busy) setEditingDay(null);
+        }}
+      >
+        <Pressable
+          accessible={false}
+          onPress={() => {
+            if (!busy) setEditingDay(null);
+          }}
+          className="flex-1 justify-end"
+          style={{ backgroundColor: 'rgba(35, 31, 32, 0.35)' }}
+        >
+          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-card bg-bg px-5 pb-3 pt-5">
+            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-3">
+              <View className="flex-row items-start justify-between gap-3">
+                <View className="flex-1 gap-1">
+                  <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
+                    {editingDay === null ? '' : WEEKDAYS[editingDay]}
+                  </Text>
+                  <Text className="text-sm text-muted">目前：{editingTemplate?.name ?? '休息日'}</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={() => setEditingDay(null)}
+                  className={`min-h-[44px] justify-center px-2 ${busy ? 'opacity-40' : ''}`}
+                >
+                  <Text className="text-base text-primary">關閉</Text>
+                </Pressable>
+              </View>
+              <ScrollView contentContainerClassName="gap-2 pb-4" keyboardShouldPersistTaps="handled">
+                <ScheduleOption
+                  label="休息日"
+                  selected={!editingEntry}
+                  disabled={busy || editingDay === null}
+                  onPress={() => editingDay !== null && assign(editingDay, null)}
+                />
+                {templates.map((option) => (
+                  <ScheduleOption
+                    key={option.id}
+                    label={option.name}
+                    detail={describe(option)}
+                    selected={editingEntry?.template_id === option.id}
+                    disabled={busy || editingDay === null}
+                    onPress={() => editingDay !== null && assign(editingDay, option.id)}
+                  />
+                ))}
+              </ScrollView>
+            </Pressable>
+          </SafeAreaView>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
