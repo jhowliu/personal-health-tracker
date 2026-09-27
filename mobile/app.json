@@ -38,6 +38,13 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "拍下餐點照片，辨識吃了哪些食物與大約份量。",
+          "photosPermission": "從相簿選擇餐點照片來辨識食物。"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "color": "#A3245F"

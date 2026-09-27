@@ -7,6 +7,8 @@ from app.domain.errors import (
     InvalidCredentials,
     NotFound,
     PermissionDenied,
+    QuotaExceeded,
+    ServiceUnavailable,
     ValidationFailed,
 )
 
@@ -16,6 +18,8 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
     InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
     PermissionDenied: status.HTTP_403_FORBIDDEN,
     ValidationFailed: status.HTTP_422_UNPROCESSABLE_CONTENT,
+    QuotaExceeded: status.HTTP_429_TOO_MANY_REQUESTS,
+    ServiceUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

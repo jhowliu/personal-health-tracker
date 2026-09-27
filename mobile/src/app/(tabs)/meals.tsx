@@ -32,30 +32,46 @@ export default function MealsScreen() {
   const [tab, setTab] = useState<Tab>('mine');
 
   return (
-    <Screen>
-      <View className="flex-row items-center justify-between">
-        <Title>餐點</Title>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push(tab === 'mine' ? '/meals/new' : '/meals/add-food')}
-          className="min-h-[44px] justify-center rounded-field bg-primary px-4"
-        >
-          <Text className="text-base font-semibold text-white">
-            {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
-          </Text>
-        </Pressable>
-      </View>
-
-      <Segmented
-        value={tab}
-        onChange={setTab}
-        tone="soft"
-        options={[
-          { value: 'mine', label: '我的餐點' },
-          { value: 'library', label: '食物庫' },
-        ]}
-      />
-
+    <Screen
+      footerSafeArea={false}
+      pinnedHeader={
+        <>
+          <View className="flex-row items-center justify-between">
+            <Title>餐點</Title>
+            <View className="flex-row items-center gap-2">
+              {tab === 'mine' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="用照片記錄今天吃的食物"
+                  onPress={() => router.navigate('/meals/photo?destination=today')}
+                  className="h-11 w-11 items-center justify-center rounded-field bg-fill"
+                >
+                  <Text className="text-xl text-primary">⌁</Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
+                className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+              >
+                <Text className="text-base font-semibold text-white">
+                  {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+          <Segmented
+            value={tab}
+            onChange={setTab}
+            tone="soft"
+            options={[
+              { value: 'mine', label: '我的餐點' },
+              { value: 'library', label: '食物庫' },
+            ]}
+          />
+        </>
+      }
+    >
       {tab === 'mine' ? <MyMeals /> : <FoodLibrary />}
     </Screen>
   );
@@ -134,7 +150,7 @@ function MyMeals() {
             <MealCard
               key={meal.id}
               meal={meal}
-              onPress={() => router.push(`/meals/${meal.id}`)}
+              onPress={() => router.navigate(`/meals/${meal.id}`)}
             />
           ))}
         </Rows>

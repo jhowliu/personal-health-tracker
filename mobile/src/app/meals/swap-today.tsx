@@ -5,13 +5,14 @@
  * the day's plan, so the change lands on today only and leaves the recipe alone.
  */
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { backOrReplace } from '@/navigation/back';
 
 type Exchange = Schema<'ExchangeOut'>;
 type Category = Schema<'FoodCategoryOut'>;
@@ -37,6 +38,15 @@ export default function SwapToday() {
   const [options, setOptions] = useState<Exchange[] | null>(null);
   const [picked, setPicked] = useState<Exchange | null>(null);
   const [busy, setBusy] = useState(false);
+  const loadVersion = useRef(0);
+
+  useEffect(() => {
+    if (!params.date || !params.slot || !params.item || !params.food || !params.grams) {
+      Alert.alert('找不到今日餐點', '請回到今日流程重新選擇要替換的食物。', [
+        { text: '返回今天', onPress: () => router.replace('/today') },
+      ]);
+    }
+  }, [params.date, params.food, params.grams, params.item, params.slot]);
 
   useEffect(() => {
     (async () => {
@@ -56,12 +66,16 @@ export default function SwapToday() {
   }, [params.food]);
 
   const load = useCallback(async () => {
+    if (!params.food || !params.grams) return;
+    const version = ++loadVersion.current;
+    setOptions(null);
+    setPicked(null);
     try {
       const chosen = basis ?? defaultBasis;
-      setOptions(
-        await api.get(`/foods/${params.food}/exchanges?grams=${params.grams}&match=${chosen}`),
+      const result = await api.get(
+        `/foods/${params.food}/exchanges?grams=${params.grams}&match=${chosen}`,
       );
-      setPicked(null);
+      if (version === loadVersion.current) setOptions(result);
     } catch (error) {
       Alert.alert('讀不到替換選項', error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -82,7 +96,7 @@ export default function SwapToday() {
         to_food_id: picked.food.id,
         match: basis ?? defaultBasis,
       });
-      router.back();
+      backOrReplace('/today');
     } catch (error) {
       Alert.alert('換不了', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -94,8 +108,24 @@ export default function SwapToday() {
   const choices = defaultBasis === 'kcal' ? [] : [defaultBasis, 'kcal'];
 
   return (
-    <Screen>
-      <Pressable accessibilityRole="button" onPress={() => router.back()}>
+    <Screen
+      footer={
+        picked ? (
+          <>
+            <View className="flex-row items-baseline justify-between gap-3">
+              <Text className="flex-1 text-base font-semibold text-ink" numberOfLines={1}>
+                {picked.food.name}
+              </Text>
+              <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>
+            </View>
+            <PrimaryButton onPress={confirm} busy={busy}>
+              {busy ? '處理中…' : '換成這個'}
+            </PrimaryButton>
+          </>
+        ) : undefined
+      }
+    >
+      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/today')} disabled={busy}>
         <Text className="text-base text-primary">‹ 今日流程</Text>
       </Pressable>
 
@@ -142,10 +172,6 @@ export default function SwapToday() {
           </Rows>
         </Card>
       )}
-
-      <PrimaryButton onPress={confirm} disabled={!picked || busy}>
-        {busy ? '處理中…' : '換成這個'}
-      </PrimaryButton>
 
       {categories.length === 0 ? null : (
         <Hint>想永久替換,到「餐點」分頁編輯這道餐點。</Hint>

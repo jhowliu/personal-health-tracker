@@ -1,7 +1,15 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUserId, Meals
-from app.api.schemas import CalculateIn, MealIn, MealOut, MealPatch, NutrientsOut
+from app.api.deps import CurrentUserId, Decisions, Meals
+from app.api.schemas import (
+    CalculateIn,
+    MealIn,
+    MealOut,
+    MealPatch,
+    MealSettingsSuggestionOut,
+    NutrientsOut,
+    SuggestionIn,
+)
 from app.domain.models import MealTag, MealTime
 
 router = APIRouter(prefix="/meals", tags=["meals"])
@@ -31,12 +39,17 @@ async def create_meal(payload: MealIn, user_id: CurrentUserId, service: Meals) -
 
 
 @router.post("/calculate", response_model=NutrientsOut)
-async def calculate(
-    payload: CalculateIn, user_id: CurrentUserId, service: Meals
-) -> NutrientsOut:
+async def calculate(payload: CalculateIn, user_id: CurrentUserId, service: Meals) -> NutrientsOut:
     """Totals for a draft meal. Stores nothing — the edit screen calls this while typing."""
     items = tuple((i.food_id, i.grams) for i in payload.items)
     return NutrientsOut.of(await service.calculate(user_id, items))
+
+
+@router.post("/suggest-settings", response_model=MealSettingsSuggestionOut)
+async def suggest_settings(
+    payload: SuggestionIn, user_id: CurrentUserId, service: Decisions
+) -> MealSettingsSuggestionOut:
+    return MealSettingsSuggestionOut.of(await service.meal_settings(payload.subject))
 
 
 @router.get("/{meal_id}", response_model=MealOut)

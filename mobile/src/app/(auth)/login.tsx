@@ -1,13 +1,15 @@
-import { Link, router } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Field, PrimaryButton, Screen, Title } from '@/components/ui';
+import { safeReturnTo } from '@/navigation/return-to';
 
 export default function Login() {
   const { signIn } = useSession();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -16,7 +18,7 @@ export default function Login() {
     setBusy(true);
     try {
       await signIn('/auth/login', { email, password });
-      router.replace('/');
+      router.replace(safeReturnTo(returnTo));
     } catch (error) {
       Alert.alert('登入失敗', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -71,7 +73,7 @@ export default function Login() {
 
         <Text className="text-center text-base text-muted">
           還沒有帳號?{' '}
-          <Link href="/register" className="text-primary underline">
+          <Link href={{ pathname: '/register', params: { returnTo } }} className="text-primary underline">
             註冊新帳號
           </Link>
         </Text>

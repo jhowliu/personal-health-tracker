@@ -1,0 +1,1 @@
+"""AI vendor adapters."""

@@ -1,9 +1,9 @@
 /**
- * The meal being edited, shared across the edit / add-food / substitute screens.
+ * Meals being edited, shared across the edit / add-food / substitute screens.
  *
  * Expo Router has no way to hand a value back when a pushed screen pops, so the draft
- * lives here instead of being threaded through route params. Screens read it with
- * `useDraft()` and change it through the named actions — none of them splice arrays.
+ * live here instead of being threaded through route params. Each draft is keyed by the
+ * meal route id so two mounted editors can never write through the same mutable state.
  *
  * Grams here are always *baseline* grams, the same thing the server stores. carb_scale
  * is applied when a day is planned, never to the template being edited.
@@ -32,12 +32,27 @@ export type Draft = {
 
 const EMPTY: Draft = { id: null, name: '', tag: 'regular', mealTimes: ['lunch'], items: [] };
 
-let current: Draft = EMPTY;
+const drafts = new Map<string, Draft>();
+const baselines = new Map<string, string>();
 const listeners = new Set<() => void>();
 
-function commit(next: Draft) {
-  current = next;
+function commit(key: string, next: Draft) {
+  drafts.set(key, next);
   listeners.forEach((notify) => notify());
+}
+
+function get(key: string): Draft {
+  return drafts.get(key) ?? EMPTY;
+}
+
+function requireDraft(key: string): Draft {
+  const current = drafts.get(key);
+  if (!current) throw new Error('找不到目前餐點草稿，請回到餐點頁重新開啟。');
+  return current;
+}
+
+function serialise(value: Draft) {
+  return JSON.stringify(value);
 }
 
 function subscribe(listener: () => void) {
@@ -49,9 +64,13 @@ let counter = 0;
 const nextKey = () => `draft-${counter++}`;
 
 export const draft = {
+  has(key: string) {
+    return drafts.has(key);
+  },
+
   /** Begin editing — an existing meal, or a blank one when given null. */
-  start(meal: Meal | null) {
-    commit(
+  start(key: string, meal: Meal | null) {
+    const next: Draft =
       meal
         ? {
             id: meal.id,
@@ -64,47 +83,55 @@ export const draft = {
               grams: item.grams,
             })),
           }
-        : { ...EMPTY, items: [] },
-    );
+        : { ...EMPTY, items: [] };
+    drafts.set(key, next);
+    baselines.set(key, serialise(next));
+    listeners.forEach((notify) => notify());
   },
 
-  set(changes: Partial<Omit<Draft, 'items'>>) {
-    commit({ ...current, ...changes });
+  set(key: string, changes: Partial<Omit<Draft, 'items'>>) {
+    commit(key, { ...requireDraft(key), ...changes });
   },
 
-  toggleMealTime(slot: Draft['mealTimes'][number]) {
+  toggleMealTime(key: string, slot: Draft['mealTimes'][number]) {
+    const current = requireDraft(key);
     const has = current.mealTimes.includes(slot);
     const mealTimes = has
       ? current.mealTimes.filter((s) => s !== slot)
       : [...current.mealTimes, slot];
     // A meal nobody can be served is not worth saving, so never empty the list.
-    commit({ ...current, mealTimes: mealTimes.length ? mealTimes : current.mealTimes });
+    commit(key, { ...current, mealTimes: mealTimes.length ? mealTimes : current.mealTimes });
   },
 
-  addItem(food: Food, grams: number) {
-    commit({ ...current, items: [...current.items, { key: nextKey(), food, grams }] });
+  addItem(key: string, food: Food, grams: number) {
+    const current = requireDraft(key);
+    commit(key, { ...current, items: [...current.items, { key: nextKey(), food, grams }] });
   },
 
-  setGrams(key: string, grams: number) {
-    commit({
+  setGrams(draftKey: string, itemKey: string, grams: number) {
+    const current = requireDraft(draftKey);
+    commit(draftKey, {
       ...current,
-      items: current.items.map((item) => (item.key === key ? { ...item, grams } : item)),
+      items: current.items.map((item) => (item.key === itemKey ? { ...item, grams } : item)),
     });
   },
 
-  replaceItem(key: string, food: Food, grams: number) {
-    commit({
+  replaceItem(draftKey: string, itemKey: string, food: Food, grams: number) {
+    const current = requireDraft(draftKey);
+    commit(draftKey, {
       ...current,
-      items: current.items.map((item) => (item.key === key ? { ...item, food, grams } : item)),
+      items: current.items.map((item) => (item.key === itemKey ? { ...item, food, grams } : item)),
     });
   },
 
-  removeItem(key: string) {
-    commit({ ...current, items: current.items.filter((item) => item.key !== key) });
+  removeItem(draftKey: string, itemKey: string) {
+    const current = requireDraft(draftKey);
+    commit(draftKey, { ...current, items: current.items.filter((item) => item.key !== itemKey) });
   },
 
   /** The shape POST/PATCH /meals expects. */
-  payload() {
+  payload(key: string) {
+    const current = requireDraft(key);
     return {
       name: current.name,
       tag: current.tag,
@@ -112,8 +139,25 @@ export const draft = {
       items: current.items.map((item) => ({ food_id: item.food.id, grams: item.grams })),
     };
   },
+
+  isDirty(key: string) {
+    const current = drafts.get(key);
+    return Boolean(current && baselines.get(key) !== serialise(current));
+  },
+
+  clear(key: string) {
+    drafts.delete(key);
+    baselines.delete(key);
+    listeners.forEach((notify) => notify());
+  },
+
+  clearAll() {
+    drafts.clear();
+    baselines.clear();
+    listeners.forEach((notify) => notify());
+  },
 };
 
-export function useDraft(): Draft {
-  return useSyncExternalStore(subscribe, () => current);
+export function useDraft(key: string): Draft {
+  return useSyncExternalStore(subscribe, () => get(key));
 }

@@ -1,10 +1,11 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Card, Field, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
+import { safeReturnTo } from '@/navigation/return-to';
 
 type Targets = Schema<'TargetsOut'>;
 type Sex = 'f' | 'm';
@@ -29,6 +30,7 @@ const TIMEZONE = 'Asia/Taipei';
 
 export default function ProfileSetup() {
   const { reload } = useSession();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
 
   const [sex, setSex] = useState<Sex>('f');
   const [age, setAge] = useState('31');
@@ -88,7 +90,7 @@ export default function ProfileSetup() {
         });
       }
       await reload();
-      router.replace('/today');
+      router.replace(safeReturnTo(returnTo));
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
@@ -97,7 +99,26 @@ export default function ProfileSetup() {
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <View className="flex-row items-center gap-3">
+          {payload && targets ? (
+            <View>
+              <Text className="text-xs text-muted">每日目標</Text>
+              <Text className="font-display text-lg font-bold text-ink">
+                {targets.kcal.toLocaleString()}{' '}
+                <Text className="text-xs font-normal text-muted">大卡</Text>
+              </Text>
+            </View>
+          ) : null}
+          <View className="flex-1">
+            <PrimaryButton onPress={submit} disabled={!payload} busy={busy}>
+              {busy ? '儲存中…' : '開始使用'}
+            </PrimaryButton>
+          </View>
+        </View>
+      }
+    >
       <View className="gap-5 pt-4">
         <Title sub="用來計算每天的熱量和營養素目標">建立你的資料</Title>
 
@@ -140,10 +161,6 @@ export default function ProfileSetup() {
         <Picker label="減脂速度" value={deficit} labels={DEFICIT_LABEL} onChange={setDeficit} />
 
         <TargetPreview targets={payload ? targets : null} />
-
-        <PrimaryButton onPress={submit} disabled={busy || !payload}>
-          {busy ? '儲存中…' : '開始使用'}
-        </PrimaryButton>
       </View>
     </Screen>
   );
@@ -171,15 +188,19 @@ function Picker<T extends string | number>({
           const option = normalise(key);
           const active = option === value;
           return (
-            <Text
+            <Pressable
               key={String(key)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
               onPress={() => onChange(option)}
-              className={`overflow-hidden rounded-field px-3 py-3 text-base ${
-                active ? 'bg-ink font-semibold text-white' : 'border border-line bg-surface text-ink'
+              className={`min-h-[44px] justify-center overflow-hidden rounded-field px-3 ${
+                active ? 'bg-ink' : 'border border-line bg-surface'
               }`}
             >
-              {labels[key]}
-            </Text>
+              <Text className={`text-base ${active ? 'font-semibold text-white' : 'text-ink'}`}>
+                {labels[key]}
+              </Text>
+            </Pressable>
           );
         })}
       </View>

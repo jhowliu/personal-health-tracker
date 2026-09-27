@@ -1,7 +1,8 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
 
+import { ProtectedRoute } from '@/auth/route-gates';
 import { useSession } from '@/auth/session';
 import { registerPushToken } from '@/notifications/push';
 import { color } from '@/theme/tokens';
@@ -21,37 +22,29 @@ export default function TabsLayout() {
     if (status === 'ready') registerPushToken();
   }, [status]);
 
-  if (status === 'loading') {
-    return (
-      <View className="flex-1 items-center justify-center bg-bg">
-        <ActivityIndicator color={color.primary} />
-      </View>
-    );
-  }
-  if (status === 'signedOut') return <Redirect href="/login" />;
-  if (status === 'newUser') return <Redirect href="/profile-setup" />;
-
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: color.primary,
-        tabBarInactiveTintColor: color.muted,
-        tabBarStyle: { backgroundColor: color.surface, borderTopColor: color.line },
-        sceneStyle: { backgroundColor: color.bg },
-      }}
-    >
-      {TABS.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            title: tab.title,
-            tabBarIcon: ({ focused }) => <Dot focused={focused} />,
-          }}
-        />
-      ))}
-    </Tabs>
+    <ProtectedRoute>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: color.primary,
+          tabBarInactiveTintColor: color.muted,
+          tabBarStyle: { backgroundColor: color.surface, borderTopColor: color.line },
+          sceneStyle: { backgroundColor: color.bg },
+        }}
+      >
+        {TABS.map((tab) => (
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              title: tab.title,
+              tabBarIcon: ({ focused }) => <Dot focused={focused} />,
+            }}
+          />
+        ))}
+      </Tabs>
+    </ProtectedRoute>
   );
 }
 

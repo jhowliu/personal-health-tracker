@@ -63,7 +63,7 @@ export default function BodyScreen() {
 
   if (!summary) {
     return (
-      <Screen scroll={false}>
+      <Screen scroll={false} footerSafeArea={false}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={color.primary} />
         </View>
@@ -72,7 +72,7 @@ export default function BodyScreen() {
   }
 
   return (
-    <Screen>
+    <Screen footerSafeArea={false}>
       <Title>身形追蹤</Title>
 
       <Card className="gap-3">

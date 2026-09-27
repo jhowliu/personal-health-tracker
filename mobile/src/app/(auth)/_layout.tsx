@@ -1,5 +1,11 @@
 import { Stack } from 'expo-router';
 
+import { AuthRoute } from '@/auth/route-gates';
+
 export default function AuthLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <AuthRoute>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthRoute>
+  );
 }

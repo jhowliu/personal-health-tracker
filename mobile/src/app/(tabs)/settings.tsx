@@ -51,7 +51,7 @@ export default function SettingsScreen() {
     ]);
 
   return (
-    <Screen>
+    <Screen footerSafeArea={false}>
       <Title>設定</Title>
 
       <SectionHeading action={<Text className="text-base text-primary">編輯</Text>}>
@@ -75,6 +75,8 @@ export default function SettingsScreen() {
           <Row label="蛋白質" value={`${targets.protein_g} g`} />
           <Row label="脂肪" value={`${targets.fat_g} g`} />
           <Row label="碳水" value={`${targets.carb_g} g`} />
+          <Row label="基礎代謝" value={`${targets.bmr.toLocaleString()} 大卡`} />
+          <Row label="每日總消耗" value={`${targets.tdee.toLocaleString()} 大卡`} />
         </Rows>
       </Card>
 
