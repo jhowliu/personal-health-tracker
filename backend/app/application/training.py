@@ -162,12 +162,31 @@ class TrainingService:
         return found
 
     async def save_template(self, user_id: str, template: WorkoutTemplate) -> WorkoutTemplate:
+        current = await self._store.load_template(user_id, template.id) if template.id else None
+        if current is not None and current.is_builtin:
+            raise PermissionDenied("公用課表不能修改,請先複製一份")
         stored = template if template.id else replace(template, id=new_id())
-        stored = replace(stored, location=await self._location_for(user_id, stored.items))
+        stored = replace(
+            stored,
+            location=await self._location_for(user_id, stored.items),
+            is_builtin=False,
+        )
         await self._store.save_template(user_id, stored)
         if stored.items:
             await self._store.replace_items(user_id, stored.id, stored.items)
         return stored
+
+    async def copy_template(self, user_id: str, template_id: str) -> WorkoutTemplate:
+        source = await self.template(user_id, template_id)
+        copied = replace(
+            source,
+            id=new_id(),
+            name=f"{source.name} 副本",
+            is_builtin=False,
+            items=tuple(replace(item, id=new_id()) for item in source.items),
+        )
+        await self.save_template(user_id, copied)
+        return await self.template(user_id, copied.id)
 
     async def _location_for(self, user_id: str, items: tuple[TemplateItem, ...]) -> str:
         if not items:
@@ -181,12 +200,13 @@ class TrainingService:
         return infer_location(stated.get(item.exercise_id) for item in items)
 
     async def remove_template(self, user_id: str, template_id: str) -> None:
+        await self._template_owned_by(user_id, template_id)
         await self._store.archive_template(user_id, template_id)
 
     async def reorder_items(
         self, user_id: str, template_id: str, item_ids: tuple[str, ...]
     ) -> WorkoutTemplate:
-        current = await self.template(user_id, template_id)
+        current = await self._template_owned_by(user_id, template_id)
         by_id = {item.id: item for item in current.items}
         missing = set(item_ids) ^ set(by_id)
         if missing:
@@ -204,8 +224,16 @@ class TrainingService:
     async def set_schedule(
         self, user_id: str, entries: tuple[ScheduleEntry, ...]
     ) -> tuple[ScheduleEntry, ...]:
+        for entry in entries:
+            await self.template(user_id, entry.template_id)
         await self._store.replace_schedule(user_id, entries)
         return await self._store.load_schedule(user_id)
+
+    async def _template_owned_by(self, user_id: str, template_id: str) -> WorkoutTemplate:
+        template = await self.template(user_id, template_id)
+        if template.is_builtin:
+            raise PermissionDenied("公用課表不能修改或刪除,請先複製一份")
+        return template
 
 
 _REASON_LABEL = {"equipment": "沒有器材", "pain": "不舒服", "variety": "想換動作"}

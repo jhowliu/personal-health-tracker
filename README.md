@@ -57,13 +57,17 @@ cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.foods
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.exercises
 ```
 
+```bash
+cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.workout_templates
+```
+
 可選的範例餐點,讓新帳號一進來今日流程就有東西可排:
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.sample_meals
 ```
 
-內建食物與動作 seed 都可重複執行:只會更新同 id 的內建資料；範例餐點會跳過已經有餐點的使用者。
+內建食物、動作與公用課表 seed 都可重複執行:只會更新同 id 的內建資料；範例餐點會跳過已經有餐點的使用者。
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite JWT_SECRET=$(openssl rand -hex 32) .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010

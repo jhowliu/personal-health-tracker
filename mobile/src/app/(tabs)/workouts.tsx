@@ -72,6 +72,8 @@ export default function WorkoutsScreen() {
   }
 
   const byId = new Map(templates.map((template) => [template.id, template]));
+  const builtinTemplates = templates.filter((template) => template.is_builtin);
+  const ownedTemplates = templates.filter((template) => !template.is_builtin);
   const editingEntry = schedule.find((item) => item.weekday === editingDay);
   const editingTemplate = editingEntry ? byId.get(editingEntry.template_id) : undefined;
 
@@ -128,29 +130,28 @@ export default function WorkoutsScreen() {
         </Rows>
       </Card>
 
-      <SectionHeading>課表</SectionHeading>
-      {templates.length === 0 ? (
-        <Empty>還沒有課表,按右上角新增一份</Empty>
+      {builtinTemplates.length > 0 ? (
+        <>
+          <SectionHeading>公用課表</SectionHeading>
+          <Hint>公用課表可直接排程；要調整內容時，先複製成自己的課表。</Hint>
+          <Card className="py-0">
+            <Rows>
+              {builtinTemplates.map((template) => (
+                <TemplateRow key={template.id} template={template} />
+              ))}
+            </Rows>
+          </Card>
+        </>
+      ) : null}
+
+      <SectionHeading>我的課表</SectionHeading>
+      {ownedTemplates.length === 0 ? (
+        <Empty>還沒有自己的課表,可新增或從公用課表複製</Empty>
       ) : (
         <Card className="py-0">
           <Rows>
-            {templates.map((template) => (
-              <Pressable
-                key={template.id}
-                accessibilityRole="button"
-                onPress={() => router.navigate(`/workouts/${template.id}`)}
-                className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
-              >
-                <View className="flex-1 gap-0.5">
-                  <Text className="text-base font-semibold text-ink">{template.name}</Text>
-                  <Text className="text-sm text-muted">{describe(template)}</Text>
-                </View>
-                <Chip
-                  label={template.location === 'gym' ? '健身房' : '在家'}
-                  tone={template.location === 'gym' ? 'primary' : 'neutral'}
-                />
-                <Text className="text-base text-primary">編輯</Text>
-              </Pressable>
+            {ownedTemplates.map((template) => (
+              <TemplateRow key={template.id} template={template} />
             ))}
           </Rows>
         </Card>
@@ -201,7 +202,7 @@ export default function WorkoutsScreen() {
                   <ScheduleOption
                     key={option.id}
                     label={option.name}
-                    detail={describe(option)}
+                    detail={`${option.is_builtin ? '公用 · ' : ''}${describe(option)}`}
                     selected={editingEntry?.template_id === option.id}
                     disabled={busy || editingDay === null}
                     onPress={() => editingDay !== null && assign(editingDay, option.id)}
@@ -213,6 +214,26 @@ export default function WorkoutsScreen() {
         </Pressable>
       </Modal>
     </Screen>
+  );
+}
+
+function TemplateRow({ template }: { template: Template }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => router.navigate(`/workouts/${template.id}`)}
+      className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
+    >
+      <View className="flex-1 gap-0.5">
+        <Text className="text-base font-semibold text-ink">{template.name}</Text>
+        <Text className="text-sm text-muted">{describe(template)}</Text>
+      </View>
+      <Chip
+        label={template.location === 'gym' ? '健身房' : '在家'}
+        tone={template.location === 'gym' ? 'primary' : 'neutral'}
+      />
+      <Text className="text-base text-primary">{template.is_builtin ? '查看' : '編輯'}</Text>
+    </Pressable>
   );
 }
 

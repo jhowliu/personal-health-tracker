@@ -360,6 +360,7 @@ class TemplateOut(BaseModel):
     name: str
     location: str
     duration_min: int | None
+    is_builtin: bool
     items: list[TemplateItemOut]
 
     @classmethod
@@ -370,6 +371,7 @@ class TemplateOut(BaseModel):
             name=template.name,
             location=template.location,
             duration_min=template.duration_min,
+            is_builtin=template.is_builtin,
             items=[TemplateItemOut.of(i) for i in template.items],
         )
 
@@ -450,6 +452,7 @@ class WorkoutTemplateMetaOut(BaseModel):
     name: str
     location: str
     duration_min: int | None
+    is_builtin: bool
 
     @classmethod
     def of(cls, template: WorkoutTemplate) -> "WorkoutTemplateMetaOut":
@@ -459,6 +462,7 @@ class WorkoutTemplateMetaOut(BaseModel):
             name=template.name,
             location=template.location,
             duration_min=template.duration_min,
+            is_builtin=template.is_builtin,
         )
 
 

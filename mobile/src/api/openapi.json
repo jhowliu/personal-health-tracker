@@ -3589,6 +3589,64 @@
         }
       }
     },
+    "/workout-templates/{template_id}/copy": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Copy Template",
+        "operationId": "copy_template_workout_templates__template_id__copy_post",
+        "parameters": [
+          {
+            "name": "template_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Template Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/workout-templates/{template_id}": {
       "get": {
         "tags": [
@@ -6802,6 +6860,10 @@
             ],
             "title": "Duration Min"
           },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/TemplateItemOut"
@@ -6817,6 +6879,7 @@
           "name",
           "location",
           "duration_min",
+          "is_builtin",
           "items"
         ],
         "title": "TemplateOut"
@@ -7240,6 +7303,10 @@
               }
             ],
             "title": "Duration Min"
+          },
+          "is_builtin": {
+            "type": "boolean",
+            "title": "Is Builtin"
           }
         },
         "type": "object",
@@ -7248,7 +7315,8 @@
           "category_id",
           "name",
           "location",
-          "duration_min"
+          "duration_min",
+          "is_builtin"
         ],
         "title": "WorkoutTemplateMetaOut"
       }

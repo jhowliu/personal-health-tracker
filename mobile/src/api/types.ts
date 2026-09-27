@@ -766,6 +766,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workout-templates/{template_id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Template */
+        post: operations["copy_template_workout_templates__template_id__copy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workout-templates/{template_id}": {
         parameters: {
             query?: never;
@@ -1669,6 +1686,8 @@ export interface components {
             location: string;
             /** Duration Min */
             duration_min: number | null;
+            /** Is Builtin */
+            is_builtin: boolean;
             /** Items */
             items: components["schemas"]["TemplateItemOut"][];
         };
@@ -1799,6 +1818,8 @@ export interface components {
             location: string;
             /** Duration Min */
             duration_min: number | null;
+            /** Is Builtin */
+            is_builtin: boolean;
         };
     };
     responses: never;
@@ -3754,6 +3775,39 @@ export interface operations {
                 "application/json": components["schemas"]["TemplateIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_template_workout_templates__template_id__copy_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             201: {

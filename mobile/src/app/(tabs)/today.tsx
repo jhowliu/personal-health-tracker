@@ -918,14 +918,18 @@ function WorkoutStep({
             {suggestion !== undefined ? (
               <View className="gap-2 rounded-field bg-primary-soft p-3">
                 <Text className="text-base text-ink">下次建議 {suggestion} kg</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy}
-                  onPress={() => applySuggestion(item)}
-                  className="min-h-[44px] justify-center"
-                >
-                  <Text className="text-base font-semibold text-primary">套用到課表</Text>
-                </Pressable>
+                {workout.template?.is_builtin ? (
+                  <Hint>公用課表維持唯讀；複製成自己的課表後可保存建議重量。</Hint>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={() => applySuggestion(item)}
+                    className="min-h-[44px] justify-center"
+                  >
+                    <Text className="text-base font-semibold text-primary">套用到課表</Text>
+                  </Pressable>
+                )}
               </View>
             ) : null}
           </Card>

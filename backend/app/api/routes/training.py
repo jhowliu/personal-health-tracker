@@ -113,6 +113,17 @@ async def create_template(
     return TemplateOut.of(await service.template(user_id, saved.id))
 
 
+@router.post(
+    "/workout-templates/{template_id}/copy",
+    response_model=TemplateOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def copy_template(
+    template_id: str, user_id: CurrentUserId, service: Training
+) -> TemplateOut:
+    return TemplateOut.of(await service.copy_template(user_id, template_id))
+
+
 @router.get("/workout-templates/{template_id}", response_model=TemplateOut)
 async def read_template(template_id: str, user_id: CurrentUserId, service: Training) -> TemplateOut:
     return TemplateOut.of(await service.template(user_id, template_id))
@@ -122,7 +133,6 @@ async def read_template(template_id: str, user_id: CurrentUserId, service: Train
 async def replace_template(
     template_id: str, payload: TemplateIn, user_id: CurrentUserId, service: Training
 ) -> TemplateOut:
-    await service.template(user_id, template_id)
     await service.save_template(user_id, _to_template(template_id, payload))
     return TemplateOut.of(await service.template(user_id, template_id))
 
@@ -178,6 +188,7 @@ def _to_template(template_id: str, payload: TemplateIn) -> WorkoutTemplate:
         # Replaced by save_template, which reads it off the exercises' equipment.
         location=Location.HOME.value,
         duration_min=payload.duration_min,
+        is_builtin=False,
         items=tuple(
             TemplateItem(
                 id=item.id or new_id(),

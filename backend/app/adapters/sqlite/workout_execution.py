@@ -61,9 +61,11 @@ class SqliteWorkoutExecutionStore:
                    COALESCE(re.name, replaced_names.text, re.name_key) AS replaced_name,
                    t.id AS template_id, t.category_id AS template_category_id,
                    t.name AS template_name, t.location AS template_location, t.duration_min,
+                   t.user_id IS NULL AS template_is_builtin,
                    logs.logs_json
             FROM days d
-            LEFT JOIN workout_templates t ON t.id = d.template_id AND t.user_id = d.user_id
+            LEFT JOIN workout_templates t ON t.id = d.template_id
+                                         AND (t.user_id = d.user_id OR t.user_id IS NULL)
                                          AND t.archived_at IS NULL
             LEFT JOIN day_workout_items w ON w.user_id = d.user_id AND w.date = d.date
             LEFT JOIN exercises e ON e.id = w.exercise_id
@@ -92,6 +94,7 @@ class SqliteWorkoutExecutionStore:
                 name=first["template_name"],
                 location=first["template_location"],
                 duration_min=first["duration_min"],
+                is_builtin=bool(first["template_is_builtin"]),
                 items=(),
             )
         return WorkoutExecution(day, template, entries)
@@ -312,7 +315,8 @@ class SqliteWorkoutExecutionStore:
             SELECT i.id, i.exercise_id, i.sort_order, i.sets, i.reps, i.duration_sec,
                    i.weight_kg, i.rest_sec, i.note
             FROM days d
-            JOIN workout_templates t ON t.id = d.template_id AND t.user_id = d.user_id
+            JOIN workout_templates t ON t.id = d.template_id
+                                    AND (t.user_id = d.user_id OR t.user_id IS NULL)
                                     AND t.archived_at IS NULL
             JOIN workout_template_items i ON i.template_id = t.id
             WHERE d.user_id = ? AND d.date = ?

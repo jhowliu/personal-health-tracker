@@ -229,6 +229,7 @@ class WorkoutTemplate:
     name: str
     location: str
     duration_min: int | None
+    is_builtin: bool
     items: tuple[TemplateItem, ...]
 
 

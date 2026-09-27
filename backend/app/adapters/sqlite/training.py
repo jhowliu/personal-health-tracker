@@ -15,6 +15,10 @@ _EXERCISE_FROM = """
     LEFT JOIN translations td ON td.key = e.description_key AND td.locale = ?
 """
 _EXERCISE_VISIBLE = "(e.user_id IS NULL OR e.user_id = ?) AND e.archived_at IS NULL"
+_TEMPLATE_COLUMNS = (
+    "id, category_id, name, location, duration_min, user_id IS NULL AS is_builtin"
+)
+_TEMPLATE_VISIBLE = "(user_id IS NULL OR user_id = ?) AND archived_at IS NULL"
 
 
 class SqliteTrainingStore:
@@ -127,8 +131,8 @@ class SqliteTrainingStore:
             params.append(location)
 
         async with self._conn.execute(
-            "SELECT id, category_id, name, location, duration_min FROM workout_templates"
-            f" WHERE user_id = ? AND archived_at IS NULL{clause} ORDER BY name",
+            f"SELECT {_TEMPLATE_COLUMNS} FROM workout_templates"
+            f" WHERE {_TEMPLATE_VISIBLE}{clause} ORDER BY is_builtin DESC, name",
             params,
         ) as cursor:
             rows = await cursor.fetchall()
@@ -142,6 +146,7 @@ class SqliteTrainingStore:
                     name=row["name"],
                     location=row["location"],
                     duration_min=row["duration_min"],
+                    is_builtin=bool(row["is_builtin"]),
                     items=await self._items(row["id"]),
                 )
             )
@@ -149,8 +154,8 @@ class SqliteTrainingStore:
 
     async def load_template(self, user_id: str, template_id: str) -> WorkoutTemplate | None:
         async with self._conn.execute(
-            "SELECT id, category_id, name, location, duration_min FROM workout_templates"
-            " WHERE id = ? AND user_id = ? AND archived_at IS NULL",
+            f"SELECT {_TEMPLATE_COLUMNS} FROM workout_templates"
+            f" WHERE id = ? AND {_TEMPLATE_VISIBLE}",
             (template_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
@@ -162,6 +167,7 @@ class SqliteTrainingStore:
             name=row["name"],
             location=row["location"],
             duration_min=row["duration_min"],
+            is_builtin=bool(row["is_builtin"]),
             items=await self._items(row["id"]),
         )
 

@@ -42,6 +42,7 @@ export default function EditTemplate() {
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
   const [items, setItems] = useState<Draft[]>([]);
+  const [isBuiltin, setIsBuiltin] = useState(false);
   const [editing, setEditing] = useState<number | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export default function EditTemplate() {
           setName('');
           setDuration('');
           setItems([]);
+          setIsBuiltin(false);
           setBaseline(serialiseTemplate('', '', []));
           setLoadedId(id);
         } else {
@@ -68,6 +70,7 @@ export default function EditTemplate() {
           if (!live) return;
           setName(template.name);
           setDuration(template.duration_min ? String(template.duration_min) : '');
+          setIsBuiltin(template.is_builtin);
           const loadedItems = template.items.map((item) => ({ ...item }));
           setItems(loadedItems);
           setBaseline(serialiseTemplate(
@@ -180,6 +183,19 @@ export default function EditTemplate() {
     }
   };
 
+  const copy = async () => {
+    setBusy(true);
+    try {
+      const copied: Template = await api.post(`/workout-templates/${id}/copy`);
+      setAllowLeave(true);
+      requestAnimationFrame(() => router.replace(`/workouts/${copied.id}`));
+    } catch (error) {
+      Alert.alert('複製不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!ready) {
     return (
       <Screen scroll={false}>
@@ -193,27 +209,41 @@ export default function EditTemplate() {
   return (
     <Screen
       footer={
-        <View className="flex-row items-center gap-3">
-          <Text className="text-sm text-muted">{items.length} 個動作</Text>
-          <View className="flex-1">
-            <PrimaryButton
-              onPress={save}
-              disabled={!name || items.length === 0}
-              busy={busy}
-            >
-              {busy ? '儲存中…' : '儲存課表'}
-            </PrimaryButton>
+        isBuiltin ? (
+          <PrimaryButton onPress={copy} busy={busy}>
+            {busy ? '複製中…' : '複製並自訂'}
+          </PrimaryButton>
+        ) : (
+          <View className="flex-row items-center gap-3">
+            <Text className="text-sm text-muted">{items.length} 個動作</Text>
+            <View className="flex-1">
+              <PrimaryButton
+                onPress={save}
+                disabled={!name || items.length === 0}
+                busy={busy}
+              >
+                {busy ? '儲存中…' : '儲存課表'}
+              </PrimaryButton>
+            </View>
           </View>
-        </View>
+        )
       }
     >
       <Pressable accessibilityRole="button" onPress={() => backOrReplace('/workouts')} disabled={busy}>
         <Text className="text-base text-primary">‹ 訓練</Text>
       </Pressable>
 
-      <Title>{isNew ? '新增課表' : '編輯課表'}</Title>
+      <Title>{isNew ? '新增課表' : isBuiltin ? '公用課表' : '編輯課表'}</Title>
 
-      <Field label="課表名稱" value={name} onChangeText={setName} placeholder="健身房:下肢" />
+      {isBuiltin ? <Hint>公用課表可直接排程，但不能修改。複製後即可自訂。</Hint> : null}
+
+      <Field
+        label="課表名稱"
+        value={name}
+        onChangeText={setName}
+        placeholder="健身房:下肢"
+        editable={!isBuiltin}
+      />
 
       <Field
         label="大約時間"
@@ -221,6 +251,7 @@ export default function EditTemplate() {
         value={duration}
         onChangeText={setDuration}
         keyboardType="numeric"
+        editable={!isBuiltin}
       />
       <Hint>地點依動作用到的器材自動判定:出現槓鈴、機械、滑輪或跑步機就算健身房。</Hint>
 
@@ -331,6 +362,7 @@ export default function EditTemplate() {
           <Pressable
             key={`${item.exercise_id}-${index}`}
             accessibilityRole="button"
+            disabled={isBuiltin}
             onPress={() => setEditing(index)}
             className="min-h-[44px] flex-row items-center gap-2 rounded-card border border-line bg-surface p-3"
           >
@@ -347,24 +379,32 @@ export default function EditTemplate() {
                 {item.weight_kg ? `,${item.weight_kg} kg` : ''}
               </Text>
             </View>
-            <Arrow label="上移" onPress={() => move(index, -1)} disabled={index === 0} glyph="↑" />
-            <Arrow
-              label="下移"
-              onPress={() => move(index, 1)}
-              disabled={index === items.length - 1}
-              glyph="↓"
-            />
+            {isBuiltin ? null : (
+              <>
+                <Arrow label="上移" onPress={() => move(index, -1)} disabled={index === 0} glyph="↑" />
+                <Arrow
+                  label="下移"
+                  onPress={() => move(index, 1)}
+                  disabled={index === items.length - 1}
+                  glyph="↓"
+                />
+              </>
+            )}
           </Pressable>
         ),
       )}
 
       {items.length === 0 ? <Hint>還沒有動作,從下面加入。</Hint> : null}
 
-      <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
-        {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
-      </PrimaryButton>
+      {isBuiltin ? null : (
+        <>
+          <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
+            {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
+          </PrimaryButton>
 
-      {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
+          {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
+        </>
+      )}
     </Screen>
   );
 }
