@@ -231,9 +231,12 @@ function FoodLibrary() {
         <Card className="py-0">
           <Rows>
             {foods.map((food) => (
-              <View
+              <Pressable
                 key={food.id}
-                className="flex-row items-start justify-between gap-3 py-3"
+                accessibilityRole="button"
+                accessibilityLabel={`編輯${food.name}`}
+                onPress={() => router.navigate({ pathname: '/foods/[id]', params: { id: food.id } })}
+                className="min-h-[52px] flex-row items-center justify-between gap-3 py-3"
               >
                 <View className="flex-1 gap-0.5">
                   <Text className="text-base font-semibold text-ink">{food.name}</Text>
@@ -243,7 +246,8 @@ function FoodLibrary() {
                   <Text className="text-xs text-muted">常用</Text>
                   <Text className="text-sm text-ink">{usualPortion(food)}</Text>
                 </View>
-              </View>
+                <Text className="text-base text-primary">›</Text>
+              </Pressable>
             ))}
           </Rows>
         </Card>

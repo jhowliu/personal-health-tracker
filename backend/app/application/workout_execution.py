@@ -2,8 +2,10 @@ from dataclasses import replace
 from datetime import date
 
 from app.application.ports import AccountStore, Clock, WorkoutExecutionStore
+from app.application.training import TrainingService
 from app.domain.errors import NotFound, ValidationFailed
 from app.domain.ids import new_id
+from app.domain.models import Location, TemplateItem, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
     ReplacementReason,
@@ -20,11 +22,48 @@ class WorkoutExecutionService:
     """Daily workout facts and progression, isolated from editable template management."""
 
     def __init__(
-        self, store: WorkoutExecutionStore, accounts: AccountStore, clock: Clock
+        self,
+        store: WorkoutExecutionStore,
+        accounts: AccountStore,
+        clock: Clock,
+        training: TrainingService,
     ) -> None:
         self._store = store
         self._accounts = accounts
         self._clock = clock
+        self._training = training
+
+    async def save_as_template(
+        self, user_id: str, day: date, name: str
+    ) -> WorkoutTemplate:
+        workout = await self.view(user_id, day)
+        if not name.strip() or not workout.items:
+            raise ValidationFailed("請輸入課表名稱並至少保留一個動作")
+        template = WorkoutTemplate(
+            id=new_id(),
+            category_id=workout.template.category_id if workout.template else "strength",
+            name=name.strip(),
+            location=Location.HOME.value,
+            duration_min=workout.template.duration_min if workout.template else None,
+            is_builtin=False,
+            items=tuple(
+                TemplateItem(
+                    id=new_id(),
+                    exercise_id=entry.item.exercise_id,
+                    exercise_name=entry.item.exercise_name,
+                    sort_order=index,
+                    sets=entry.item.sets,
+                    reps=entry.item.reps,
+                    duration_sec=entry.item.duration_sec,
+                    weight_kg=entry.item.weight_kg,
+                    rest_sec=entry.item.rest_sec,
+                    note=entry.item.note,
+                )
+                for index, entry in enumerate(workout.items)
+            ),
+        )
+        stored = await self._training.save_template(user_id, template)
+        return await self._training.template(user_id, stored.id)
 
     async def view(self, user_id: str, day: date) -> WorkoutExecution:
         profile = await self._profile(user_id)

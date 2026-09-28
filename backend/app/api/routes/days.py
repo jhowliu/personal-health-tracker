@@ -10,10 +10,12 @@ from app.api.schemas import (
     ExtraItemOut,
     MealStateIn,
     PlanItemPatchIn,
+    SaveDayTemplateIn,
     SetLogIn,
     SetLogResultOut,
     ShuffleIn,
     SwapItemIn,
+    TemplateOut,
     TodayOut,
     WorkoutExecutionOut,
     WorkoutItemIn,
@@ -67,6 +69,13 @@ async def read_workout(
     day: date, user_id: CurrentUserId, service: WorkoutExecution
 ) -> WorkoutExecutionOut:
     return WorkoutExecutionOut.of(await service.view(user_id, day))
+
+
+@router.post("/{day}/workout/save-as-template", response_model=TemplateOut, status_code=201)
+async def save_day_as_template(
+    day: date, payload: SaveDayTemplateIn, user_id: CurrentUserId, service: WorkoutExecution
+) -> TemplateOut:
+    return TemplateOut.of(await service.save_as_template(user_id, day, payload.name))
 
 
 @router.post("/{day}/workout/items", response_model=WorkoutExecutionOut, status_code=201)

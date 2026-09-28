@@ -157,6 +157,11 @@ class SqliteWorkoutExecutionStore:
                 None,
             ),
         )
+        await self._conn.execute(
+            "UPDATE days SET workout_initialized_at = COALESCE(workout_initialized_at, "
+            "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) WHERE user_id = ? AND date = ?",
+            (user_id, to_day(day)),
+        )
 
     async def update_item(
         self, user_id: str, day: date, item: DayWorkoutItem, *, replacing: bool
@@ -304,11 +309,12 @@ class SqliteWorkoutExecutionStore:
         later days, not to this one.
         """
         async with self._conn.execute(
-            "SELECT 1 FROM day_workout_items WHERE user_id = ? AND date = ? LIMIT 1",
+            "SELECT template_id, workout_initialized_at FROM days WHERE user_id = ? AND date = ?",
             (user_id, to_day(day)),
         ) as cursor:
-            if await cursor.fetchone():
-                return
+            current = await cursor.fetchone()
+        if current is None or current["workout_initialized_at"] or not current["template_id"]:
+            return
 
         async with self._conn.execute(
             """
@@ -326,27 +332,30 @@ class SqliteWorkoutExecutionStore:
         ) as cursor:
             rows = await cursor.fetchall()
 
-        if not rows:
-            return
-
-        await self._conn.executemany(
-            f"INSERT INTO day_workout_items ({_SNAPSHOT_COLUMNS})"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            [
-                (
-                    new_id(),
-                    user_id,
-                    to_day(day),
-                    row["exercise_id"],
-                    row["sort_order"],
-                    row["sets"],
-                    row["reps"],
-                    row["duration_sec"],
-                    row["weight_kg"],
-                    row["rest_sec"],
-                    row["note"],
-                    row["id"],
-                )
-                for row in rows
-            ],
+        if rows:
+            await self._conn.executemany(
+                f"INSERT INTO day_workout_items ({_SNAPSHOT_COLUMNS})"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        new_id(),
+                        user_id,
+                        to_day(day),
+                        row["exercise_id"],
+                        row["sort_order"],
+                        row["sets"],
+                        row["reps"],
+                        row["duration_sec"],
+                        row["weight_kg"],
+                        row["rest_sec"],
+                        row["note"],
+                        row["id"],
+                    )
+                    for row in rows
+                ],
+            )
+        await self._conn.execute(
+            "UPDATE days SET workout_initialized_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+            " WHERE user_id = ? AND date = ?",
+            (user_id, to_day(day)),
         )

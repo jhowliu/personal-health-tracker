@@ -1,5 +1,8 @@
 from httpx import AsyncClient
 
+from seeds.exercises import seed as seed_exercises
+from seeds.workout_templates import seed as seed_workout_templates
+
 DAY = "2026-09-22"  # Tuesday
 
 
@@ -57,6 +60,55 @@ async def _profile(client: AsyncClient) -> None:
         },
     )
     assert response.status_code == 200
+
+
+async def test_removing_every_scheduled_item_does_not_recreate_the_day(
+    with_profile: AsyncClient,
+):
+    _, _, template = await _workout(with_profile)
+    first = await _day_items(with_profile)
+    assert len(first) == 1
+    removed = await with_profile.delete(f"/days/{DAY}/workout/items/{first[0]['id']}")
+    assert removed.status_code == 204
+
+    again = await with_profile.get(f"/days/{DAY}/workout")
+    assert again.status_code == 200
+    assert again.json()["template"]["id"] == template["id"]
+    assert again.json()["items"] == []
+    assert (await _day_items(with_profile)) == []
+
+
+async def test_day_can_be_saved_as_an_owned_template_without_modifying_public_source(
+    with_profile: AsyncClient,
+):
+    await seed_exercises()
+    await seed_workout_templates()
+    await with_profile.put(
+        "/workout-schedule", json=[{"weekday": 1, "template_id": "beginner-full-body-a"}]
+    )
+    day = (await with_profile.get(f"/days/{DAY}/workout")).json()
+    first = day["items"][0]["item"]
+    updated = await with_profile.patch(
+        f"/days/{DAY}/workout/items/{first['id']}", json={"weight_kg": 30}
+    )
+    assert updated.status_code == 200
+
+    saved = await with_profile.post(
+        f"/days/{DAY}/workout/save-as-template", json={"name": "我的全身訓練"}
+    )
+    assert saved.status_code == 201
+    assert saved.json()["is_builtin"] is False
+    assert saved.json()["id"] != day["template"]["id"]
+    assert saved.json()["items"][0]["weight_kg"] == 30
+    assert [item["exercise_id"] for item in saved.json()["items"]] == [
+        entry["item"]["exercise_id"] for entry in day["items"]
+    ]
+    assert (await with_profile.get("/workout-templates/beginner-full-body-a")).json()["items"][0][
+        "weight_kg"
+    ] is None
+    assert (await with_profile.get("/workout-schedule")).json() == [
+        {"weekday": 1, "template_id": "beginner-full-body-a"}
+    ]
 
 
 async def test_daily_swap_is_returned_without_mutating_the_template(with_profile: AsyncClient):

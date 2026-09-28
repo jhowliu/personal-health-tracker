@@ -40,14 +40,26 @@ class SqliteDayStore:
         async with self._conn.execute(
             """
             SELECT dm.meal_time, dm.meal_id, dm.eaten_at, dm.skipped_at,
-                   COALESCE(SUM(COALESCE(i.kcal, f.kcal_per_100g * i.grams / 100.0)), 0) AS kcal,
-                   COALESCE(
-                       SUM(COALESCE(i.protein_g, f.protein_per_100g * i.grams / 100.0)), 0
-                   ) AS protein_g,
-                   COALESCE(SUM(COALESCE(i.fat_g, f.fat_per_100g * i.grams / 100.0)), 0) AS fat_g,
-                   COALESCE(
-                       SUM(COALESCE(i.carb_g, f.carb_per_100g * i.grams / 100.0)), 0
-                   ) AS carb_g
+                    COALESCE(SUM(CASE WHEN i.food_id IS NULL THEN i.kcal
+                        WHEN i.nutrition_snapshot_grams IS NOT NULL
+                        THEN i.kcal * i.grams / i.nutrition_snapshot_grams
+                        ELSE f.kcal_per_100g * i.grams / 100.0 END), 0) AS kcal,
+                    COALESCE(
+                        SUM(CASE WHEN i.food_id IS NULL THEN i.protein_g
+                            WHEN i.nutrition_snapshot_grams IS NOT NULL
+                            THEN i.protein_g * i.grams / i.nutrition_snapshot_grams
+                            ELSE f.protein_per_100g * i.grams / 100.0 END), 0
+                    ) AS protein_g,
+                    COALESCE(SUM(CASE WHEN i.food_id IS NULL THEN i.fat_g
+                        WHEN i.nutrition_snapshot_grams IS NOT NULL
+                        THEN i.fat_g * i.grams / i.nutrition_snapshot_grams
+                        ELSE f.fat_per_100g * i.grams / 100.0 END), 0) AS fat_g,
+                    COALESCE(
+                        SUM(CASE WHEN i.food_id IS NULL THEN i.carb_g
+                            WHEN i.nutrition_snapshot_grams IS NOT NULL
+                            THEN i.carb_g * i.grams / i.nutrition_snapshot_grams
+                            ELSE f.carb_per_100g * i.grams / 100.0 END), 0
+                    ) AS carb_g
             FROM day_meals dm
             LEFT JOIN day_meal_items i
                    ON i.user_id = dm.user_id AND i.date = dm.date AND i.meal_time = dm.meal_time
@@ -142,6 +154,15 @@ class SqliteDayStore:
             f"UPDATE day_meals SET {assignment} WHERE user_id = ? AND date = ? AND meal_time = ?",
             (*values, user_id, to_day(day), meal_time.value),
         )
+        if state == "eaten":
+            await self._freeze_slot(user_id, day, meal_time.value, refresh=True)
+        else:
+            await self._conn.execute(
+                "UPDATE day_meal_items SET nutrition_snapshot_grams = NULL,"
+                " kcal = NULL, protein_g = NULL, fat_g = NULL, carb_g = NULL"
+                " WHERE user_id = ? AND date = ? AND meal_time = ? AND food_id IS NOT NULL",
+                (user_id, to_day(day), meal_time.value),
+            )
 
     async def log_set(
         self,
@@ -243,7 +264,7 @@ class SqliteDayStore:
         async with self._conn.execute(
             """
             SELECT id, food_id, custom_name, grams, kcal, protein_g, fat_g, carb_g,
-                   photo_id, sort_order
+                   nutrition_snapshot_grams, photo_id, sort_order
             FROM day_meal_items
             WHERE user_id = ? AND date = ? AND meal_time = 'extras'
             ORDER BY sort_order, created_at
@@ -254,8 +275,12 @@ class SqliteDayStore:
         extras = []
         for row in rows:
             if row["food_id"]:
-                food = await self._foods.load(user_id, row["food_id"])
-                nutrients = food.nutrients_for(row["grams"]) if food else Nutrients(0, 0, 0, 0)
+                food = await self._foods.load_referenced(user_id, row["food_id"])
+                nutrients = (
+                    self._frozen_nutrients(row)
+                    if row["nutrition_snapshot_grams"] is not None
+                    else food.nutrients_for(row["grams"]) if food else Nutrients(0, 0, 0, 0)
+                )
             else:
                 nutrients = Nutrients(row["kcal"], row["protein_g"], row["fat_g"], row["carb_g"])
             extras.append(
@@ -288,8 +313,8 @@ class SqliteDayStore:
             """
             INSERT INTO day_meal_items
             (id, user_id, date, meal_time, food_id, custom_name, grams, kcal, protein_g,
-             fat_g, carb_g, photo_id, sort_order)
-            VALUES (?, ?, ?, 'extras', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              fat_g, carb_g, photo_id, sort_order, nutrition_snapshot_grams)
+            VALUES (?, ?, ?, 'extras', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 item.id,
@@ -304,6 +329,7 @@ class SqliteDayStore:
                 item.nutrients.carb_g,
                 item.photo_id,
                 next_order,
+                item.grams if item.food_id else None,
             ),
         )
 
@@ -378,10 +404,13 @@ class SqliteDayStore:
         grams: float,
     ) -> None:
         await self._conn.execute(
-            "UPDATE day_meal_items SET food_id = ?, grams = ?"
+            "UPDATE day_meal_items SET food_id = ?, grams = ?,"
+            " kcal = NULL, protein_g = NULL, fat_g = NULL, carb_g = NULL,"
+            " nutrition_snapshot_grams = NULL"
             " WHERE id = ? AND user_id = ? AND date = ? AND meal_time = ?",
             (food_id, grams, item_id, user_id, to_day(day), meal_time.value),
         )
+        await self._freeze_slot(user_id, day, meal_time.value)
 
     async def add_plan_item(
         self, user_id: str, day: date, meal_time: MealTime, item: PlannedItem, profile: Profile
@@ -413,14 +442,15 @@ class SqliteDayStore:
                 item.food.id if item.food else None,
                 item.custom_name,
                 item.grams,
-                item.nutrients.kcal,
-                item.nutrients.protein_g,
-                item.nutrients.fat_g,
-                item.nutrients.carb_g,
+                item.custom_nutrients.kcal if item.custom_nutrients else None,
+                item.custom_nutrients.protein_g if item.custom_nutrients else None,
+                item.custom_nutrients.fat_g if item.custom_nutrients else None,
+                item.custom_nutrients.carb_g if item.custom_nutrients else None,
                 item.photo_id,
                 next_order,
             ),
         )
+        await self._freeze_slot(user_id, day, meal_time.value)
 
     async def update_plan_item(
         self, user_id: str, day: date, meal_time: MealTime, item_id: str, grams: float
@@ -444,7 +474,8 @@ class SqliteDayStore:
 
     async def _plan_items(self, user_id: str, day: date, meal_time: str) -> tuple[PlannedItem, ...]:
         async with self._conn.execute(
-            "SELECT id, food_id, custom_name, grams, kcal, protein_g, fat_g, carb_g, photo_id, "
+            "SELECT id, food_id, custom_name, grams, kcal, protein_g, fat_g, carb_g,"
+            " nutrition_snapshot_grams, photo_id, "
             "sort_order "
             "FROM day_meal_items WHERE user_id = ? AND date = ? AND meal_time = ?"
             " ORDER BY sort_order",
@@ -454,7 +485,10 @@ class SqliteDayStore:
 
         items: list[PlannedItem] = []
         for row in rows:
-            food = await self._foods.load(user_id, row["food_id"]) if row["food_id"] else None
+            food = (
+                await self._foods.load_referenced(user_id, row["food_id"])
+                if row["food_id"] else None
+            )
             if row["food_id"] and food is None:
                 continue
             items.append(
@@ -470,9 +504,47 @@ class SqliteDayStore:
                     ),
                     photo_id=row["photo_id"],
                     sort_order=row["sort_order"],
+                    frozen_nutrients=(
+                        self._frozen_nutrients(row)
+                        if row["nutrition_snapshot_grams"] is not None else None
+                    ),
                 )
             )
         return tuple(items)
+
+    @staticmethod
+    def _frozen_nutrients(row: aiosqlite.Row) -> Nutrients:
+        factor = row["grams"] / row["nutrition_snapshot_grams"]
+        return Nutrients(
+            row["kcal"] * factor,
+            row["protein_g"] * factor,
+            row["fat_g"] * factor,
+            row["carb_g"] * factor,
+        )
+
+    async def _freeze_slot(
+        self, user_id: str, day: date, meal_time: str, *, refresh: bool = False
+    ) -> None:
+        await self._conn.execute(
+            """
+            UPDATE day_meal_items
+            SET (kcal, protein_g, fat_g, carb_g) = (
+                SELECT f.kcal_per_100g * day_meal_items.grams / 100.0,
+                       f.protein_per_100g * day_meal_items.grams / 100.0,
+                       f.fat_per_100g * day_meal_items.grams / 100.0,
+                       f.carb_per_100g * day_meal_items.grams / 100.0
+                FROM foods f WHERE f.id = day_meal_items.food_id AND f.user_id = ?
+            ), nutrition_snapshot_grams = grams
+            WHERE user_id = ? AND date = ? AND meal_time = ? AND food_id IS NOT NULL
+              AND (? OR nutrition_snapshot_grams IS NULL)
+              AND EXISTS (
+                SELECT 1 FROM day_meals dm
+                WHERE dm.user_id = day_meal_items.user_id AND dm.date = day_meal_items.date
+                  AND dm.meal_time = day_meal_items.meal_time AND dm.eaten_at IS NOT NULL
+              )
+            """,
+            (user_id, user_id, to_day(day), meal_time, refresh),
+        )
 
     async def _ensure_day(self, user_id: str, day: date, profile: Profile) -> None:
         await self._conn.execute(

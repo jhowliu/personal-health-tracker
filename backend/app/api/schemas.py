@@ -380,6 +380,10 @@ class TemplateWeightIn(BaseModel):
     weight_kg: float = Field(ge=0)
 
 
+class SaveDayTemplateIn(BaseModel):
+    name: str = Field(min_length=1)
+
+
 class WorkoutItemIn(BaseModel):
     exercise_id: str
     sets: int | None = Field(default=None, ge=1, le=10)
@@ -549,12 +553,13 @@ class FoodOut(BaseModel):
     name: str
     state: str
     per_100g: NutrientsOut
+    fiber_per_100g: float | None
     unit: str
     grams_per_unit: float | None
     usual_grams: float
     max_grams: float
     aliases: list[str]
-    is_builtin: bool
+    template_id: str | None
 
     @classmethod
     def of(cls, food: Food) -> "FoodOut":
@@ -564,12 +569,13 @@ class FoodOut(BaseModel):
             name=food.name,
             state=food.state.value,
             per_100g=NutrientsOut.of(food.per_100g),
+            fiber_per_100g=food.fiber_per_100g,
             unit=food.unit,
             grams_per_unit=food.grams_per_unit,
             usual_grams=food.usual_grams,
             max_grams=food.max_grams,
             aliases=list(food.aliases),
-            is_builtin=food.is_builtin,
+            template_id=food.template_id,
         )
 
 
@@ -581,6 +587,7 @@ class FoodIn(BaseModel):
     protein_per_100g: float = Field(ge=0)
     fat_per_100g: float = Field(ge=0)
     carb_per_100g: float = Field(ge=0)
+    fiber_per_100g: float | None = Field(default=None, ge=0)
     unit: Literal["g", "ml", "piece", "scoop", "bowl"] = "g"
     grams_per_unit: float | None = Field(default=None, gt=0)
     usual_grams: float = Field(gt=0)

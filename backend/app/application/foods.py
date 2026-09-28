@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from app.application.ports import FoodStore
-from app.domain.errors import NotFound, PermissionDenied
+from app.domain.errors import NotFound
 from app.domain.exchange import options
 from app.domain.ids import new_id
 from app.domain.models import Exchange, Food, FoodCategory, SwapBasis
@@ -28,20 +28,16 @@ class FoodCatalogService:
         return found
 
     async def add_custom(self, user_id: str, draft: Food) -> Food:
-        food = replace(draft, id=new_id(), is_builtin=False)
+        food = replace(draft, id=new_id(), template_id=None)
         await self._store.save_custom(user_id, food)
         return food
 
     async def edit_custom(self, user_id: str, food: Food) -> None:
         existing = await self.get(user_id, food.id)
-        if existing.is_builtin:
-            raise PermissionDenied("內建食物不能修改,請先複製一份")
-        await self._store.save_custom(user_id, food)
+        await self._store.save_custom(user_id, replace(food, template_id=existing.template_id))
 
     async def remove_custom(self, user_id: str, food_id: str) -> None:
-        existing = await self.get(user_id, food_id)
-        if existing.is_builtin:
-            raise PermissionDenied("內建食物不能刪除")
+        await self.get(user_id, food_id)
         await self._store.archive_custom(user_id, food_id)
 
     async def exchanges(

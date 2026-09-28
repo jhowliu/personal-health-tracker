@@ -137,7 +137,7 @@ def daily_flow(conn: DbConn) -> DailyFlowService:
 
 def workout_execution(conn: DbConn) -> WorkoutExecutionService:
     return WorkoutExecutionService(
-        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock()
+        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock(), training(conn)
     )
 
 

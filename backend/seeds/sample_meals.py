@@ -96,11 +96,11 @@ async def seed(email: str | None = None) -> dict[str, int]:
             users = await cursor.fetchall()
 
         store = SqliteMealStore(conn)
-        foods = await _food_lookup(conn)
-
         for user in users:
             if await store.list(user["id"], None, None):
                 continue
+
+            foods = await _food_lookup(conn, user["id"])
 
             for name, tag, slots, items in RECIPES:
                 resolved = [
@@ -128,17 +128,15 @@ async def seed(email: str | None = None) -> dict[str, int]:
     return added
 
 
-async def _food_lookup(conn) -> dict:
+async def _food_lookup(conn, user_id: str) -> dict:
     from app.adapters.sqlite.foods import SqliteFoodStore
 
     store = SqliteFoodStore(conn)
     ids = {fid for _, _, _, items in RECIPES for fid, _ in items}
     found = {}
-    for fid in ids:
-        # user_id is irrelevant here: every seeded food is built-in.
-        food = await store.load("", fid)
-        if food:
-            found[fid] = food
+    for food in await store.search(user_id, None, None):
+        if food.template_id in ids:
+            found[food.template_id] = food
     return found
 
 

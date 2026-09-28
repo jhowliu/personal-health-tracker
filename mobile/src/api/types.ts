@@ -317,6 +317,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/days/{day}/workout/save-as-template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Day As Template */
+        post: operations["save_day_as_template_days__day__workout_save_as_template_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/days/{day}/workout/items": {
         parameters: {
             query?: never;
@@ -538,7 +555,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Read Food */
+        get: operations["read_food_foods__food_id__get"];
         put?: never;
         post?: never;
         /** Remove Food */
@@ -1130,6 +1148,8 @@ export interface components {
             fat_per_100g: number;
             /** Carb Per 100G */
             carb_per_100g: number;
+            /** Fiber Per 100G */
+            fiber_per_100g?: number | null;
             /**
              * Unit
              * @default g
@@ -1154,6 +1174,8 @@ export interface components {
             /** State */
             state: string;
             per_100g: components["schemas"]["NutrientsOut"];
+            /** Fiber Per 100G */
+            fiber_per_100g: number | null;
             /** Unit */
             unit: string;
             /** Grams Per Unit */
@@ -1164,8 +1186,8 @@ export interface components {
             max_grams: number;
             /** Aliases */
             aliases: string[];
-            /** Is Builtin */
-            is_builtin: boolean;
+            /** Template Id */
+            template_id: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1525,6 +1547,11 @@ export interface components {
             reminder_time?: string | null;
             /** Timezone */
             timezone?: string | null;
+        };
+        /** SaveDayTemplateIn */
+        SaveDayTemplateIn: {
+            /** Name */
+            name: string;
         };
         /** ScheduleEntryIn */
         ScheduleEntryIn: {
@@ -2554,6 +2581,43 @@ export interface operations {
             };
         };
     };
+    save_day_as_template_days__day__workout_save_as_template_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveDayTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     add_workout_item_days__day__workout_items_post: {
         parameters: {
             query?: never;
@@ -3096,6 +3160,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CategorySuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_food_foods__food_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                food_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FoodOut"];
                 };
             };
             /** @description Validation Error */

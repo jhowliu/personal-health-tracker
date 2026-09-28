@@ -1,5 +1,7 @@
 from httpx import AsyncClient
 
+from tests.factories import seeded_food_id
+
 CHICKEN_BREAST = "chicken-breast-cooked"
 
 
@@ -20,24 +22,25 @@ async def test_browsing_by_category(with_foods: AsyncClient):
 
 async def test_search_matches_the_name(with_foods: AsyncClient):
     foods = (await with_foods.get("/foods?q=雞胸")).json()
-    assert CHICKEN_BREAST in [f["id"] for f in foods]
+    assert CHICKEN_BREAST in [f["template_id"] for f in foods]
 
 
 async def test_search_matches_an_alias(with_foods: AsyncClient):
     """"雞腿" is an alias; the stored name is 去骨雞腿(帶皮、熟)."""
     foods = (await with_foods.get("/foods?q=雞腿")).json()
 
-    assert "chicken-thigh-skin-on-cooked" in [f["id"] for f in foods]
+    assert "chicken-thigh-skin-on-cooked" in [f["template_id"] for f in foods]
 
 
 async def test_search_matches_an_english_alias(with_foods: AsyncClient):
     foods = (await with_foods.get("/foods?q=tofu")).json()
-    assert "firm-tofu" in [f["id"] for f in foods]
+    assert "firm-tofu" in [f["template_id"] for f in foods]
 
 
 async def test_foods_report_state_and_usual_portion(with_foods: AsyncClient):
     rice = next(
-        f for f in (await with_foods.get("/foods?q=糙米")).json() if f["id"] == "brown-rice-cooked"
+        f for f in (await with_foods.get("/foods?q=糙米")).json()
+        if f["template_id"] == "brown-rice-cooked"
     )
 
     assert rice["state"] == "cooked", "raw and cooked rice differ ~3x per 100 g"
@@ -46,7 +49,7 @@ async def test_foods_report_state_and_usual_portion(with_foods: AsyncClient):
 
 async def test_foods_counted_in_pieces_expose_grams_per_unit(with_foods: AsyncClient):
     proteins = (await with_foods.get("/foods?category=protein")).json()
-    egg = next(f for f in proteins if f["id"] == "egg")
+    egg = next(f for f in proteins if f["template_id"] == "egg")
     assert egg["grams_per_unit"] == 50
     assert egg["unit"] == "piece"
 
@@ -69,7 +72,7 @@ class TestCustomFoods:
         )
         assert created.status_code == 201
         food = created.json()
-        assert not food["is_builtin"]
+        assert food["template_id"] is None
 
         found = (await with_foods.get("/foods?q=滷雞腿")).json()
         assert [f["id"] for f in found] == [food["id"]]
@@ -77,54 +80,56 @@ class TestCustomFoods:
         assert (await with_foods.delete(f"/foods/{food['id']}")).status_code == 204
         assert (await with_foods.get("/foods?q=滷雞腿")).json() == []
 
-    async def test_builtin_foods_cannot_be_deleted(self, with_foods: AsyncClient):
-        response = await with_foods.delete(f"/foods/{CHICKEN_BREAST}")
-        assert response.status_code == 403
+    async def test_default_food_can_be_removed_by_its_owner(self, with_foods: AsyncClient):
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        response = await with_foods.delete(f"/foods/{chicken}")
+        assert response.status_code == 204
+        assert (await with_foods.get(f"/foods/{chicken}")).status_code == 404
 
 
 class TestExchanges:
     async def test_matches_the_spec_worked_example(self, with_foods: AsyncClient):
         """100 g chicken breast swaps to 130 g of thigh on equal protein."""
-        swaps = (
-            await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges?grams=100")
-        ).json()
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        swaps = (await with_foods.get(f"/foods/{chicken}/exchanges?grams=100")).json()
 
-        thigh = next(s for s in swaps if s["food"]["id"] == "chicken-thigh-skin-on-cooked")
+        thigh = next(
+            s for s in swaps if s["food"]["template_id"] == "chicken-thigh-skin-on-cooked"
+        )
         assert thigh["grams"] == 130
         assert not thigh["capped"]
 
     async def test_excludes_the_source_food(self, with_foods: AsyncClient):
-        swaps = (await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges")).json()
-        assert CHICKEN_BREAST not in [s["food"]["id"] for s in swaps]
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        swaps = (await with_foods.get(f"/foods/{chicken}/exchanges")).json()
+        assert chicken not in [s["food"]["id"] for s in swaps]
 
     async def test_only_offers_the_same_category(self, with_foods: AsyncClient):
-        swaps = (await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges")).json()
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        swaps = (await with_foods.get(f"/foods/{chicken}/exchanges")).json()
         assert {s["food"]["category_id"] for s in swaps} == {"protein"}
 
     async def test_reports_when_the_portion_cap_bites(self, with_foods: AsyncClient):
-        swaps = (
-            await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges?grams=150")
-        ).json()
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        swaps = (await with_foods.get(f"/foods/{chicken}/exchanges?grams=150")).json()
 
-        tofu = next(s for s in swaps if s["food"]["id"] == "firm-tofu")
+        tofu = next(s for s in swaps if s["food"]["template_id"] == "firm-tofu")
         assert tofu["capped"], "matching 46 g of protein with tofu blows past its cap"
         assert tofu["delta"]["protein_g"] < 0
 
     async def test_matching_on_calories_instead(self, with_foods: AsyncClient):
-        swaps = (
-            await with_foods.get(
-                f"/foods/{CHICKEN_BREAST}/exchanges?grams=100&match=kcal"
-            )
-        ).json()
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        swaps = (await with_foods.get(f"/foods/{chicken}/exchanges?grams=100&match=kcal")).json()
 
-        thigh = next(s for s in swaps if s["food"]["id"] == "chicken-thigh-skin-on-cooked")
+        thigh = next(
+            s for s in swaps if s["food"]["template_id"] == "chicken-thigh-skin-on-cooked"
+        )
         assert abs(thigh["delta"]["kcal"]) < 15
         assert thigh["delta"]["protein_g"] < 0
 
     async def test_defaults_to_the_usual_portion(self, with_foods: AsyncClient):
-        without = (await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges")).json()
-        with_grams = (
-            await with_foods.get(f"/foods/{CHICKEN_BREAST}/exchanges?grams=100")
-        ).json()
+        chicken = await seeded_food_id(with_foods, CHICKEN_BREAST)
+        without = (await with_foods.get(f"/foods/{chicken}/exchanges")).json()
+        with_grams = (await with_foods.get(f"/foods/{chicken}/exchanges?grams=100")).json()
 
         assert without == with_grams, "usual_grams for chicken breast is 100"

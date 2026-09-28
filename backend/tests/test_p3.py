@@ -6,6 +6,7 @@ from app.config import settings
 from app.domain.decisions import DecisionResult
 from app.domain.meal_photos import EstimatedFood, Recognition
 from app.domain.models import Nutrients
+from tests.factories import seeded_food_id
 
 
 class FakeStorage:
@@ -88,9 +89,10 @@ async def test_photo_recognition_matches_visible_food_candidates(
     analyzed = await with_foods.post(f"/meal-photos/{photo.json()['id']}/analyze")
     assert analyzed.status_code == 200
     item = analyzed.json()["items"][0]
-    assert item["food_id"] == "chicken-breast-cooked"
+    chicken = await seeded_food_id(with_foods, "chicken-breast-cooked")
+    assert item["food_id"] == chicken
     assert item["category_id"] == "protein"
-    assert item["alternatives"][0]["food_id"] == "chicken-breast-cooked"
+    assert item["alternatives"][0]["food_id"] == chicken
 
 
 async def test_extras_calculate_known_food_and_preserve_custom_nutrition(
@@ -99,9 +101,10 @@ async def test_extras_calculate_known_food_and_preserve_custom_nutrition(
     monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
     photo = await with_foods.post("/meal-photos", json={"content_type": "image/jpeg"})
     photo_id = photo.json()["id"]
+    chicken = await seeded_food_id(with_foods, "chicken-breast-cooked")
     known = await with_foods.post(
         "/days/2026-09-23/meals/extras/items",
-        json={"food_id": "chicken-breast-cooked", "grams": 100, "photo_id": photo_id},
+        json={"food_id": chicken, "grams": 100, "photo_id": photo_id},
     )
     assert known.status_code == 201
     assert known.json()["nutrients"]["kcal"] == 165
@@ -121,7 +124,7 @@ async def test_extras_calculate_known_food_and_preserve_custom_nutrition(
     with_foods.headers["Authorization"] = f"Bearer {other.json()['access_token']}"
     unowned_photo = await with_foods.post(
         "/days/2026-09-23/meals/extras/items",
-        json={"food_id": "chicken-breast-cooked", "grams": 100, "photo_id": photo_id},
+        json={"food_id": chicken, "grams": 100, "photo_id": photo_id},
     )
     assert unowned_photo.status_code == 404
 
@@ -141,15 +144,43 @@ async def test_extras_calculate_known_food_and_preserve_custom_nutrition(
     ).status_code == 204
 
 
+async def test_photographed_food_can_be_added_to_a_specific_meal_slot(
+    with_meals: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    photo = await with_meals.post("/meal-photos", json={"content_type": "image/jpeg"})
+    chicken = await seeded_food_id(with_meals, "chicken-breast-cooked")
+
+    added = await with_meals.post(
+        "/days/2026-09-23/plan/breakfast/items",
+        json={
+            "food_id": chicken,
+            "grams": 100,
+            "photo_id": photo.json()["id"],
+        },
+    )
+
+    assert added.status_code == 201
+    breakfast = next(
+        meal for meal in added.json()["meals"] if meal["meal_time"] == "breakfast"
+    )
+    photographed = next(
+        item for item in breakfast["items"] if item["photo_id"] == photo.json()["id"]
+    )
+    assert photographed["food"]["id"] == chicken
+    assert photographed["nutrients"]["kcal"] == 165
+
+
 async def test_plan_snapshot_items_support_known_and_custom_crud(with_meals: AsyncClient):
     day = "2026-09-23"
     before = (await with_meals.get(f"/days/{day}/plan")).json()
     breakfast = next(meal for meal in before["meals"] if meal["meal_time"] == "breakfast")
     before_kcal = before["nutrients"]["kcal"]
+    chicken = await seeded_food_id(with_meals, "chicken-breast-cooked")
 
     known = await with_meals.post(
         f"/days/{day}/plan/breakfast/items",
-        json={"food_id": "chicken-breast-cooked", "grams": 100},
+        json={"food_id": chicken, "grams": 100},
     )
     assert known.status_code == 201
     known_breakfast = next(
@@ -158,7 +189,7 @@ async def test_plan_snapshot_items_support_known_and_custom_crud(with_meals: Asy
     known_item = next(
         item
         for item in known_breakfast["items"]
-        if item["food"] and item["food"]["id"] == "chicken-breast-cooked"
+        if item["food"] and item["food"]["id"] == chicken
     )
 
     custom = await with_meals.post(
@@ -196,6 +227,100 @@ async def test_plan_snapshot_items_support_known_and_custom_crud(with_meals: Asy
     assert breakfast["meal_id"] == next(
         meal for meal in skipped["meals"] if meal["meal_time"] == "breakfast"
     )["meal_id"]
+
+
+async def test_editing_an_eaten_item_updates_the_day_nutrition_summary(
+    with_meals: AsyncClient,
+):
+    day = "2026-09-23"
+    plan = (await with_meals.get(f"/days/{day}/plan")).json()
+    breakfast = next(meal for meal in plan["meals"] if meal["meal_time"] == "breakfast")
+    item = breakfast["items"][0]
+    await with_meals.patch(f"/days/{day}/meals/breakfast", json={"state": "eaten"})
+    before = (await with_meals.get(f"/days/{day}")).json()["flow"]["eaten"]
+
+    updated_plan = (
+        await with_meals.patch(
+            f"/days/{day}/plan/breakfast/items/{item['id']}",
+            json={"grams": item["grams"] * 2},
+        )
+    ).json()
+    updated_breakfast = next(
+        meal for meal in updated_plan["meals"] if meal["meal_time"] == "breakfast"
+    )
+    updated_item = next(value for value in updated_breakfast["items"] if value["id"] == item["id"])
+    after = (await with_meals.get(f"/days/{day}")).json()["flow"]["eaten"]
+
+    assert round(after["kcal"] - before["kcal"], 1) == round(
+        updated_item["nutrients"]["kcal"] - item["nutrients"]["kcal"], 1
+    )
+
+
+async def test_editing_an_added_food_updates_all_day_totals_even_with_legacy_cached_nutrients(
+    with_meals: AsyncClient,
+):
+    day = "2026-09-23"
+    chicken = await seeded_food_id(with_meals, "chicken-breast-cooked")
+    added = await with_meals.post(
+        f"/days/{day}/plan/breakfast/items",
+        json={"food_id": chicken, "grams": 100},
+    )
+    assert added.status_code == 201
+    original = next(
+        item
+        for meal in added.json()["meals"]
+        if meal["meal_time"] == "breakfast"
+        for item in meal["items"]
+        if item["food"] and item["food"]["id"] == chicken
+    )
+    async with aiosqlite.connect(settings.db_path) as conn:
+        stored = await (
+            await conn.execute(
+                "SELECT kcal, protein_g, fat_g, carb_g FROM day_meal_items WHERE id = ?",
+                (original["id"],),
+            )
+        ).fetchone()
+    assert stored == (None, None, None, None)
+    await with_meals.patch(f"/days/{day}/meals/breakfast", json={"state": "eaten"})
+    before = (await with_meals.get(f"/days/{day}")).json()["flow"]["eaten"]
+
+    updated = await with_meals.patch(
+        f"/days/{day}/plan/breakfast/items/{original['id']}", json={"grams": 200}
+    )
+    assert updated.status_code == 200
+    changed = next(
+        item
+        for meal in updated.json()["meals"]
+        for item in meal["items"]
+        if item["id"] == original["id"]
+    )
+
+    for nutrient in ("kcal", "protein_g", "fat_g", "carb_g"):
+        expected_delta = changed["nutrients"][nutrient] - original["nutrients"][nutrient]
+        actual_delta = (await with_meals.get(f"/days/{day}")).json()["flow"]["eaten"][
+            nutrient
+        ] - before[nutrient]
+        assert round(actual_delta, 1) == round(expected_delta, 1)
+
+    # Existing installs may still contain the originally cached per-item nutrients.
+    async with aiosqlite.connect(settings.db_path) as conn:
+        await conn.execute(
+            "UPDATE day_meal_items SET kcal = ?, protein_g = ?, fat_g = ?, carb_g = ?,"
+            " nutrition_snapshot_grams = NULL"
+            " WHERE id = ?",
+            (
+                original["nutrients"]["kcal"],
+                original["nutrients"]["protein_g"],
+                original["nutrients"]["fat_g"],
+                original["nutrients"]["carb_g"],
+                original["id"],
+            ),
+        )
+        await conn.commit()
+    legacy = (await with_meals.get(f"/days/{day}")).json()["flow"]["eaten"]
+    for nutrient in ("kcal", "protein_g", "fat_g", "carb_g"):
+        expected_delta = changed["nutrients"][nutrient] - original["nutrients"][nutrient]
+        assert round(legacy[nutrient] - before[nutrient], 1) == round(expected_delta, 1)
 
 
 async def test_suggestions_reject_model_created_category_ids(with_foods: AsyncClient, monkeypatch):
@@ -277,7 +402,7 @@ async def test_photo_exact_local_match_skips_the_decision_layer(
 
     assert analyzed.status_code == 200
     item = analyzed.json()["items"][0]
-    assert item["food_id"] == "banana"
+    assert item["food_id"] == await seeded_food_id(with_foods, "banana")
     assert item["recognition_confidence"] == 0.91
     assert item["match_confidence"] == 1.0
 
@@ -381,10 +506,11 @@ async def test_photographed_extras_count_towards_what_was_eaten(
 ):
     monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
     before = (await with_foods.get("/days/2026-09-23")).json()["flow"]["eaten"]
+    chicken = await seeded_food_id(with_foods, "chicken-breast-cooked")
 
     added = await with_foods.post(
         "/days/2026-09-23/meals/extras/items",
-        json={"food_id": "chicken-breast-cooked", "grams": 100},
+        json={"food_id": chicken, "grams": 100},
     )
     assert added.status_code == 201
 

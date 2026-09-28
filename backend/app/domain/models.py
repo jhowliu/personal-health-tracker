@@ -260,7 +260,7 @@ class Food:
     usual_grams: float
     max_grams: float
     aliases: tuple[str, ...] = ()
-    is_builtin: bool = True
+    template_id: str | None = None
 
     def nutrients_for(self, grams: float) -> Nutrients:
         factor = grams / 100.0
@@ -343,9 +343,12 @@ class PlannedItem:
     custom_nutrients: Nutrients | None
     photo_id: str | None
     sort_order: int
+    frozen_nutrients: Nutrients | None = None
 
     @property
     def nutrients(self) -> Nutrients:
+        if self.frozen_nutrients is not None:
+            return self.frozen_nutrients
         if self.food is not None:
             assert self.grams is not None
             return self.food.nutrients_for(self.grams)

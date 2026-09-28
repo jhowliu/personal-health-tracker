@@ -96,10 +96,9 @@ class SqliteMealStore:
 
         items = []
         for item_row in item_rows:
-            food = await self._foods.load(user_id, item_row["food_id"])
+            food = await self._foods.load_referenced(user_id, item_row["food_id"])
             if food is None:
-                # The food was archived out from under the meal; drop it rather than
-                # failing the whole meal.
+                # The food belonged to another user or no longer exists.
                 continue
             items.append(
                 MealItem(

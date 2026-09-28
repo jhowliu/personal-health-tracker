@@ -6,6 +6,8 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
+import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
+import { photoDraft } from '@/meals/photo-draft';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -28,6 +30,7 @@ export default function AddFood() {
   const [picked, setPicked] = useState<Food | null>(null);
   const [grams, setGrams] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const searchVersion = useRef(0);
 
   const parentRoute =
@@ -91,6 +94,39 @@ export default function AddFood() {
     }
   };
 
+  const addFromPhoto = async () => {
+    if (destination === 'day' && (!date || !slot)) {
+      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。');
+      return;
+    }
+    setPhotoBusy(true);
+    try {
+      const analysis = await pickAndAnalyzeMealPhoto();
+      if (!analysis) return;
+      photoDraft.set(analysis);
+      router.navigate({
+        pathname: '/meals/photo-results',
+        params: {
+          destination,
+          meal_id,
+          date,
+          slot,
+          analysis_id: analysis.id,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof ApiError && error.status >= 500
+          ? '辨識服務目前未設定或暫時無法使用，請改用手動加入食物。'
+          : error instanceof Error
+            ? error.message
+            : '照片辨識失敗，請稍後再試。';
+      Alert.alert('無法辨識餐點', message);
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
   const label = categories.find((c) => c.id === filter)?.name;
   const kcal = picked ? Math.round((picked.per_100g.kcal * (Number(grams) || 0)) / 100) : 0;
 
@@ -115,30 +151,29 @@ export default function AddFood() {
               suffix="g"
               keyboardType="decimal-pad"
             />
-            <PrimaryButton onPress={add} disabled={!grams} busy={busy}>
+            <PrimaryButton onPress={add} disabled={!grams || photoBusy} busy={busy}>
               {busy ? '加入中…' : `加入${label ?? '食物'}`}
             </PrimaryButton>
           </>
         ) : undefined
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)} disabled={busy}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => backOrReplace(parentRoute)}
+        disabled={busy || photoBusy}
+      >
         <Text className="text-base text-primary">‹ {destination === 'day' ? '今日流程' : '編輯餐點'}</Text>
       </Pressable>
 
-       <Title>{label ? `加入${label}` : '加入食物'}</Title>
+      <Title>{label ? `加入${label}` : '加入食物'}</Title>
 
-        {destination === 'meal' ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${meal_id ?? 'new'}`)}
-            className="min-h-[44px] justify-center"
-          >
-            <Text className="text-base text-primary">⌁ 改用餐點照片辨識</Text>
-          </Pressable>
-        ) : null}
+      <PrimaryButton tone="plain" onPress={addFromPhoto} disabled={busy} busy={photoBusy}>
+        {photoBusy ? '辨識中…' : '用照片辨識多個食物'}
+      </PrimaryButton>
+      <Hint>可拍照或從相簿選擇，確認辨識結果後才會加入。</Hint>
 
-       <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
+      <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
 
       <View className="flex-row flex-wrap gap-2">
         <Chip label="全部" selected={filter === 'all'} onPress={() => setFilter('all')} />

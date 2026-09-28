@@ -2,6 +2,7 @@ from datetime import datetime
 
 import aiosqlite
 
+from app.adapters.sqlite.foods import seed_user_foods
 from app.adapters.sqlite.rows import to_day, to_iso, to_profile
 from app.application.ports import Credentials
 from app.domain.ids import new_id
@@ -24,6 +25,7 @@ class SqliteAccountStore:
                 to_iso(account.created_at),
             ),
         )
+        await seed_user_foods(self._conn, account.id)
 
     async def find_credentials(self, email: str) -> Credentials | None:
         async with self._conn.execute(

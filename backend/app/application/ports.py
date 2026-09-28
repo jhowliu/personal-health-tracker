@@ -264,11 +264,12 @@ class FoodStore(Protocol):
     async def search(
         self, user_id: str, query: str | None, category_id: str | None
     ) -> tuple[Food, ...]:
-        """Browse or search the library. Matches names and aliases; built-ins plus the
-        user's own foods.
-        """
+        """Browse active foods owned by the user, matching names and aliases."""
 
     async def load(self, user_id: str, food_id: str) -> Food | None: ...
+
+    async def load_referenced(self, user_id: str, food_id: str) -> Food | None:
+        """Existing meals can read an archived food without exposing it to new picks."""
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         """Swap candidates: everything in the same category."""

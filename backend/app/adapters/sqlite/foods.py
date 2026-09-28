@@ -2,22 +2,51 @@ import aiosqlite
 
 from app.domain.models import Food, FoodCategory, FoodState, Nutrients, SwapBasis
 
-# Built-in rows carry a translation key; user-created ones carry a literal name.
-_NAME = "COALESCE(f.name, t.text, f.name_key)"
+_NAME = "f.name"
 
 _COLUMNS = f"""
     f.id, f.category_id, {_NAME} AS name, f.state,
     f.kcal_per_100g, f.protein_per_100g, f.fat_per_100g, f.carb_per_100g, f.fiber_per_100g,
     f.unit, f.grams_per_unit, f.usual_grams, f.max_grams,
-    f.user_id IS NULL AS is_builtin
+    f.template_id
 """
 
-_FROM = """
-    FROM foods f
-    LEFT JOIN translations t ON t.key = f.name_key AND t.locale = ?
-"""
+_FROM = "FROM foods f"
+_VISIBLE = "f.user_id = ? AND f.archived_at IS NULL"
 
-_VISIBLE = "(f.user_id IS NULL OR f.user_id = ?) AND f.archived_at IS NULL"
+
+async def seed_user_foods(conn: aiosqlite.Connection, user_id: str) -> None:
+    """Copy only missing defaults. Archived copies retain their template key and stay hidden."""
+    async with conn.execute(
+        """
+        INSERT INTO foods (
+            id, user_id, template_id, category_id, name, state, kcal_per_100g,
+            protein_per_100g, fat_per_100g, carb_per_100g, fiber_per_100g,
+            unit, grams_per_unit, usual_grams, max_grams
+        )
+        SELECT 'seed:' || ? || ':' || t.id, ?, t.id, t.category_id, t.name, t.state,
+               t.kcal_per_100g, t.protein_per_100g, t.fat_per_100g, t.carb_per_100g,
+               t.fiber_per_100g, t.unit, t.grams_per_unit, t.usual_grams, t.max_grams
+        FROM food_templates t WHERE t.retired_at IS NULL
+        ON CONFLICT DO NOTHING
+        RETURNING id
+        """,
+        (user_id, user_id),
+    ) as cursor:
+        inserted = [row["id"] for row in await cursor.fetchall()]
+    if not inserted:
+        return
+    placeholders = ", ".join("?" for _ in inserted)
+    await conn.execute(
+        f"""
+        INSERT OR IGNORE INTO food_aliases (food_id, alias)
+        SELECT f.id, a.value
+        FROM foods f JOIN food_templates t ON t.id = f.template_id,
+             json_each(t.aliases_json) a
+        WHERE f.user_id = ? AND f.id IN ({placeholders})
+        """,
+        (user_id, *inserted),
+    )
 
 
 class SqliteFoodStore:
@@ -50,7 +79,7 @@ class SqliteFoodStore:
         self, user_id: str, query: str | None, category_id: str | None
     ) -> tuple[Food, ...]:
         clauses = [_VISIBLE]
-        params: list[object] = [self._locale, user_id]
+        params: list[object] = [user_id]
 
         if category_id:
             clauses.append("f.category_id = ?")
@@ -74,7 +103,16 @@ class SqliteFoodStore:
     async def load(self, user_id: str, food_id: str) -> Food | None:
         async with self._conn.execute(
             f"SELECT {_COLUMNS} {_FROM} WHERE f.id = ? AND {_VISIBLE}",
-            (self._locale, food_id, user_id),
+            (food_id, user_id),
+        ) as cursor:
+            row = await cursor.fetchone()
+        return await self._with_aliases(row) if row else None
+
+    async def load_referenced(self, user_id: str, food_id: str) -> Food | None:
+        """Existing meals and day snapshots retain foods archived from the picker."""
+        async with self._conn.execute(
+            f"SELECT {_COLUMNS} {_FROM} WHERE f.id = ? AND f.user_id = ?",
+            (food_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
         return await self._with_aliases(row) if row else None
@@ -88,8 +126,8 @@ class SqliteFoodStore:
             INSERT INTO foods (
                 id, user_id, category_id, name, state,
                 kcal_per_100g, protein_per_100g, fat_per_100g, carb_per_100g, fiber_per_100g,
-                unit, grams_per_unit, usual_grams, max_grams, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')
+                unit, grams_per_unit, usual_grams, max_grams
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
                 category_id = excluded.category_id,
                 name = excluded.name,
@@ -154,5 +192,5 @@ class SqliteFoodStore:
             usual_grams=row["usual_grams"],
             max_grams=row["max_grams"],
             aliases=aliases,
-            is_builtin=bool(row["is_builtin"]),
+            template_id=row["template_id"],
         )

@@ -41,6 +41,11 @@ async def add_food(payload: FoodIn, user_id: CurrentUserId, service: Foods) -> F
     return FoodOut.of(await service.add_custom(user_id, _to_food("", payload)))
 
 
+@router.get("/foods/{food_id}", response_model=FoodOut)
+async def read_food(food_id: str, user_id: CurrentUserId, service: Foods) -> FoodOut:
+    return FoodOut.of(await service.get(user_id, food_id))
+
+
 @router.patch("/foods/{food_id}", response_model=FoodOut)
 async def edit_food(
     food_id: str, payload: FoodIn, user_id: CurrentUserId, service: Foods
@@ -83,10 +88,10 @@ def _to_food(food_id: str, payload: FoodIn) -> Food:
             fat_g=payload.fat_per_100g,
             carb_g=payload.carb_per_100g,
         ),
-        fiber_per_100g=None,
+        fiber_per_100g=payload.fiber_per_100g,
         unit=payload.unit,
         grams_per_unit=payload.grams_per_unit,
         usual_grams=payload.usual_grams,
         max_grams=max(payload.max_grams, payload.usual_grams),
-        is_builtin=False,
+        template_id=None,
     )
