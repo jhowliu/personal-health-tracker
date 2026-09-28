@@ -3,9 +3,10 @@ from datetime import date
 
 import aiosqlite
 
+from app.adapters.sqlite.day_row import open_day
 from app.adapters.sqlite.rows import from_iso, to_day, to_iso
 from app.domain.ids import new_id
-from app.domain.models import Exercise, Profile, WorkoutTemplate
+from app.domain.models import Exercise, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
     ReplacementReason,
@@ -26,8 +27,8 @@ class SqliteWorkoutExecutionStore:
         self._conn = conn
         self._locale = locale
 
-    async def load(self, user_id: str, day: date, profile: Profile) -> WorkoutExecution:
-        await self._ensure_day(user_id, day, profile)
+    async def load(self, user_id: str, day: date) -> WorkoutExecution:
+        await open_day(self._conn, user_id, day)
         await self._ensure_snapshot(user_id, day)
 
         async with self._conn.execute(
@@ -129,10 +130,11 @@ class SqliteWorkoutExecutionStore:
             is_builtin=bool(row["is_builtin"]),
         )
 
-    async def add_item(
-        self, user_id: str, day: date, profile: Profile, item: DayWorkoutItem
-    ) -> None:
-        await self._ensure_day(user_id, day, profile)
+    async def add_item(self, user_id: str, day: date, item: DayWorkoutItem) -> None:
+        await open_day(self._conn, user_id, day)
+        # Copy the scheduled template first, or it would never be copied once the day holds
+        # an item of its own.
+        await self._ensure_snapshot(user_id, day)
         async with self._conn.execute(
             "SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM day_workout_items "
             "WHERE user_id = ? AND date = ?",
@@ -196,14 +198,16 @@ class SqliteWorkoutExecutionStore:
         return cursor.rowcount == 1
 
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool:
+        await open_day(self._conn, user_id, day)
+        await self._ensure_snapshot(user_id, day)
         cursor = await self._conn.execute(
             "DELETE FROM day_workout_items WHERE id = ? AND user_id = ? AND date = ?",
             (item_id, user_id, to_day(day)),
         )
         return cursor.rowcount == 1
 
-    async def log_set(self, user_id: str, day: date, profile: Profile, log: SetLog) -> None:
-        await self._ensure_day(user_id, day, profile)
+    async def log_set(self, user_id: str, day: date, log: SetLog) -> None:
+        await open_day(self._conn, user_id, day)
         await self._conn.execute(
             """
             INSERT INTO set_logs
@@ -284,23 +288,6 @@ class SqliteWorkoutExecutionStore:
             for value in json.loads(row["logs_json"] or "[]")
         )
         return WorkoutExecutionItem(item, logs)
-
-    async def _ensure_day(self, user_id: str, day: date, profile: Profile) -> None:
-        await self._conn.execute(
-            "INSERT INTO days (user_id, date, workout_time, location)"
-            " VALUES (?, ?, ?, ?) ON CONFLICT (user_id, date) DO NOTHING",
-            (user_id, to_day(day), profile.workout_time.value, profile.default_location.value),
-        )
-        await self._conn.execute(
-            """
-            UPDATE days SET template_id = (
-                SELECT ws.template_id FROM workout_schedule ws
-                WHERE ws.user_id = days.user_id AND ws.weekday = ?
-            )
-            WHERE user_id = ? AND date = ? AND template_id IS NULL
-            """,
-            (day.weekday(), user_id, to_day(day)),
-        )
 
     async def _ensure_snapshot(self, user_id: str, day: date) -> None:
         """Copy the scheduled template into the day the first time it is opened.

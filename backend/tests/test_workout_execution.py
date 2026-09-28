@@ -517,3 +517,19 @@ async def test_editing_the_template_leaves_a_day_already_underway_alone(
     assert entry["completed_set_count"] == 1
     assert entry["item"]["sets"] == 3
     assert entry["item"]["weight_kg"] == 20
+
+
+async def test_adding_to_a_scheduled_day_keeps_the_scheduled_prescription(
+    with_profile: AsyncClient,
+):
+    original, alternative, _template = await _workout(with_profile)
+
+    # The very first call on the day is the add, so the day has not been opened yet.
+    added = await with_profile.post(
+        f"/days/{DAY}/workout/items",
+        json={"exercise_id": alternative["id"], "sets": 2, "reps": "12"},
+    )
+
+    assert added.status_code == 201
+    exercises = [entry["item"]["exercise_id"] for entry in added.json()["items"]]
+    assert exercises == [original["id"], alternative["id"]]

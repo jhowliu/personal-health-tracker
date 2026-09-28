@@ -181,7 +181,6 @@ def extras(conn: DbConn) -> ExtrasService:
         SqliteDayStore(conn),
         SqliteFoodStore(conn),
         SqliteMealPhotoStore(conn),
-        SqliteAccountStore(conn),
     )
 
 

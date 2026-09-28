@@ -1,10 +1,10 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 import aiosqlite
 
+from app.adapters.sqlite.day_row import PLANNED_MEALS, open_day
 from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.rows import from_day, from_iso, to_day, to_iso
-from app.domain.ids import new_id
 from app.domain.models import (
     ZERO_NUTRIENTS,
     DayFacts,
@@ -16,12 +16,9 @@ from app.domain.models import (
     Nutrients,
     PlannedMeal,
     PlateItem,
-    Profile,
     WorkoutTime,
 )
-
-PLANNED_MEALS = ("breakfast", "lunch", "dinner")
-STREAK_SCAN_DAYS = 400
+from app.domain.streak import DayRecord
 
 
 class SqliteDayStore:
@@ -29,8 +26,8 @@ class SqliteDayStore:
         self._conn = conn
         self._foods = SqliteFoodStore(conn, locale)
 
-    async def load_facts(self, user_id: str, day: date, profile: Profile) -> DayFacts:
-        await self._ensure_day(user_id, day, profile)
+    async def load_facts(self, user_id: str, day: date) -> DayFacts:
+        await open_day(self._conn, user_id, day)
 
         async with self._conn.execute(
             "SELECT workout_time, template_id, workout_done_at, workout_skipped_at FROM days"
@@ -77,7 +74,6 @@ class SqliteDayStore:
         self,
         user_id: str,
         day: date,
-        profile: Profile,
         *,
         workout_time: str | None = None,
         location: str | None = None,
@@ -85,7 +81,7 @@ class SqliteDayStore:
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
     ) -> None:
-        await self._ensure_day(user_id, day, profile)
+        await open_day(self._conn, user_id, day)
         changes = {
             "workout_time": workout_time,
             "location": location,
@@ -114,9 +110,8 @@ class SqliteDayStore:
         meal_time: MealTime,
         state: str,
         at: datetime,
-        profile: Profile,
     ) -> None:
-        await self._ensure_day(user_id, day, profile)
+        await open_day(self._conn, user_id, day)
         assignments = {
             "eaten": ("eaten_at = ?, skipped_at = NULL", (to_iso(at),)),
             "skipped": ("eaten_at = NULL, skipped_at = ?", (to_iso(at),)),
@@ -132,70 +127,28 @@ class SqliteDayStore:
             user_id, day, meal_time.value, refresh=True, freeze=state == "eaten"
         )
 
-    async def log_set(
-        self,
-        user_id: str,
-        day: date,
-        template_item_id: str,
-        exercise_id: str,
-        set_index: int,
-        reps_done: int | None,
-        weight_kg: float | None,
-        done_at: datetime,
-    ) -> None:
-        await self._conn.execute(
-            """
-            INSERT INTO set_logs
-                (id, user_id, date, template_item_id, exercise_id, set_index,
-                 reps_done, weight_kg, done_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (user_id, date, template_item_id, set_index) DO UPDATE SET
-                reps_done = excluded.reps_done,
-                weight_kg = excluded.weight_kg,
-                done_at = excluded.done_at
-            """,
-            (
-                new_id(),
-                user_id,
-                to_day(day),
-                template_item_id,
-                exercise_id,
-                set_index,
-                reps_done,
-                weight_kg,
-                to_iso(done_at),
-            ),
-        )
-
-    async def streak_until(self, user_id: str, day: date) -> int:
-        """Streak: count back from `day`. A day counts only when the body was logged
-        and all three meals were marked eaten or skipped.
-        """
+    async def recent_days(self, user_id: str, until: date, limit: int) -> tuple[DayRecord, ...]:
         async with self._conn.execute(
             f"""
-            SELECT d.date FROM days d
-            WHERE d.user_id = ? AND d.date <= ?
-              AND EXISTS (SELECT 1 FROM body_logs b
-                          WHERE b.user_id = d.user_id AND b.date = d.date)
-              AND (SELECT COUNT(*) FROM day_meals m
-                   WHERE m.user_id = d.user_id AND m.date = d.date
+            SELECT d.date,
+                   EXISTS (SELECT 1 FROM body_logs b
+                           WHERE b.user_id = d.user_id AND b.date = d.date) AS body_logged,
+                   (SELECT COUNT(*) FROM day_meals m
+                    WHERE m.user_id = d.user_id AND m.date = d.date
                       AND m.meal_time IN {PLANNED_MEALS}
-                      AND (m.eaten_at IS NOT NULL OR m.skipped_at IS NOT NULL)) = 3
+                      AND (m.eaten_at IS NOT NULL OR m.skipped_at IS NOT NULL)) AS meals_resolved
+            FROM days d
+            WHERE d.user_id = ? AND d.date <= ?
             ORDER BY d.date DESC
-            LIMIT {STREAK_SCAN_DAYS}
+            LIMIT ?
             """,
-            (user_id, to_day(day)),
+            (user_id, to_day(until), limit),
         ) as cursor:
-            completed = [from_day(row["date"]) for row in await cursor.fetchall()]
-
-        streak = 0
-        expected = day
-        for completed_day in completed:
-            if completed_day != expected:
-                break
-            streak += 1
-            expected -= timedelta(days=1)
-        return streak
+            rows = await cursor.fetchall()
+        return tuple(
+            DayRecord(from_day(row["date"]), bool(row["body_logged"]), row["meals_resolved"])
+            for row in rows
+        )
 
     async def load_plan(self, user_id: str, day: date) -> tuple[PlannedMeal, ...]:
         async with self._conn.execute(
@@ -232,8 +185,8 @@ class SqliteDayStore:
     async def load_extras(self, user_id: str, day: date) -> tuple[PlateItem, ...]:
         return (await self._load_items(user_id, day)).get(MealTime.EXTRAS.value, ())
 
-    async def add_extra(self, user_id: str, day: date, item: PlateItem, profile: Profile) -> None:
-        await self._ensure_day(user_id, day, profile)
+    async def add_extra(self, user_id: str, day: date, item: PlateItem) -> None:
+        await open_day(self._conn, user_id, day)
         await self._insert_item(user_id, day, MealTime.EXTRAS, item)
 
     async def delete_extra(self, user_id: str, day: date, item_id: str) -> bool:
@@ -249,11 +202,10 @@ class SqliteDayStore:
         user_id: str,
         day: date,
         meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
-        profile: Profile,
     ) -> None:
         # day_meals references days(user_id, date); planning may be the first thing
         # that touches this date.
-        await self._ensure_day(user_id, day, profile)
+        await open_day(self._conn, user_id, day)
 
         for meal_time, (meal_id, _name, items) in meals.items():
             async with self._conn.execute(
@@ -316,9 +268,9 @@ class SqliteDayStore:
         await self._freeze_slot(user_id, day, meal_time.value)
 
     async def add_plan_item(
-        self, user_id: str, day: date, meal_time: MealTime, item: PlateItem, profile: Profile
+        self, user_id: str, day: date, meal_time: MealTime, item: PlateItem
     ) -> None:
-        await self._ensure_day(user_id, day, profile)
+        await open_day(self._conn, user_id, day)
         await self._insert_item(user_id, day, meal_time, item)
         await self._freeze_slot(user_id, day, meal_time.value)
 
@@ -426,29 +378,6 @@ class SqliteDayStore:
                 if item.food is not None
                 and (updated := _refrozen(item, refresh=refresh, freeze=freeze)) is not item
             ],
-        )
-
-    async def _ensure_day(self, user_id: str, day: date, profile: Profile) -> None:
-        await self._conn.execute(
-            "INSERT INTO days (user_id, date, workout_time, location)"
-            " VALUES (?, ?, ?, ?) ON CONFLICT (user_id, date) DO NOTHING",
-            (user_id, to_day(day), profile.workout_time.value, profile.default_location.value),
-        )
-        # The schedule may have been set after the day was opened, so backfill on every read.
-        await self._conn.execute(
-            """
-            UPDATE days SET template_id = (
-                SELECT ws.template_id FROM workout_schedule ws
-                WHERE ws.user_id = days.user_id AND ws.weekday = ?
-            )
-            WHERE user_id = ? AND date = ? AND template_id IS NULL
-            """,
-            (day.weekday(), user_id, to_day(day)),
-        )
-        await self._conn.executemany(
-            "INSERT INTO day_meals (user_id, date, meal_time) VALUES (?, ?, ?)"
-            " ON CONFLICT (user_id, date, meal_time) DO NOTHING",
-            [(user_id, to_day(day), meal_time) for meal_time in PLANNED_MEALS],
         )
 
 

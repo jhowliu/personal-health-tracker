@@ -108,7 +108,6 @@ class DailyPlanService:
     ) -> DayPlan:
         """Replace one food on today's plate, converting the portion as we go."""
         self._check_meal_time(meal_time)
-        await self._ensure_day(user_id, day)
         plan = DayPlan(date=day, meals=await self._days.load_plan(user_id, day))
         slot = plan.slot(meal_time)
         if slot is None:
@@ -150,7 +149,6 @@ class DailyPlanService:
         photo_id: str | None,
     ) -> DayPlan:
         self._check_meal_time(meal_time)
-        profile = await self._ensure_day(user_id, day)
         if photo_id and await self._photos.load(user_id, photo_id) is None:
             raise NotFound("找不到這張照片")
         if food_id:
@@ -164,14 +162,13 @@ class DailyPlanService:
             item = PlateItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
         else:
             raise ValidationFailed("請提供食物份量或自訂食物營養")
-        await self._days.add_plan_item(user_id, day, meal_time, item, profile)
+        await self._days.add_plan_item(user_id, day, meal_time, item)
         return await self.view(user_id, day)
 
     async def update_item(
         self, user_id: str, day: date, meal_time: MealTime, item_id: str, grams: float
     ) -> DayPlan:
         self._check_meal_time(meal_time)
-        await self._ensure_day(user_id, day)
         plan = DayPlan(date=day, meals=await self._days.load_plan(user_id, day))
         slot = plan.slot(meal_time)
         item = next((item for item in slot.items if item.id == item_id), None) if slot else None
@@ -187,7 +184,6 @@ class DailyPlanService:
         self, user_id: str, day: date, meal_time: MealTime, item_id: str
     ) -> None:
         self._check_meal_time(meal_time)
-        await self._ensure_day(user_id, day)
         if not await self._days.delete_plan_item(user_id, day, meal_time, item_id):
             raise NotFound("找不到餐點項目")
 
@@ -207,14 +203,7 @@ class DailyPlanService:
             slot: (meal.id, meal.name, _fresh_ids(apply_carb_scale(meal.items, scale)))
             for slot, meal in chosen.items()
         }
-        await self._days.save_plan(user_id, day, snapshot, profile)
-
-    async def _ensure_day(self, user_id: str, day: date):
-        profile = await self._accounts.load_profile(user_id)
-        if profile is None:
-            raise NotFound("還沒有建立個人資料")
-        await self._days.load_facts(user_id, day, profile)
-        return profile
+        await self._days.save_plan(user_id, day, snapshot)
 
     @staticmethod
     def _check_meal_time(meal_time: MealTime) -> None:

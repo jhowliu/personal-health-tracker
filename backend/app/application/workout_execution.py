@@ -67,7 +67,7 @@ class WorkoutExecutionService:
 
     async def view(self, user_id: str, day: date) -> WorkoutExecution:
         profile = await self._profile(user_id)
-        workout = await self._store.load(user_id, day, profile)
+        workout = await self._store.load(user_id, day)
         return replace(
             workout, estimated_burn_kcal=estimate_burn_kcal(workout, profile.weight_kg)
         )
@@ -85,15 +85,12 @@ class WorkoutExecutionService:
         rest_sec: int,
         note: str | None,
     ) -> WorkoutExecution:
-        profile = await self._profile(user_id)
-        await self.view(user_id, day)  # Materialise any scheduled snapshot before appending.
         exercise = await self._store.load_visible_exercise(user_id, exercise_id)
         if exercise is None:
             raise NotFound("找不到可使用的動作")
         await self._store.add_item(
             user_id,
             day,
-            profile,
             DayWorkoutItem(
                 id=new_id(),
                 exercise_id=exercise.id,
@@ -153,7 +150,6 @@ class WorkoutExecutionService:
         return await self.view(user_id, day)
 
     async def delete_item(self, user_id: str, day: date, item_id: str) -> None:
-        await self.view(user_id, day)
         if not await self._store.delete_item(user_id, day, item_id):
             raise NotFound("找不到今天排定的動作")
 
@@ -173,7 +169,6 @@ class WorkoutExecutionService:
         await self._store.log_set(
             user_id,
             day,
-            await self._profile(user_id),
             SetLog(
                 day_workout_item_id=day_workout_item_id,
                 exercise_id=exercise_id,

@@ -5,7 +5,6 @@ from datetime import date
 
 from app.application.decisions import DecisionService
 from app.application.ports import (
-    AccountStore,
     Clock,
     DayStore,
     FoodStore,
@@ -201,13 +200,10 @@ class MealPhotoService:
 
 
 class ExtrasService:
-    def __init__(
-        self, days: DayStore, foods: FoodStore, photos: MealPhotoStore, accounts: AccountStore
-    ) -> None:
+    def __init__(self, days: DayStore, foods: FoodStore, photos: MealPhotoStore) -> None:
         self._days = days
         self._foods = foods
         self._photos = photos
-        self._accounts = accounts
 
     async def add(
         self,
@@ -234,10 +230,7 @@ class ExtrasService:
         else:
             raise ValidationFailed("請提供食物份量或自訂食物營養")
 
-        profile = await self._accounts.load_profile(user_id)
-        if profile is None:
-            raise NotFound("還沒有建立個人資料")
-        await self._days.add_extra(user_id, day, item, profile)
+        await self._days.add_extra(user_id, day, item)
         return item
 
     async def remove(self, user_id: str, day: date, item_id: str) -> None:
