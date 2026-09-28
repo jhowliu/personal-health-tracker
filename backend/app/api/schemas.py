@@ -12,8 +12,8 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
 from app.domain.decisions import DecisionResult
-from app.domain.meal_photos import ExtraItem, MealPhoto, RecognizedItem
-from app.domain.meals import total
+from app.domain.meal_photos import MealPhoto, RecognizedItem
+from app.domain.meals import planned_total, total
 from app.domain.models import (
     BodyLog,
     BodySummary,
@@ -26,8 +26,8 @@ from app.domain.models import (
     Meal,
     MealItem,
     Nutrients,
-    PlannedItem,
     PlannedMeal,
+    PlateItem,
     Profile,
     ScheduleEntry,
     Targets,
@@ -705,7 +705,7 @@ class PlannedMealItemOut(BaseModel):
     photo_id: str | None
 
     @classmethod
-    def of(cls, item: PlannedItem) -> "PlannedMealItemOut":
+    def of(cls, item: PlateItem) -> "PlannedMealItemOut":
         return cls(
             id=item.id,
             food=FoodOut.of(item.food) if item.food else None,
@@ -725,14 +725,11 @@ class DayPlanOut(BaseModel):
 
     @classmethod
     def of(cls, plan: DayPlan) -> "DayPlanOut":
-        nutrients = total(tuple(i for m in plan.meals if not m.skipped for i in m.items))
-        for extra in plan.extras:
-            nutrients += extra.nutrients
         return cls(
             date=plan.date,
             meals=[PlannedMealOut.of(m) for m in plan.meals],
             extras=[ExtraItemOut.of(extra) for extra in plan.extras],
-            nutrients=NutrientsOut.of(nutrients),
+            nutrients=NutrientsOut.of(planned_total(plan)),
         )
 
 
@@ -849,7 +846,7 @@ class ExtraItemOut(BaseModel):
     photo_id: str | None
 
     @classmethod
-    def of(cls, item: ExtraItem) -> "ExtraItemOut":
+    def of(cls, item: PlateItem) -> "ExtraItemOut":
         return cls(
             id=item.id,
             food_id=item.food_id,

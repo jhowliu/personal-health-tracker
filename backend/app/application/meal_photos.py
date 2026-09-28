@@ -16,14 +16,13 @@ from app.application.ports import (
 from app.domain.errors import NotFound, QuotaExceeded, ServiceUnavailable, ValidationFailed
 from app.domain.ids import new_id
 from app.domain.meal_photos import (
-    ExtraItem,
     MealPhoto,
     MealPhotoStatus,
     Recognition,
     RecognizedFood,
     RecognizedItem,
 )
-from app.domain.models import Food, Nutrients
+from app.domain.models import Food, Nutrients, PlateItem
 
 _IMAGE_TYPES = {"image/jpeg", "image/png"}
 _CANDIDATE_LIMIT = 10
@@ -220,7 +219,7 @@ class ExtrasService:
         custom_name: str | None,
         nutrients: Nutrients | None,
         photo_id: str | None,
-    ) -> ExtraItem:
+    ) -> PlateItem:
         if photo_id and await self._photos.load(user_id, photo_id) is None:
             raise NotFound("找不到這張照片")
         if food_id:
@@ -229,9 +228,9 @@ class ExtrasService:
             food = await self._foods.load(user_id, food_id)
             if food is None:
                 raise NotFound("找不到這個食物")
-            item = ExtraItem(new_id(), food.id, None, grams, food.nutrients_for(grams), photo_id, 0)
+            item = PlateItem(new_id(), food, None, grams, None, photo_id, 0).freeze()
         elif custom_name and nutrients:
-            item = ExtraItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
+            item = PlateItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
         else:
             raise ValidationFailed("請提供食物份量或自訂食物營養")
 

@@ -56,14 +56,3 @@ class RecognizedItem:
     match_confidence: float
     alternatives: tuple[RecognizedFood, ...]
     estimate: EstimatedFood | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ExtraItem:
-    id: str
-    food_id: str | None
-    custom_name: str | None
-    grams: float | None
-    nutrients: Nutrients
-    photo_id: str | None
-    sort_order: int

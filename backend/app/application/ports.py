@@ -9,7 +9,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.decisions import DecisionRequest, DecisionResult
-from app.domain.meal_photos import ExtraItem, MealPhoto, Recognition
+from app.domain.meal_photos import MealPhoto, Recognition
 from app.domain.models import (
     Account,
     BodyLog,
@@ -20,8 +20,8 @@ from app.domain.models import (
     Meal,
     MealItem,
     MealTime,
-    PlannedItem,
     PlannedMeal,
+    PlateItem,
     Profile,
     ScheduleEntry,
     TemplateItem,
@@ -238,7 +238,7 @@ class DayStore(Protocol):
         """Swap one food in today's plate, keeping its position in the meal."""
 
     async def add_plan_item(
-        self, user_id: str, day: date, meal_time: MealTime, item: PlannedItem, profile: Profile
+        self, user_id: str, day: date, meal_time: MealTime, item: PlateItem, profile: Profile
     ) -> None: ...
 
     async def update_plan_item(
@@ -249,10 +249,10 @@ class DayStore(Protocol):
         self, user_id: str, day: date, meal_time: MealTime, item_id: str
     ) -> bool: ...
 
-    async def load_extras(self, user_id: str, day: date) -> tuple[ExtraItem, ...]: ...
+    async def load_extras(self, user_id: str, day: date) -> tuple[PlateItem, ...]: ...
 
     async def add_extra(
-        self, user_id: str, day: date, item: ExtraItem, profile: Profile
+        self, user_id: str, day: date, item: PlateItem, profile: Profile
     ) -> None: ...
 
     async def delete_extra(self, user_id: str, day: date, item_id: str) -> bool: ...

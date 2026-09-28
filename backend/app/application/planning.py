@@ -28,7 +28,7 @@ from app.domain.models import (
     MealItem,
     MealTime,
     Nutrients,
-    PlannedItem,
+    PlateItem,
     SwapBasis,
 )
 from app.domain.nutrition import compute_targets
@@ -159,9 +159,9 @@ class DailyPlanService:
             food = await self._foods.load(user_id, food_id)
             if food is None:
                 raise NotFound("找不到這個食物")
-            item = PlannedItem(new_id(), food, None, grams, None, photo_id, 0)
+            item = PlateItem(new_id(), food, None, grams, None, photo_id, 0)
         elif custom_name and nutrients:
-            item = PlannedItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
+            item = PlateItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
         else:
             raise ValidationFailed("請提供食物份量或自訂食物營養")
         await self._days.add_plan_item(user_id, day, meal_time, item, profile)
