@@ -138,7 +138,7 @@ async function performRefresh(tokens: Tokens, sessionVersion: number): Promise<b
 }
 
 async function fail(response: Response): Promise<never> {
-  let detail = `請求失敗(${response.status})`;
+  let detail = `請求失敗（${response.status}）`;
   try {
     const body = await response.json();
     if (typeof body?.detail === 'string') detail = body.detail;

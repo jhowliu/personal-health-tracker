@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
-import { Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 
@@ -77,9 +77,7 @@ export default function ReplaceTodayWorkout() {
 
   return (
     <Screen>
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/today')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 今日流程</Text>
-      </Pressable>
+      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
       <Title sub="只換今天這一次，不會改到原本課表。">替代 {name ?? '動作'}</Title>
       <View className="flex-row flex-wrap gap-2">
         {REASONS.map((option) => (

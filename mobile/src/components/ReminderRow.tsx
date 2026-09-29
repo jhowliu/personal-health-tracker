@@ -7,6 +7,7 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Platform, Pressable, Switch, Text, View } from 'react-native';
 
 import { Sheet } from '@/components/Sheet';
+import { ChevronIcon } from '@/components/icons';
 import { LabelWithTip } from '@/components/ui';
 import { formatReminderTime, parseReminderTime } from '@/notifications/reminder-plan';
 import { color } from '@/theme/tokens';
@@ -70,7 +71,7 @@ export function ReminderRow({
   return (
     <View className="py-3">
       <View className="flex-row items-center justify-between">
-        <LabelWithTip label="早上提醒量體重" tip="今天已經量過,就不會再提醒。" />
+        <LabelWithTip label="早上提醒量體重" tip="今天已經量過，就不會再提醒。" />
         <Switch
           value={draft !== null}
           onValueChange={(on) => setDraft(on ? DEFAULT_TIME : null)}
@@ -85,7 +86,10 @@ export function ReminderRow({
           className="min-h-[44px] flex-row items-center justify-between"
         >
           <Text className="text-base text-ink">提醒時間</Text>
-          <Text className="text-base text-muted">{draft} ›</Text>
+          <View className="flex-row items-center gap-1">
+            <Text className="text-base text-muted">{draft}</Text>
+            <ChevronIcon direction="right" size={16} tint={color.muted} />
+          </View>
         </Pressable>
       ) : null}
       {/* Saving is debounced as before, so the sheet needs no confirm button. */}

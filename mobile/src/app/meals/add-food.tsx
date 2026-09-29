@@ -1,11 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
+import { byCategoryOrder } from '@/meals/order';
+import { amountToGrams, describeFood, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { photoDraft } from '@/meals/photo-draft';
 import { backOrReplace } from '@/navigation/back';
@@ -28,7 +30,8 @@ export default function AddFood() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [foods, setFoods] = useState<Food[] | null>(null);
   const [picked, setPicked] = useState<Food | null>(null);
-  const [grams, setGrams] = useState('');
+  // Typed in the food's own unit (顆, 匙, g); converted to grams only when it is saved.
+  const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const searchVersion = useRef(0);
@@ -71,12 +74,12 @@ export default function AddFood() {
   const choose = (food: Food) => {
     setPicked(food);
     // Default to the usual portion, which is what the spec says a fresh pick starts at.
-    setGrams(String(Math.round(food.usual_grams)));
+    setAmount(readableAmount(gramsToAmount(food, food.usual_grams)));
   };
 
   const add = async () => {
     if (!picked) return;
-    const portion = Number(grams) || picked.usual_grams;
+    const portion = amountToGrams(picked, Number(amount)) || picked.usual_grams;
     setBusy(true);
     try {
       if (destination === 'day') {
@@ -128,7 +131,10 @@ export default function AddFood() {
   };
 
   const label = categories.find((c) => c.id === filter)?.name;
-  const kcal = picked ? Math.round((picked.per_100g.kcal * (Number(grams) || 0)) / 100) : 0;
+  const unit = portionUnit(picked);
+  const pickedGrams = picked ? amountToGrams(picked, Number(amount) || 0) : 0;
+  const kcal = picked ? Math.round((picked.per_100g.kcal * pickedGrams) / 100) : 0;
+  const ordered = useMemo(() => foods && byCategoryOrder(foods, categories), [foods, categories]);
 
   return (
     <Screen
@@ -146,25 +152,24 @@ export default function AddFood() {
             </View>
             <Field
               label="份量"
-              value={grams}
-              onChangeText={setGrams}
-              suffix="g"
+              value={amount}
+              onChangeText={setAmount}
+              suffix={unit.label}
               keyboardType="decimal-pad"
             />
-            <PrimaryButton onPress={add} disabled={!grams || photoBusy} busy={busy}>
+            {unit.gramsPerUnit === 1 || !pickedGrams ? null : <Hint>約 {readableAmount(pickedGrams)} g</Hint>}
+            <PrimaryButton onPress={add} disabled={!Number(amount) || photoBusy} busy={busy}>
               {busy ? '加入中…' : `加入${label ?? '食物'}`}
             </PrimaryButton>
           </>
         ) : undefined
       }
     >
-      <Pressable
-        accessibilityRole="button"
+      <BackLink
+        label={destination === 'day' ? '今天' : '編輯餐點'}
         onPress={() => backOrReplace(parentRoute)}
         disabled={busy || photoBusy}
-      >
-        <Text className="text-base text-primary">‹ {destination === 'day' ? '今日流程' : '編輯餐點'}</Text>
-      </Pressable>
+      />
 
       <Title>{label ? `加入${label}` : '加入食物'}</Title>
 
@@ -187,20 +192,18 @@ export default function AddFood() {
         ))}
       </View>
 
-      {foods === null ? (
+      {ordered === null ? (
         <ActivityIndicator color={color.primary} />
-      ) : foods.length === 0 ? (
-        <Card>
-          <Hint>找不到符合的食物。換個關鍵字,或到食物庫新增自訂食物。</Hint>
-        </Card>
+      ) : ordered.length === 0 ? (
+        <Empty compact>找不到符合的食物。換個關鍵字，或到食物庫新增自訂食物。</Empty>
       ) : (
         <Card className="px-0 py-0">
           <Rows>
-            {foods.map((food) => (
+            {ordered.map((food) => (
             <FoodOptionRow
               key={food.id}
               name={food.name}
-              detail={summarise(food)}
+              detail={describeFood(food)}
               badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: 'primary' }]}
               selected={picked?.id === food.id}
               onPress={() => choose(food)}
@@ -214,11 +217,3 @@ export default function AddFood() {
   );
 }
 
-function summarise(food: Food): string {
-  const { kcal, protein_g, fat_g, carb_g } = food.per_100g;
-  const base =
-    food.grams_per_unit && food.unit === 'piece' ? `每顆 ${food.grams_per_unit} g` : '每 100 g';
-  const factor = food.grams_per_unit && food.unit === 'piece' ? food.grams_per_unit / 100 : 1;
-  const r = (n: number) => Math.round(n * factor);
-  return `${base} ${r(kcal)} 大卡,蛋白質 ${r(protein_g)}、脂肪 ${r(fat_g)}、碳水 ${r(carb_g)} g`;
-}

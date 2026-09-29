@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { photoDraft, type RecognizedFood, type RecognizedItem } from '@/meals/photo-draft';
 
@@ -236,8 +236,8 @@ export default function MealPhotoResults() {
         )
       }
     >
-      <Pressable
-        accessibilityRole="button"
+      <BackLink
+        label="重新選照片"
         onPress={() => {
           photoDraft.clear(analysisId);
           router.replace({
@@ -246,9 +246,7 @@ export default function MealPhotoResults() {
           });
         }}
         disabled={busy}
-      >
-        <Text className="text-base text-primary">‹ 重新選照片</Text>
-      </Pressable>
+      />
       <Title sub="確認食物與份量後再加入。低信心結果建議改選候選食物或略過。">辨識結果</Title>
 
       {destination === 'today' ? (
@@ -279,9 +277,10 @@ export default function MealPhotoResults() {
                   <Text className="text-base font-semibold text-ink">{item.selected?.label ?? item.label}</Text>
                   <Confidence confidence={item.recognition_confidence} />
                 </View>
-                <Pressable accessibilityRole="button" onPress={() => update(index, { skipped: !item.skipped })}>
-                  <Text className="text-base text-primary">{item.skipped ? '恢復' : '略過'}</Text>
-                </Pressable>
+                <TextAction
+                  label={item.skipped ? '恢復' : '略過'}
+                  onPress={() => update(index, { skipped: !item.skipped })}
+                />
               </View>
               <Field
                 label="估計份量"

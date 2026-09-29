@@ -1,9 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { PlusIcon } from '@/components/icons';
+import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { Card, Chip, Empty, Hint, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
@@ -86,16 +87,17 @@ export default function WorkoutsScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => router.navigate('/workouts/new')}
-            className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+            className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-field bg-primary px-4"
           >
-            <Text className="text-base font-semibold text-white">+ 新增課表</Text>
+            <PlusIcon size={18} tint={color.surface} />
+            <Text className="text-base font-semibold text-white">新增課表</Text>
           </Pressable>
         </View>
       }
     >
       <SectionHeading>一週排程</SectionHeading>
       {templates.length === 0 ? (
-        <Hint>先新增一份課表,才排得進星期幾。</Hint>
+        <Hint>先新增一份課表，才排得進星期幾。</Hint>
       ) : null}
       <Card className="py-0">
         <Rows>
@@ -120,7 +122,7 @@ export default function WorkoutsScreen() {
                     <Text className="text-base font-semibold text-ink">{label}</Text>
                     <Text className="text-sm text-muted">{template?.name ?? '休息日'}</Text>
                   </View>
-                  <Chip label={category?.label ?? '休息'} tone={category?.tone ?? 'neutral'} />
+                  {category ? <Chip label={category.label} tone={category.tone} /> : null}
                   <Text className="text-base text-primary">{open ? '收起' : '更改'}</Text>
                 </Pressable>
 
@@ -146,7 +148,7 @@ export default function WorkoutsScreen() {
 
       <SectionHeading>我的課表</SectionHeading>
       {ownedTemplates.length === 0 ? (
-        <Empty>還沒有自己的課表,可新增或從公用課表複製</Empty>
+        <Empty>還沒有自己的課表，可新增或從公用課表複製</Empty>
       ) : (
         <Card className="py-0">
           <Rows>
@@ -157,62 +159,33 @@ export default function WorkoutsScreen() {
         </Card>
       )}
 
-      <Modal
+      <Sheet
         visible={editingDay !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => {
+        title={editingDay === null ? '' : WEEKDAYS[editingDay]}
+        onClose={() => {
           if (!busy) setEditingDay(null);
         }}
       >
-        <Pressable
-          accessible={false}
-          onPress={() => {
-            if (!busy) setEditingDay(null);
-          }}
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(35, 31, 32, 0.35)' }}
-        >
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-card bg-bg px-5 pb-3 pt-5">
-            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-3">
-              <View className="flex-row items-start justify-between gap-3">
-                <View className="flex-1 gap-1">
-                  <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
-                    {editingDay === null ? '' : WEEKDAYS[editingDay]}
-                  </Text>
-                  <Text className="text-sm text-muted">目前：{editingTemplate?.name ?? '休息日'}</Text>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy}
-                  onPress={() => setEditingDay(null)}
-                  className={`min-h-[44px] justify-center px-2 ${busy ? 'opacity-40' : ''}`}
-                >
-                  <Text className="text-base text-primary">關閉</Text>
-                </Pressable>
-              </View>
-              <ScrollView contentContainerClassName="gap-2 pb-4" keyboardShouldPersistTaps="handled">
-                <ScheduleOption
-                  label="休息日"
-                  selected={!editingEntry}
-                  disabled={busy || editingDay === null}
-                  onPress={() => editingDay !== null && assign(editingDay, null)}
-                />
-                {templates.map((option) => (
-                  <ScheduleOption
-                    key={option.id}
-                    label={option.name}
-                    detail={`${option.is_builtin ? '公用 · ' : ''}${describe(option)}`}
-                    selected={editingEntry?.template_id === option.id}
-                    disabled={busy || editingDay === null}
-                    onPress={() => editingDay !== null && assign(editingDay, option.id)}
-                  />
-                ))}
-              </ScrollView>
-            </Pressable>
-          </SafeAreaView>
-        </Pressable>
-      </Modal>
+        <Hint>目前：{editingTemplate?.name ?? '休息日'}</Hint>
+        <ScrollView contentContainerClassName="gap-2 pb-4" keyboardShouldPersistTaps="handled">
+          <ChoiceOption
+            label="休息日"
+            selected={!editingEntry}
+            disabled={busy || editingDay === null}
+            onPress={() => editingDay !== null && assign(editingDay, null)}
+          />
+          {templates.map((option) => (
+            <ChoiceOption
+              key={option.id}
+              label={option.name}
+              detail={`${option.is_builtin ? '公用 · ' : ''}${describe(option)}`}
+              selected={editingEntry?.template_id === option.id}
+              disabled={busy || editingDay === null}
+              onPress={() => editingDay !== null && assign(editingDay, option.id)}
+            />
+          ))}
+        </ScrollView>
+      </Sheet>
     </Screen>
   );
 }
@@ -237,39 +210,8 @@ function TemplateRow({ template }: { template: Template }) {
   );
 }
 
-function ScheduleOption({
-  label,
-  detail,
-  selected,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  detail?: string;
-  selected: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected, disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-field px-3 py-2 ${
-        selected ? 'bg-primary-soft' : 'bg-fill'
-      }`}
-    >
-      <View className="flex-1 gap-0.5">
-        <Text className="text-base text-ink">{label}</Text>
-        {detail ? <Text className="text-sm text-muted">{detail}</Text> : null}
-      </View>
-      {selected ? <Text className="text-base text-primary">✓</Text> : null}
-    </Pressable>
-  );
-}
 
 function describe(template: Template): string {
-  const minutes = template.duration_min ? `,約 ${template.duration_min} 分鐘` : '';
+  const minutes = template.duration_min ? `，約 ${template.duration_min} 分鐘` : '';
   return `${template.items.length} 個動作${minutes}`;
 }

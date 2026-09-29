@@ -1,10 +1,10 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
+import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
@@ -114,9 +114,7 @@ export default function Substitute() {
         ) : undefined
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)}>
-        <Text className="text-base text-primary">‹ 編輯餐點</Text>
-      </Pressable>
+      <BackLink label="編輯餐點" onPress={() => backOrReplace(parentRoute)} />
 
       <Title>替換{source ? CATEGORY_LABEL[source.category_id] ?? '食物' : '食物'}</Title>
 
@@ -145,7 +143,7 @@ export default function Substitute() {
         </View>
       ) : null}
 
-      <Hint>同分類的食物,克數已自動換算</Hint>
+      <Hint>同分類的食物，克數已自動換算</Hint>
 
       {options === null ? (
         <ActivityIndicator color={color.primary} />
@@ -161,7 +159,7 @@ export default function Substitute() {
               badgesBelow
               note={
                 option.capped
-                  ? `已到常見份量上限,${BASIS_LABEL[active].replace('等', '')}會比原本少`
+                  ? `已到常見份量上限，${BASIS_LABEL[active].replace('等', '')}會比原本少`
                   : undefined
               }
               selected={picked?.food.id === option.food.id}

@@ -52,7 +52,7 @@ export function TrendChart({
       </View>
 
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height: HEIGHT }}>
-        {width > 0 && points.length > 0 ? (
+        {width > 0 && points.length >= 2 ? (
           <Svg width={width} height={HEIGHT}>
             <Line
               x1={PADDING}
@@ -84,12 +84,16 @@ export function TrendChart({
           </Svg>
         ) : (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-sm text-muted">還沒有紀錄</Text>
+            <Text className="text-center text-sm text-muted">
+              {points.length === 0 ? '還沒有紀錄' : '再多記幾天，就會看到趨勢'}
+            </Text>
           </View>
         )}
       </View>
 
-      <Text className="text-xs text-muted">灰點:每次紀錄　粗線:7 天平均</Text>
+      {points.length >= 2 ? (
+        <Text className="text-xs text-muted">灰點：每次紀錄　粗線：7 天平均</Text>
+      ) : null}
     </View>
   );
 }

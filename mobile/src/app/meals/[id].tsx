@@ -5,8 +5,10 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
-import { Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
+import { CameraIcon, CloseIcon, PlusIcon } from '@/components/icons';
+import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
+import { amountToGrams, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -23,7 +25,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 const CATEGORY_ORDER = ['staple', 'protein', 'vegetable', 'fruit', 'fat_sauce'];
 
 const SWAP_NOTE: Record<string, string> = {
-  staple: '依碳水換算,份量隨目標自動調整',
+  staple: '依碳水換算，份量隨目標自動調整',
   protein: '依蛋白質換算',
   vegetable: '依熱量換算',
   fruit: '依碳水換算',
@@ -196,9 +198,7 @@ export default function EditMeal() {
         </>
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/meals')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 我的餐點</Text>
-      </Pressable>
+      <BackLink label="餐點" onPress={() => backOrReplace('/meals')} disabled={busy} />
 
       <Title>{isNew ? '新增餐點' : '編輯餐點'}</Title>
 
@@ -249,15 +249,12 @@ export default function EditMeal() {
                     <Chip label={CATEGORY_LABEL[group.category]} tone="primary" />
                     <Text className="flex-1 text-xs text-muted">{SWAP_NOTE[group.category]}</Text>
                   </View>
-                  <Pressable
-                    accessibilityRole="button"
-                     onPress={() => router.navigate(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
-                    className="min-h-[44px] justify-center pl-2"
-                  >
-                    <Text className="text-base text-primary underline">
-                      ＋ {CATEGORY_LABEL[group.category]}
-                    </Text>
-                  </Pressable>
+                  <TextAction
+                    icon={PlusIcon}
+                    label={CATEGORY_LABEL[group.category]}
+                    onPress={() => router.navigate(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
+                    className="min-h-[44px] pl-2"
+                  />
                 </View>
 
                 {group.items.map((item) => (
@@ -274,51 +271,35 @@ export default function EditMeal() {
         </Card>
       ) : null}
 
-       <Pressable
-         accessibilityRole="button"
-         onPress={() => router.navigate(`/meals/add-food?meal_id=${id}`)}
-        className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
-      >
-         <Text className="text-base text-primary">＋ 加入食物</Text>
-       </Pressable>
+       <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => router.navigate(`/meals/add-food?meal_id=${id}`)}>
+        加入食物
+      </PrimaryButton>
 
-       <Pressable
-         accessibilityRole="button"
-         onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${id}`)}
-         className="min-h-[52px] items-center justify-center rounded-field border border-dashed border-line"
-       >
-         <Text className="text-base text-primary">⌁ 用照片加入食物</Text>
-       </Pressable>
+       <PrimaryButton
+        tone="plain"
+        icon={CameraIcon}
+        onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${id}`)}
+      >
+        用照片加入食物
+      </PrimaryButton>
 
       {isNew ? null : (
-        <Pressable
-          accessibilityRole="button"
-          onPress={remove}
-          className="min-h-[52px] items-center justify-center"
-        >
-          <Text className="text-base text-primary">刪除這道餐點</Text>
-        </Pressable>
+        <PrimaryButton tone="danger" onPress={remove}>
+          刪除這道餐點
+        </PrimaryButton>
       )}
     </Screen>
   );
 }
 
 function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string; scaled: boolean }) {
-  const unitLabel =
-    item.food.unit === 'piece' ? '顆' : item.food.unit === 'scoop' ? '匙' : item.food.unit;
-  const display =
-    item.food.grams_per_unit && item.food.unit !== 'g'
-      ? String(Math.round((item.grams / item.food.grams_per_unit) * 10) / 10)
-      : String(Math.round(item.grams));
+  const unit = portionUnit(item.food);
+  const display = readableAmount(gramsToAmount(item.food, item.grams));
 
   const onChange = (text: string) => {
     const value = Number(text);
     if (!value || value <= 0) return;
-    const grams =
-      item.food.grams_per_unit && item.food.unit !== 'g'
-        ? value * item.food.grams_per_unit
-        : value;
-    draft.setGrams(draftKey, item.key, grams);
+    draft.setGrams(draftKey, item.key, amountToGrams(item.food, value));
   };
 
   const kcal = Math.round((item.food.per_100g.kcal * item.grams) / 100);
@@ -332,7 +313,7 @@ function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string
 
       <View className="flex-row items-center gap-2">
         <View className="flex-1">
-          <Field value={display} onChangeText={onChange} suffix={unitLabel} keyboardType="decimal-pad" />
+          <Field value={display} onChangeText={onChange} suffix={unit.label} keyboardType="decimal-pad" />
         </View>
         <Pressable
           accessibilityRole="button"
@@ -351,11 +332,11 @@ function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string
           onPress={() => draft.removeItem(draftKey, item.key)}
           className="h-11 w-11 items-center justify-center"
         >
-          <Text className="text-lg text-muted">✕</Text>
+          <CloseIcon size={18} tint={color.muted} />
         </Pressable>
       </View>
 
-      {scaled ? <Hint>主食份量會隨熱量目標自動調整,這裡顯示的是基準克數。</Hint> : null}
+      {scaled ? <Hint>主食份量會隨熱量目標自動調整，這裡顯示的是基準克數。</Hint> : null}
     </View>
   );
 }

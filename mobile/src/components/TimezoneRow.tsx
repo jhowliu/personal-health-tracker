@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ChoiceOption, Sheet } from '@/components/Sheet';
+import { ChevronIcon } from '@/components/icons';
+import { color } from '@/theme/tokens';
 import { LabelWithTip } from '@/components/ui';
 import { COMMON_TIMEZONES, deviceTimezone, timezoneLabel } from '@/timezone';
 
@@ -32,15 +34,17 @@ export function TimezoneRow({
   }
 
   return (
-    <View className="py-3">
+    <View className="flex-row items-center justify-between gap-3 py-3">
+      {/* Two sibling controls: a button cannot contain the (i) button of the label. */}
+      <LabelWithTip label="時區" tip="決定「今天」從哪一刻算起。提醒按手機目前的時區響。" />
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="更改時區"
         onPress={() => setOpen(true)}
-        className="min-h-[44px] flex-row items-center justify-between"
+        className="min-h-[44px] flex-1 flex-row items-center justify-end gap-1"
       >
-        <LabelWithTip label="時區" tip="決定「今天」從哪一刻算起。提醒按手機目前的時區響。" />
-        <Text className="text-base text-muted">{timezoneLabel(value)} ▾</Text>
+        <Text className="shrink text-base text-muted">{timezoneLabel(value)}</Text>
+        <ChevronIcon direction="right" size={16} tint={color.muted} />
       </Pressable>
       <Sheet visible={open} title="時區" onClose={() => setOpen(false)}>
         <ScrollView contentContainerClassName="gap-2 pb-4">

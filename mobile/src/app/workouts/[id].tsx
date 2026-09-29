@@ -6,7 +6,9 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 import { ApiError, api, type Schema } from '@/api/client';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
 import { NumberStepper } from '@/components/NumberStepper';
+import { PlusIcon } from '@/components/icons';
 import {
+  BackLink,
   Card,
   Field,
   Hint,
@@ -14,6 +16,7 @@ import {
   Screen,
   Segmented,
   SectionHeading,
+  TextAction,
   Title,
 } from '@/components/ui';
 import { color } from '@/theme/tokens';
@@ -229,9 +232,7 @@ export default function EditTemplate() {
         )
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/workouts')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 訓練</Text>
-      </Pressable>
+      <BackLink label="訓練" onPress={() => backOrReplace('/workouts')} disabled={busy} />
 
       <Title>{isNew ? '新增課表' : isBuiltin ? '公用課表' : '編輯課表'}</Title>
 
@@ -241,7 +242,7 @@ export default function EditTemplate() {
         label="課表名稱"
         value={name}
         onChangeText={setName}
-        placeholder="健身房:下肢"
+        placeholder="健身房：下肢"
         editable={!isBuiltin}
       />
 
@@ -253,7 +254,7 @@ export default function EditTemplate() {
         keyboardType="numeric"
         editable={!isBuiltin}
       />
-      <Hint>地點依動作用到的器材自動判定:出現槓鈴、機械、滑輪或跑步機就算健身房。</Hint>
+      <Hint>地點依動作用到的器材自動判定：出現槓鈴、機械、滑輪或跑步機就算健身房。</Hint>
 
       <SectionHeading action={<Text className="text-sm text-muted">{items.length} 個</Text>}>
         動作
@@ -266,15 +267,14 @@ export default function EditTemplate() {
               <Text className="text-base font-semibold text-ink">
                 {index + 1}. {item.exercise_name}
               </Text>
-              <Pressable
-                accessibilityRole="button"
+              <TextAction
+                tone="danger"
+                label="移除"
                 onPress={() => {
                   setItems(items.filter((_, i) => i !== index));
                   setEditing(null);
                 }}
-              >
-                <Text className="text-base text-primary">刪除</Text>
-              </Pressable>
+              />
             </View>
 
             <Segmented
@@ -332,7 +332,7 @@ export default function EditTemplate() {
               label="做法說明"
               value={item.note ?? ''}
               onChangeText={(note) => patch(index, { note: note || null })}
-              placeholder="腳與肩同寬,膝蓋不要完全打直"
+              placeholder="腳與肩同寬，膝蓋不要完全打直"
             />
 
             <Field
@@ -343,20 +343,16 @@ export default function EditTemplate() {
               keyboardType="numeric"
             />
 
-            <Pressable
-              accessibilityRole="button"
+            <TextAction
+              label="找替代動作"
               onPress={() =>
                 router.navigate(
                   `/workouts/alternatives?template_id=${id}&exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
                 )
               }
-            >
-              <Text className="text-base text-primary">找替代動作</Text>
-            </Pressable>
+            />
 
-            <Pressable accessibilityRole="button" onPress={() => setEditing(null)}>
-              <Text className="text-center text-base text-muted">收起</Text>
-            </Pressable>
+            <TextAction tone="muted" label="收起" onPress={() => setEditing(null)} className="justify-center" />
           </Card>
         ) : (
           <Pressable
@@ -394,12 +390,16 @@ export default function EditTemplate() {
         ),
       )}
 
-      {items.length === 0 ? <Hint>還沒有動作,從下面加入。</Hint> : null}
+      {items.length === 0 ? <Hint>還沒有動作，從下面加入。</Hint> : null}
 
       {isBuiltin ? null : (
         <>
-          <PrimaryButton tone="plain" onPress={() => setLibraryOpen((open) => !open)}>
-            {libraryOpen ? '收起動作庫' : '+ 從動作庫加入'}
+          <PrimaryButton
+            tone="plain"
+            icon={libraryOpen ? undefined : PlusIcon}
+            onPress={() => setLibraryOpen((open) => !open)}
+          >
+            {libraryOpen ? '收起動作庫' : '從動作庫加入'}
           </PrimaryButton>
 
           {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}

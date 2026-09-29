@@ -11,6 +11,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { api } from '@/api/client';
+import { color } from '@/theme/tokens';
 
 const ANDROID_CHANNEL = 'weigh-in';
 
@@ -22,7 +23,7 @@ export async function registerPushToken(): Promise<boolean> {
       await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
         name: '每天早上提醒',
         importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: '#A3245F',
+        lightColor: color.primary,
       });
     }
 

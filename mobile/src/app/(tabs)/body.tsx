@@ -6,6 +6,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Sheet } from '@/components/Sheet';
 import { TrendChart } from '@/components/TrendChart';
+import { ChevronIcon } from '@/components/icons';
 import { Card, Field, Hint, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
@@ -122,7 +123,10 @@ export default function BodyScreen() {
           >
             <View className="flex-row items-center justify-between">
               <Text className="text-sm text-muted">今天已記錄</Text>
-              <Text className="text-base text-primary">修改 ›</Text>
+              <View className="flex-row items-center gap-0.5">
+                <Text className="text-base text-primary">修改</Text>
+                <ChevronIcon direction="right" size={16} />
+              </View>
             </View>
             <View className="flex-row gap-3">
               <Stat
@@ -191,10 +195,10 @@ export default function BodyScreen() {
         <Kpi label="腰圍" value={summary.latest_waist?.toFixed(1) ?? '—'} />
       </View>
 
-      <TrendChart title="體重" unit="kg,近 30 天" points={summary.weight_series} />
+      <TrendChart title="體重" unit="kg，近 30 天" points={summary.weight_series} />
       <TrendChart
         title="腰圍"
-        unit="cm,近 30 天"
+        unit="cm，近 30 天"
         points={summary.waist_series}
         stroke={color.good}
       />

@@ -1,53 +1,106 @@
-/** The progress bar at the top of today's flow. Completed steps can be tapped to go back. */
+/** The progress track at the top of today's flow. Completed steps and the next open step can be tapped. */
 import { Pressable, Text, View } from 'react-native';
+
+import { CheckIcon } from '@/components/icons';
+import { color } from '@/theme/tokens';
 
 export const STEP_LABEL: Record<string, string> = {
   body: '量身形',
   breakfast: '早餐',
   lunch: '午餐',
-  workout: '運動',
+  workout: '訓練',
   dinner: '晚餐',
   done: '完成',
 };
+
+/**
+ * One dot on the track. State is never colour alone: a check for done, a ring for the step on
+ * screen, a dark outline for the next open step, a plain grey disc for the rest.
+ */
+function StepNode({ done, viewing, next }: { done: boolean; viewing: boolean; next: boolean }) {
+  const disc = done
+    ? 'bg-good'
+    : viewing
+      ? 'bg-primary'
+      : next
+        ? 'border-2 border-ink bg-surface'
+        : 'border border-line bg-fill';
+
+  return (
+    <View
+      className={`h-7 w-7 items-center justify-center rounded-full ${
+        viewing ? 'border-2 border-primary' : ''
+      }`}
+    >
+      <View className={`h-5 w-5 items-center justify-center rounded-full ${disc}`}>
+        {done ? (
+          <CheckIcon size={12} tint={color.surface} />
+        ) : viewing ? (
+          <View className="h-2 w-2 rounded-full bg-surface" />
+        ) : null}
+      </View>
+    </View>
+  );
+}
 
 export function StepIndicator({
   steps,
   completed,
   current,
+  next,
   onSelect,
 }: {
   steps: string[];
   completed: string[];
+  /** The step on screen. It is not always the next open one: a finished step can be revisited. */
   current: string;
+  /** The first step still open. It stays tappable while an earlier step is on screen. */
+  next?: string;
   onSelect?: (step: string) => void;
 }) {
   return (
-    <View className="flex-row gap-1.5">
-      {steps.map((step) => {
+    <View className="flex-row">
+      {steps.map((step, index) => {
         const isDone = completed.includes(step);
         const isCurrent = step === current;
-        const reachable = isDone || isCurrent;
+        const isNext = step === next;
+        const reachable = isDone || isCurrent || isNext;
+        const name = STEP_LABEL[step] ?? step;
+        // The track between two dots is filled once the step on its left is finished.
+        const leftFilled = index > 0 && completed.includes(steps[index - 1]);
+        const rightFilled = isDone;
 
         return (
           <Pressable
             key={step}
             accessibilityRole="button"
+            accessibilityLabel={`${name}，第 ${index + 1} 步，共 ${steps.length} 步，${
+              isDone ? '已完成' : '未完成'
+            }${isCurrent ? '，目前顯示' : ''}`}
             accessibilityState={{ selected: isCurrent, disabled: !reachable }}
             disabled={!reachable || !onSelect}
             onPress={() => onSelect?.(step)}
-            className="flex-1 gap-1.5 pb-1"
+            className="flex-1 items-center gap-1"
           >
-            <View
-              className={`h-1 rounded-full ${
-                isCurrent ? 'bg-primary' : isDone ? 'bg-primary/40' : 'bg-line'
-              }`}
-            />
+            <View className="w-full flex-row items-center">
+              <View
+                className={`mr-1 h-0.5 flex-1 ${
+                  index === 0 ? '' : leftFilled ? 'bg-good' : 'bg-line'
+                }`}
+              />
+              <StepNode done={isDone} viewing={isCurrent} next={isNext} />
+              <View
+                className={`ml-1 h-0.5 flex-1 ${
+                  index === steps.length - 1 ? '' : rightFilled ? 'bg-good' : 'bg-line'
+                }`}
+              />
+            </View>
             <Text
               className={`text-center text-sm ${
-                isCurrent ? 'font-semibold text-primary' : isDone ? 'text-ink' : 'text-muted'
+                isCurrent ? 'font-semibold text-primary' : isDone || isNext ? 'text-ink' : 'text-muted'
               }`}
             >
-              {STEP_LABEL[step] ?? step}
+              {name}
             </Text>
           </Pressable>
         );

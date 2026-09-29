@@ -29,7 +29,7 @@ export default function Login() {
   return (
     <Screen>
       <View className="gap-6 pt-16">
-        <Title sub="每天照著流程走,把好習慣養起來。">每日減脂計畫</Title>
+        <Title sub="每天照著流程走，把好習慣養起來。">每日減脂計畫</Title>
 
         <View className="gap-3">
           <PrimaryButton tone="dark" onPress={() => Alert.alert('尚未設定', 'Apple 登入需要 development build 與 Apple 開發者帳號。')}>
@@ -72,14 +72,14 @@ export default function Login() {
         </PrimaryButton>
 
         <Text className="text-center text-base text-muted">
-          還沒有帳號?{' '}
+          還沒有帳號？{' '}
           <Link href={{ pathname: '/register', params: { returnTo } }} className="text-primary underline">
             註冊新帳號
           </Link>
         </Text>
 
         <Text className="text-center text-sm text-muted">
-          第一次用 Apple 或 Google 登入時會自動建立帳號,接著填寫個人資料。
+          第一次用 Apple 或 Google 登入時會自動建立帳號，接著填寫個人資料。
         </Text>
       </View>
     </Screen>

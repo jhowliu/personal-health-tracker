@@ -13,6 +13,8 @@ export const color = {
   goodSoft: '#E2F0E7',
   warm: '#8A5A0B',
   warmSoft: '#F6EBD3',
+  danger: '#B42318',
+  placeholder: '#9C9599',
 } as const;
 
 /** Tap targets are at least 44 px, per the spec's component rules. */

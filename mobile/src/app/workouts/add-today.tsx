@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, Text } from 'react-native';
+import { Alert } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
-import { Screen, Title } from '@/components/ui';
+import { BackLink, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 
 export default function AddTodayWorkout() {
@@ -37,9 +37,7 @@ export default function AddTodayWorkout() {
 
   return (
     <Screen>
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/today')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 今日流程</Text>
-      </Pressable>
+      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
       <Title sub="只會加入今天的訓練，不會修改原本課表。">加入動作</Title>
       <ExerciseLibrary onSelect={add} selectLabel={busy ? '加入中…' : '加入今天'} />
     </Screen>

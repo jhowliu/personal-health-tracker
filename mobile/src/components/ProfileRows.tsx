@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { ChoiceOption, Sheet } from '@/components/Sheet';
+import { ChevronIcon } from '@/components/icons';
+import { color } from '@/theme/tokens';
 import { Field, PrimaryButton } from '@/components/ui';
 
 function TapRow({
@@ -22,7 +24,10 @@ function TapRow({
       className="min-h-[44px] flex-row items-center justify-between py-3"
     >
       <Text className="text-base text-ink">{label}</Text>
-      <Text className="text-base text-muted">{display} ›</Text>
+      <View className="shrink flex-row items-center gap-1">
+        <Text className="shrink text-base text-muted">{display}</Text>
+        <ChevronIcon direction="right" size={16} tint={color.muted} />
+      </View>
     </Pressable>
   );
 }

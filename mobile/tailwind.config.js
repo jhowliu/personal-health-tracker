@@ -17,6 +17,11 @@ module.exports = {
         primary: { DEFAULT: '#A3245F', soft: '#F6E3EC' },
         good: { DEFAULT: '#2F6B4C', soft: '#E2F0E7' },
         warm: { DEFAULT: '#8A5A0B', soft: '#F6EBD3' },
+        // Destructive actions such as deleting an account or a meal. Warnings use `warm`.
+        danger: '#B42318',
+        placeholder: '#9C9599',
+        // The dimmed backdrop behind a bottom sheet.
+        scrim: 'rgba(35, 31, 32, 0.35)',
       },
       fontFamily: {
         display: ['LXGW WenKai TC'],
