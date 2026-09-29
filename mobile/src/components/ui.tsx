@@ -1,14 +1,16 @@
 /** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
-import { Children, Fragment, type ReactNode, useId } from 'react';
+import { Children, Fragment, type ReactNode, useId, useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type KeyboardTypeOptions,
   type TextInputProps,
   type ViewProps,
@@ -294,6 +296,91 @@ export function Chip({
 
 export function Hint({ children }: { children: React.ReactNode }) {
   return <Text className="text-sm text-muted">{children}</Text>;
+}
+
+const TIP_MARGIN = 16;
+const TIP_MAX_WIDTH = 260;
+const TIP_GAP = 8;
+const TIP_ARROW = 12;
+
+/**
+ * A row label with an (i) button beside it. Tapping the button floats the explanation next to it;
+ * tapping anywhere else closes it.
+ */
+export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
+  const button = useRef<View>(null);
+  const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
+    null,
+  );
+  const screen = useWindowDimensions();
+
+  const show = () =>
+    button.current?.measureInWindow((x, y, width, height) => setAnchor({ x, y, width, height }));
+  const hide = () => setAnchor(null);
+
+  // Centre the bubble on the button, then keep it inside the screen. Below the button unless the
+  // button sits low on the screen, where it opens upward.
+  const bubbleWidth = Math.min(TIP_MAX_WIDTH, screen.width - TIP_MARGIN * 2);
+  let bubble = null;
+  if (anchor) {
+    const centre = anchor.x + anchor.width / 2;
+    const left = Math.min(
+      Math.max(centre - bubbleWidth / 2, TIP_MARGIN),
+      screen.width - TIP_MARGIN - bubbleWidth,
+    );
+    const above = anchor.y > screen.height * 0.6;
+    const arrowLeft = Math.min(
+      Math.max(centre - left - TIP_ARROW / 2, TIP_ARROW),
+      bubbleWidth - TIP_ARROW * 2,
+    );
+    bubble = (
+      <View
+        accessibilityRole="alert"
+        className="absolute rounded-field bg-ink px-3 py-2"
+        style={{
+          left,
+          width: bubbleWidth,
+          ...(above
+            ? { bottom: screen.height - anchor.y + TIP_GAP }
+            : { top: anchor.y + anchor.height + TIP_GAP }),
+        }}
+      >
+        <View
+          className="absolute bg-ink"
+          style={{
+            left: arrowLeft,
+            width: TIP_ARROW,
+            height: TIP_ARROW,
+            ...(above ? { bottom: -TIP_ARROW / 2 } : { top: -TIP_ARROW / 2 }),
+            transform: [{ rotate: '45deg' }],
+          }}
+        />
+        <Text className="text-sm text-white">{tip}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View className="flex-1 flex-row items-center gap-2 pr-4">
+      <Text className="shrink text-base text-ink">{label}</Text>
+      <Pressable
+        ref={button}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}說明`}
+        hitSlop={12}
+        onPress={show}
+        className="h-[18px] w-[18px] items-center justify-center rounded-full border border-muted"
+      >
+        <Text className="text-xs font-bold text-muted">i</Text>
+      </Pressable>
+      {/* Translucent status bar keeps the modal's coordinates the same as measureInWindow's on Android. */}
+      <Modal visible={anchor !== null} transparent statusBarTranslucent animationType="fade" onRequestClose={hide}>
+        <Pressable accessible={false} onPress={hide} className="flex-1">
+          {bubble}
+        </Pressable>
+      </Modal>
+    </View>
+  );
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {

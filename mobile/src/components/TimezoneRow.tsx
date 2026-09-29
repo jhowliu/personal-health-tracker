@@ -1,9 +1,9 @@
 /** The time zone control on the settings screen: the current zone, and a dropdown list to switch it. */
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
-import { Hint } from '@/components/ui';
+import { ChoiceOption, Sheet } from '@/components/Sheet';
+import { LabelWithTip } from '@/components/ui';
 import { COMMON_TIMEZONES, deviceTimezone, timezoneLabel } from '@/timezone';
 
 export function TimezoneRow({
@@ -39,59 +39,22 @@ export function TimezoneRow({
         onPress={() => setOpen(true)}
         className="min-h-[44px] flex-row items-center justify-between"
       >
-        <View className="flex-1 gap-0.5 pr-4">
-          <Text className="text-base text-ink">時區</Text>
-          <Hint>決定「今天」從哪一刻算起。提醒按手機目前的時區響。</Hint>
-        </View>
+        <LabelWithTip label="時區" tip="決定「今天」從哪一刻算起。提醒按手機目前的時區響。" />
         <Text className="text-base text-muted">{timezoneLabel(value)} ▾</Text>
       </Pressable>
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <Pressable
-          accessible={false}
-          onPress={() => setOpen(false)}
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(35, 31, 32, 0.35)' }}
-        >
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-card bg-bg px-5 pb-3 pt-5">
-            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-3">
-              <View className="flex-row items-center justify-between gap-3">
-                <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
-                  時區
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setOpen(false)}
-                  className="min-h-[44px] justify-center px-2"
-                >
-                  <Text className="text-base text-primary">關閉</Text>
-                </Pressable>
-              </View>
-              <ScrollView contentContainerClassName="gap-2 pb-4">
-                {options.map((zone) => {
-                  const selected = zone.id === value;
-                  return (
-                    <Pressable
-                      key={zone.id}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected }}
-                      onPress={() => choose(zone.id)}
-                      className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-field px-3 py-2 ${
-                        selected ? 'bg-primary-soft' : 'bg-fill'
-                      }`}
-                    >
-                      <View className="flex-1 gap-0.5">
-                        <Text className="text-base text-ink">{zone.label}</Text>
-                        <Text className="text-sm text-muted">{zone.id}</Text>
-                      </View>
-                      {selected ? <Text className="text-base text-primary">✓</Text> : null}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </Pressable>
-          </SafeAreaView>
-        </Pressable>
-      </Modal>
+      <Sheet visible={open} title="時區" onClose={() => setOpen(false)}>
+        <ScrollView contentContainerClassName="gap-2 pb-4">
+          {options.map((zone) => (
+            <ChoiceOption
+              key={zone.id}
+              label={zone.label}
+              detail={zone.id}
+              selected={zone.id === value}
+              onPress={() => choose(zone.id)}
+            />
+          ))}
+        </ScrollView>
+      </Sheet>
     </View>
   );
 }

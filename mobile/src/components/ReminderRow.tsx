@@ -1,9 +1,10 @@
 /** The morning weigh-in reminder control on the settings screen: a switch and a time. */
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Switch, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 
 import { NumberStepper } from '@/components/NumberStepper';
-import { Hint } from '@/components/ui';
+import { Sheet } from '@/components/Sheet';
+import { LabelWithTip } from '@/components/ui';
 import { formatReminderTime, parseReminderTime } from '@/notifications/reminder-plan';
 import { color } from '@/theme/tokens';
 
@@ -20,6 +21,7 @@ export function ReminderRow({
   onSave: (next: string | null) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(value);
+  const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(value);
   const saved = useRef(value);
   const save = useEffectEvent((next: string | null) => onSave(next));
@@ -45,12 +47,9 @@ export function ReminderRow({
   const time = parseReminderTime(draft ?? DEFAULT_TIME) ?? { hour: 7, minute: 30 };
 
   return (
-    <View className="gap-3 py-3">
+    <View className="py-3">
       <View className="flex-row items-center justify-between">
-        <View className="flex-1 gap-0.5 pr-4">
-          <Text className="text-base text-ink">早上提醒量體重</Text>
-          <Hint>{draft ? '今天已經量過,就不會再提醒。' : '關閉'}</Hint>
-        </View>
+        <LabelWithTip label="早上提醒量體重" tip="今天已經量過,就不會再提醒。" />
         <Switch
           value={draft !== null}
           onValueChange={(on) => setDraft(on ? DEFAULT_TIME : null)}
@@ -58,7 +57,19 @@ export function ReminderRow({
         />
       </View>
       {draft ? (
-        <View className="flex-row items-center justify-end gap-2">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="更改提醒時間"
+          onPress={() => setOpen(true)}
+          className="min-h-[44px] flex-row items-center justify-between"
+        >
+          <Text className="text-base text-ink">提醒時間</Text>
+          <Text className="text-base text-muted">{draft} ›</Text>
+        </Pressable>
+      ) : null}
+      {/* Saving is debounced as before, so the sheet needs no confirm button. */}
+      <Sheet visible={open} title="提醒時間" onClose={() => setOpen(false)}>
+        <View className="flex-row items-center justify-center gap-2 pb-4">
           <NumberStepper
             value={time.hour}
             min={0}
@@ -76,7 +87,7 @@ export function ReminderRow({
             onChange={(minute) => setDraft(formatReminderTime(time.hour, minute))}
           />
         </View>
-      ) : null}
+      </Sheet>
     </View>
   );
 }
