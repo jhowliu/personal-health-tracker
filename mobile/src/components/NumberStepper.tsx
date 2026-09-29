@@ -1,4 +1,4 @@
-/** A small - N + control: the set count on the template editor, the hour and minute of a reminder. */
+/** A small - N + control for short ranges, such as the set count on the template editor. */
 import { Pressable, Text, View } from 'react-native';
 
 export function NumberStepper({

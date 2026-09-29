@@ -1,8 +1,11 @@
 /** The morning weigh-in reminder control on the settings screen: a switch and a time. */
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Pressable, Switch, Text, View } from 'react-native';
+import { Platform, Pressable, Switch, Text, View } from 'react-native';
 
-import { NumberStepper } from '@/components/NumberStepper';
 import { Sheet } from '@/components/Sheet';
 import { LabelWithTip } from '@/components/ui';
 import { formatReminderTime, parseReminderTime } from '@/notifications/reminder-plan';
@@ -45,6 +48,24 @@ export function ReminderRow({
   }, [draft]);
 
   const time = parseReminderTime(draft ?? DEFAULT_TIME) ?? { hour: 7, minute: 30 };
+  // The picker works in Dates; only the time of day matters here.
+  const pickerValue = new Date();
+  pickerValue.setHours(time.hour, time.minute, 0, 0);
+
+  const pick = (event: DateTimePickerEvent, picked?: Date) => {
+    if (event.type === 'set' && picked) {
+      setDraft(formatReminderTime(picked.getHours(), picked.getMinutes()));
+    }
+  };
+
+  // Android shows its own clock dialog; iOS gets the wheel in a sheet.
+  const edit = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({ value: pickerValue, mode: 'time', is24Hour: true, onChange: pick });
+    } else {
+      setOpen(true);
+    }
+  };
 
   return (
     <View className="py-3">
@@ -60,7 +81,7 @@ export function ReminderRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="更改提醒時間"
-          onPress={() => setOpen(true)}
+          onPress={edit}
           className="min-h-[44px] flex-row items-center justify-between"
         >
           <Text className="text-base text-ink">提醒時間</Text>
@@ -69,22 +90,14 @@ export function ReminderRow({
       ) : null}
       {/* Saving is debounced as before, so the sheet needs no confirm button. */}
       <Sheet visible={open} title="提醒時間" onClose={() => setOpen(false)}>
-        <View className="flex-row items-center justify-center gap-2 pb-4">
-          <NumberStepper
-            value={time.hour}
-            min={0}
-            max={23}
-            format={(n) => String(n).padStart(2, '0')}
-            onChange={(hour) => setDraft(formatReminderTime(hour, time.minute))}
-          />
-          <Text className="text-base text-ink">:</Text>
-          <NumberStepper
-            value={time.minute}
-            min={0}
-            max={55}
-            step={5}
-            format={(n) => String(n).padStart(2, '0')}
-            onChange={(minute) => setDraft(formatReminderTime(time.hour, minute))}
+        <View className="items-center pb-4">
+          <DateTimePicker
+            value={pickerValue}
+            mode="time"
+            display="spinner"
+            themeVariant="light"
+            minuteInterval={5}
+            onChange={pick}
           />
         </View>
       </Sheet>
