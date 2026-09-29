@@ -41,6 +41,7 @@
   },
   "scripts": {
     "api:types": "npx --yes openapi-typescript@7 src/api/openapi.json -o src/api/types.ts",
+    "exercise-images": "node scripts/exercise-images.mjs",
     "typecheck": "tsc --noEmit",
     "start": "expo start",
     "android": "expo start --android",
