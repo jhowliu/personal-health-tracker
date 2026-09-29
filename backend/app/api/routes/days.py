@@ -21,8 +21,9 @@ from app.api.schemas import (
     WorkoutItemIn,
     WorkoutItemPatch,
 )
-from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis
-from app.domain.workout_execution import SetEffort
+from app.application.commands import DayAdjustment, WorkoutItemChange
+from app.domain.models import PLANNED_SLOTS, Location, MealTime, SwapBasis, WorkoutTime
+from app.domain.workout_execution import ReplacementReason, SetEffort
 
 router = APIRouter(prefix="/days", tags=["days"])
 
@@ -36,16 +37,14 @@ async def read_day(day: date, user_id: CurrentUserId, service: DailyFlow) -> Tod
 async def update_day(
     day: date, payload: DayPatch, user_id: CurrentUserId, service: DailyFlow
 ) -> TodayOut:
-    changes = payload.model_dump(exclude_unset=True, exclude={"workout_done", "workout_skipped"})
-    return TodayOut.of(
-        await service.adjust(
-            user_id,
-            day,
-            workout_done=payload.workout_done,
-            workout_skipped=payload.workout_skipped,
-            **changes,
-        )
+    change = DayAdjustment(
+        workout_time=WorkoutTime(payload.workout_time) if payload.workout_time else None,
+        location=Location(payload.location) if payload.location else None,
+        steps=payload.steps,
+        workout_done=payload.workout_done,
+        workout_skipped=payload.workout_skipped,
     )
+    return TodayOut.of(await service.adjust(user_id, day, change))
 
 
 @router.patch("/{day}/meals/{meal_time}", response_model=TodayOut)
@@ -99,7 +98,7 @@ async def update_workout_item(
     service: WorkoutExecution,
 ) -> WorkoutExecutionOut:
     return WorkoutExecutionOut.of(
-        await service.update_item(user_id, day, item_id, payload.model_dump(exclude_unset=True))
+        await service.update_item(user_id, day, item_id, _item_change(payload))
     )
 
 
@@ -231,6 +230,13 @@ async def add_extra(
 @router.delete("/{day}/meals/extras/items/{item_id}", status_code=204)
 async def delete_extra(day: date, item_id: str, user_id: CurrentUserId, service: Extras) -> None:
     await service.remove(user_id, day, item_id)
+
+
+def _item_change(payload: WorkoutItemPatch) -> WorkoutItemChange:
+    given = payload.model_dump(exclude_unset=True)
+    if given.get("replacement_reason") is not None:
+        given["replacement_reason"] = ReplacementReason(given["replacement_reason"])
+    return WorkoutItemChange(**given)
 
 
 def _meal_time(value: str) -> MealTime:

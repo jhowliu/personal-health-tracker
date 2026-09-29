@@ -533,3 +533,21 @@ async def test_adding_to_a_scheduled_day_keeps_the_scheduled_prescription(
     assert added.status_code == 201
     exercises = [entry["item"]["exercise_id"] for entry in added.json()["items"]]
     assert exercises == [original["id"], alternative["id"]]
+
+
+async def test_an_item_can_switch_from_reps_to_a_duration_by_clearing_reps(
+    with_profile: AsyncClient,
+):
+    await _workout(with_profile)
+    item = (await _day_items(with_profile))[0]
+    assert item["reps"] == "10"
+
+    switched = await with_profile.patch(
+        f"/days/{DAY}/workout/items/{item['id']}", json={"reps": None, "duration_sec": 60}
+    )
+
+    assert switched.status_code == 200
+    edited = switched.json()["items"][0]["item"]
+    assert edited["reps"] is None
+    assert edited["duration_sec"] == 60
+    assert edited["sets"] == 3, "fields that were not sent stay as they were"

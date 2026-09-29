@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import date
 
+from app.application.commands import DayAdjustment
 from app.application.ports import AccountStore, Clock, DayStore
 from app.domain.daily_flow import resolve_flow
 from app.domain.errors import NotFound, ValidationFailed
@@ -41,25 +42,19 @@ class DailyFlowService:
             ),
         )
 
-    async def adjust(
-        self,
-        user_id: str,
-        day: date,
-        *,
-        workout_done: bool = False,
-        workout_skipped: bool = False,
-        **changes: object,
-    ) -> TodayView:
-        if workout_done and workout_skipped:
+    async def adjust(self, user_id: str, day: date, change: DayAdjustment) -> TodayView:
+        if change.workout_done and change.workout_skipped:
             raise ValidationFailed("運動不能同時標記完成與跳過")
-        state = "done" if workout_done else "skipped" if workout_skipped else None
+        state = "done" if change.workout_done else "skipped" if change.workout_skipped else None
         await self._days.update_day(
             user_id,
             day,
+            workout_time=change.workout_time.value if change.workout_time else None,
+            location=change.location.value if change.location else None,
+            steps=change.steps,
             workout_state=state,
             workout_state_at=self._clock.now() if state else None,
-            **changes,
-        )  # type: ignore[arg-type]
+        )
         return await self.view(user_id, day)
 
     async def set_meal_state(

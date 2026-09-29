@@ -12,6 +12,7 @@ from app.application.ports import (
     ImageRecognizer,
     MealPhotoStore,
     ObjectStorage,
+    UnitOfWork,
 )
 from app.domain.errors import NotFound, QuotaExceeded, ServiceUnavailable, ValidationFailed
 from app.domain.ids import new_id
@@ -38,6 +39,7 @@ class MealPhotoService:
         foods: FoodStore,
         decisions: DecisionService,
         clock: Clock,
+        uow: UnitOfWork,
         daily_quota: int,
     ) -> None:
         self._photos = photos
@@ -46,6 +48,7 @@ class MealPhotoService:
         self._foods = foods
         self._decisions = decisions
         self._clock = clock
+        self._uow = uow
         self._daily_quota = daily_quota
 
     async def create(self, user_id: str, content_type: str) -> tuple[MealPhoto, str]:
@@ -127,6 +130,8 @@ class MealPhotoService:
                 MealPhotoStatus.FAILED.value,
                 json.dumps({"error": str(exc)}, ensure_ascii=False),
             )
+            # The request is about to fail and roll back; the FAILED status must outlive it.
+            await self._uow.commit()
             raise
 
     async def _match_foods(

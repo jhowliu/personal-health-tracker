@@ -14,6 +14,7 @@ them.
 import asyncio
 import sys
 
+from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.meals import SqliteMealStore
 from app.db import get_conn
 from app.domain.ids import new_id
@@ -95,7 +96,7 @@ async def seed(email: str | None = None) -> dict[str, int]:
         async with conn.execute(sql, params) as cursor:
             users = await cursor.fetchall()
 
-        store = SqliteMealStore(conn)
+        store = SqliteMealStore(conn, SqliteFoodStore(conn))
         for user in users:
             if await store.list(user["id"], None, None):
                 continue
@@ -129,8 +130,6 @@ async def seed(email: str | None = None) -> dict[str, int]:
 
 
 async def _food_lookup(conn, user_id: str) -> dict:
-    from app.adapters.sqlite.foods import SqliteFoodStore
-
     store = SqliteFoodStore(conn)
     ids = {fid for _, _, _, items in RECIPES for fid, _ in items}
     found = {}

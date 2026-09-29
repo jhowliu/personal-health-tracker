@@ -19,6 +19,8 @@ jobs:
           cache: pip
       - run: pip install -e ".[dev]"
       - run: ruff check .
+      # 依賴只能由外向內:api > adapters > application > domain(規則在 pyproject.toml)
+      - run: lint-imports
       - run: pytest -q
       # 後端改了路由卻沒重新產生 openapi.json 的話,前端的 tsc 會看著舊型別
       # 安靜地通過。擋在這裡。

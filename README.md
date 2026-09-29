@@ -114,6 +114,13 @@ cd mobile && EXPO_PUBLIC_API_URL=http://<你的區網IP>:8010 npx expo start
 cd backend && .venv/bin/python -m pytest
 ```
 
+依賴規則(`api > adapters > application > domain`,規則寫在 `backend/pyproject.toml`)用
+`import-linter` 檢查,CI 會擋:
+
+```bash
+cd backend && .venv/bin/lint-imports
+```
+
 ```bash
 cd mobile && npm run typecheck && npm run lint
 ```

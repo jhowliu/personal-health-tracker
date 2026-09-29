@@ -9,6 +9,7 @@ from app.api.schemas import (
     RemindersPatch,
     TargetsOut,
 )
+from app.application.commands import ProfileChange
 from app.domain.models import (
     ActivityLevel,
     Location,
@@ -68,18 +69,29 @@ async def preview_targets(
 async def update_profile(
     payload: ProfilePatch, user_id: CurrentUserId, service: Profiles
 ) -> ProfileWithTargetsOut:
-    enums = {
-        "sex": Sex,
-        "activity_level": ActivityLevel,
-        "workout_time": WorkoutTime,
-        "default_location": Location,
-    }
-    changes = {
-        key: enums[key](value) if key in enums else value
-        for key, value in payload.model_dump(exclude_unset=True).items()
-    }
-    profile, targets = await service.update(user_id, changes)
+    profile, targets = await service.update(user_id, _profile_change(payload))
     return ProfileWithTargetsOut(profile=ProfileOut.of(profile), targets=TargetsOut.of(targets))
+
+
+_ENUMS = {
+    "sex": Sex,
+    "activity_level": ActivityLevel,
+    "workout_time": WorkoutTime,
+    "default_location": Location,
+}
+_CLEARABLE = {"reminder_time"}
+
+
+def _profile_change(payload: ProfilePatch | RemindersPatch) -> ProfileChange:
+    """Only the fields the client sent. An explicit null clears a reminder time and is
+    ignored for anything that must have a value.
+    """
+    given = {
+        key: _ENUMS[key](value) if key in _ENUMS else value
+        for key, value in payload.model_dump(exclude_unset=True).items()
+        if value is not None or key in _CLEARABLE
+    }
+    return ProfileChange(**given)
 
 
 @router.get("/targets", response_model=TargetsOut)
@@ -91,7 +103,7 @@ async def read_targets(user_id: CurrentUserId, service: Profiles) -> TargetsOut:
 async def update_reminders(
     payload: RemindersPatch, user_id: CurrentUserId, service: Profiles
 ) -> ProfileOut:
-    profile, _ = await service.update(user_id, payload.model_dump(exclude_unset=True))
+    profile, _ = await service.update(user_id, _profile_change(payload))
     return ProfileOut.of(profile)
 
 

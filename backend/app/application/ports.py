@@ -45,6 +45,13 @@ class DueReminder:
     locale: str
 
 
+class UnitOfWork(Protocol):
+    """The request's transaction: committed when the request succeeds, rolled back when it fails."""
+
+    async def commit(self) -> None:
+        """Make everything written so far durable, even if the request fails afterwards."""
+
+
 class Clock(Protocol):
     def now(self) -> datetime: ...
 
@@ -59,6 +66,9 @@ class PasswordHasher(Protocol):
 
 class TokenIssuer(Protocol):
     def issue_access(self, user_id: str) -> str: ...
+
+    def user_id_from_access(self, token: str) -> str | None:
+        """The user an access token was issued to; None when it is invalid or expired."""
 
     def issue_refresh(self) -> tuple[str, str, datetime]:
         """Returns (raw token, hash to store, expiry)."""

@@ -3,8 +3,8 @@ from datetime import date, datetime
 import aiosqlite
 
 from app.adapters.sqlite.day_row import PLANNED_MEALS, open_day
-from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.rows import from_day, from_iso, to_day, to_iso
+from app.application.ports import FoodStore
 from app.domain.models import (
     ZERO_NUTRIENTS,
     DayFacts,
@@ -22,9 +22,9 @@ from app.domain.streak import DayRecord
 
 
 class SqliteDayStore:
-    def __init__(self, conn: aiosqlite.Connection, locale: str = "zh-TW") -> None:
+    def __init__(self, conn: aiosqlite.Connection, foods: FoodStore) -> None:
         self._conn = conn
-        self._foods = SqliteFoodStore(conn, locale)
+        self._foods = foods
 
     async def load_facts(self, user_id: str, day: date) -> DayFacts:
         await open_day(self._conn, user_id, day)

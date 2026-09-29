@@ -1,6 +1,7 @@
 from dataclasses import replace
 from datetime import date
 
+from app.application.commands import WorkoutItemChange, applied
 from app.application.ports import AccountStore, Clock, WorkoutExecutionStore
 from app.application.training import TrainingService
 from app.domain.errors import NotFound, ValidationFailed
@@ -8,7 +9,6 @@ from app.domain.ids import new_id
 from app.domain.models import Location, TemplateItem, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
-    ReplacementReason,
     SetEffort,
     SetLog,
     SetLogResult,
@@ -111,26 +111,24 @@ class WorkoutExecutionService:
         return await self.view(user_id, day)
 
     async def update_item(
-        self, user_id: str, day: date, item_id: str, changes: dict[str, object]
+        self, user_id: str, day: date, item_id: str, change: WorkoutItemChange
     ) -> WorkoutExecution:
         workout = await self.view(user_id, day)
         current = next((entry.item for entry in workout.items if entry.item.id == item_id), None)
         if current is None:
             raise NotFound("找不到今天排定的動作")
 
-        requested_exercise_id = changes.pop("exercise_id", None)
-        requested_reason = changes.pop("replacement_reason", None)
         replacing = (
-            requested_exercise_id is not None and requested_exercise_id != current.exercise_id
+            change.exercise_id is not None and change.exercise_id != current.exercise_id
         )
-        if requested_reason is not None and not replacing:
+        if change.replacement_reason is not None and not replacing:
             raise ValidationFailed("替換動作時才需要替換原因")
-        if replacing and requested_reason is None:
+        if replacing and change.replacement_reason is None:
             raise ValidationFailed("替換動作需要說明原因")
 
         item = current
         if replacing:
-            exercise = await self._store.load_visible_exercise(user_id, str(requested_exercise_id))
+            exercise = await self._store.load_visible_exercise(user_id, str(change.exercise_id))
             if exercise is None:
                 raise NotFound("找不到可使用的替代動作")
             item = replace(
@@ -138,11 +136,12 @@ class WorkoutExecutionService:
                 exercise_id=exercise.id,
                 exercise_name=exercise.name,
                 met=exercise.met,
-                replacement_reason=ReplacementReason(str(requested_reason)),
+                replacement_reason=change.replacement_reason,
             )
+        edits = applied(change)
         for field in ("sets", "reps", "duration_sec", "weight_kg", "rest_sec", "note"):
-            if field in changes:
-                item = replace(item, **{field: changes[field]})
+            if field in edits:
+                item = replace(item, **{field: edits[field]})
         if (item.reps is None) == (item.duration_sec is None):
             raise ValidationFailed("動作需要次數或時間，但不能同時提供")
         if not await self._store.update_item(user_id, day, item, replacing=replacing):

@@ -1,13 +1,13 @@
 import aiosqlite
 
-from app.adapters.sqlite.foods import SqliteFoodStore
+from app.application.ports import FoodStore
 from app.domain.models import Meal, MealItem, MealTag, MealTime
 
 
 class SqliteMealStore:
-    def __init__(self, conn: aiosqlite.Connection, locale: str = "zh-TW") -> None:
+    def __init__(self, conn: aiosqlite.Connection, foods: FoodStore) -> None:
         self._conn = conn
-        self._foods = SqliteFoodStore(conn, locale)
+        self._foods = foods
 
     async def list(
         self, user_id: str, meal_time: MealTime | None, query: str | None
