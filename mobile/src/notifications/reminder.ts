@@ -13,6 +13,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { api, type Schema } from '@/api/client';
+import { color } from '@/theme/tokens';
 
 import { localDateISO, reminderDates } from './reminder-plan';
 
@@ -77,7 +78,7 @@ export function syncWeighInReminder(
       await Notifications.setNotificationChannelAsync(CHANNEL, {
         name: '每天早上提醒',
         importance: Notifications.AndroidImportance.DEFAULT,
-        lightColor: '#A3245F',
+        lightColor: color.primary,
       });
     }
 
@@ -85,7 +86,7 @@ export function syncWeighInReminder(
     for (const date of dates) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '早安,先量一下',
+          title: '早安，先量一下',
           body: '起床、上完廁所、還沒吃喝前量最準。',
           data: { kind: KIND },
         },

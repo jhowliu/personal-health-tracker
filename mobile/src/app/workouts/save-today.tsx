@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -56,9 +56,7 @@ export default function SaveTodayWorkout() {
 
   return (
     <Screen footer={<PrimaryButton onPress={save} disabled={!name.trim() || !workout.items.length} busy={busy}>儲存為我的課表</PrimaryButton>}>
-      <Pressable accessibilityRole="button" disabled={busy} onPress={() => backOrReplace('/today')}>
-        <Text className="text-base text-primary">‹ 今天的訓練</Text>
-      </Pressable>
+      <BackLink label="今天" disabled={busy} onPress={() => backOrReplace('/today')} />
       <Title sub="從今天調整後的動作建立新課表；不會修改原課表或每週排程。">另存課表</Title>
       <Field label="課表名稱" value={name} onChangeText={setName} placeholder="我的全身訓練" />
       <Card className="gap-2">

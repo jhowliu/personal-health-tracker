@@ -6,6 +6,7 @@
  * selecting never shifts the layout.
  */
 import { Pressable, Text, View } from 'react-native';
+import { CheckIcon } from '@/components/icons';
 
 const CHECK_SLOT = 24;
 
@@ -79,7 +80,7 @@ export function FoodOptionRow({
       {trailing ? <Text className="pt-0.5 text-sm text-muted">{trailing}</Text> : null}
 
       <View style={{ width: CHECK_SLOT }} className="items-end pt-0.5">
-        {selected ? <Text className="text-base text-primary">✓</Text> : null}
+        {selected ? <CheckIcon size={18} /> : null}
       </View>
     </Pressable>
   );

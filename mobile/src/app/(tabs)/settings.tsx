@@ -6,7 +6,7 @@ import { useSession } from '@/auth/session';
 import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
 import { TimezoneRow } from '@/components/TimezoneRow';
-import { Card, LabelWithTip, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { Card, LabelWithTip, PrimaryButton, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
       await reload();
       const result = await syncWeighInReminder(next, { askPermission: next !== null });
       if (result === 'denied') {
-        Alert.alert('通知沒有開', '請到手機的系統設定,允許這個 App 傳送通知,提醒才會響。');
+        Alert.alert('通知沒有開', '請到手機的系統設定，允許這個 App 傳送通知，提醒才會響。');
       }
     } catch (error) {
       Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
@@ -68,7 +68,7 @@ export default function SettingsScreen() {
   const saveTimezone = (timezone: string) => patchProfile({ timezone });
 
   const confirmDelete = () =>
-    Alert.alert('刪除帳號', '所有紀錄會一起刪掉,無法復原。', [
+    Alert.alert('刪除帳號', '所有紀錄會一起刪掉，無法復原。', [
       { text: '取消', style: 'cancel' },
       {
         text: '刪除',
@@ -152,12 +152,12 @@ export default function SettingsScreen() {
       <SectionHeading>偏好</SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="運動時間預設" value={me.workout_time === 'am' ? '早餐後' : '晚餐前'} />
+          <Row label="訓練時間預設" value={me.workout_time === 'am' ? '早餐後' : '晚餐前'} />
           <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
           <TimezoneRow value={me.timezone} onSave={saveTimezone} />
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
           <View className="flex-row items-center justify-between py-3">
-            <LabelWithTip label="主食份量自動調整" tip="熱量目標改變時,自動增減主食份量。蛋白質和蔬菜不變。" />
+            <LabelWithTip label="主食份量自動調整" tip="熱量目標改變時，自動增減主食份量。蛋白質和蔬菜不變。" />
             <Switch
               value={me.auto_scale_carbs}
               onValueChange={toggleAutoCarbs}
@@ -176,13 +176,9 @@ export default function SettingsScreen() {
         <Text className="text-base font-semibold text-ink">登出</Text>
       </Pressable>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={confirmDelete}
-        className="min-h-[52px] items-center justify-center rounded-field border border-line bg-surface"
-      >
-        <Text className="text-base text-primary">刪除帳號</Text>
-      </Pressable>
+      <PrimaryButton tone="danger" onPress={confirmDelete}>
+        刪除帳號
+      </PrimaryButton>
     </Screen>
   );
 }

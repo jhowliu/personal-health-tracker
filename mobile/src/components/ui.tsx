@@ -1,5 +1,13 @@
 /** Shared building blocks. Styling lives here so screens never re-declare cards and buttons. */
-import { Children, Fragment, type ReactNode, useId, useRef, useState } from 'react';
+import {
+  Children,
+  Fragment,
+  type ComponentType,
+  type ReactNode,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -16,6 +24,9 @@ import {
   type ViewProps,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ChevronIcon } from '@/components/icons';
+import { color } from '@/theme/tokens';
 
 /**
  * nativeID of the accessory bar rendered once in the root layout.
@@ -171,7 +182,7 @@ export function Field({
       <View className="flex-row items-center rounded-field border border-line bg-surface px-3">
         <TextInput
           className={`min-h-[44px] flex-1 text-base text-ink ${className}`}
-          placeholderTextColor="#9C9599"
+          placeholderTextColor={color.placeholder}
           inputAccessoryViewID={needsDoneBar ? NUMERIC_ACCESSORY_ID : undefined}
           accessibilityLabel={props.accessibilityLabel ?? label}
           accessibilityLabelledBy={props.accessibilityLabelledBy ?? (label ? labelId : undefined)}
@@ -189,20 +200,26 @@ export function PrimaryButton({
   disabled,
   busy,
   tone = 'primary',
+  icon: Icon,
 }: {
   children: React.ReactNode;
   onPress?: () => void;
   disabled?: boolean;
   busy?: boolean;
-  tone?: 'primary' | 'dark' | 'plain';
+  /** `danger` is an outlined button for deleting something for good. */
+  tone?: 'primary' | 'dark' | 'plain' | 'danger';
+  /** An icon component from `icons.tsx`, drawn before the label in the label's colour. */
+  icon?: ComponentType<{ tint?: string }>;
 }) {
   const unavailable = disabled || busy;
   const skin = {
     primary: 'bg-primary',
     dark: 'bg-ink',
     plain: 'border border-line bg-surface',
+    danger: 'border border-line bg-surface',
   }[tone];
-  const label = tone === 'plain' ? 'text-ink' : 'text-white';
+  const label = { primary: 'text-white', dark: 'text-white', plain: 'text-ink', danger: 'text-danger' }[tone];
+  const iconTint = { primary: color.surface, dark: color.surface, plain: color.ink, danger: color.danger }[tone];
 
   return (
     <Pressable
@@ -211,14 +228,92 @@ export function PrimaryButton({
       onPress={onPress}
       disabled={unavailable}
       className={`min-h-[52px] items-center justify-center rounded-field ${skin} ${
-        unavailable ? 'opacity-40' : 'active:opacity-80'
-      }`}
+        Icon ? 'flex-row gap-2' : ''
+      } ${unavailable ? 'opacity-40' : 'active:opacity-80'}`}
     >
-      <Text className={`text-base font-semibold ${label}`}>{children}</Text>
+      {Icon ? <Icon tint={iconTint} /> : null}
+      <Text className={`text-base font-semibold ${label} ${Icon ? 'shrink' : ''}`}>{children}</Text>
     </Pressable>
   );
 }
 
+/**
+ * A standalone text action ("編輯", "換動作"): no underline, colour says what it does.
+ * hitSlop lifts the touch area to 44pt without moving the layout. Two of them side by side
+ * need a gap of at least 16 so their touch areas do not overlap. `className` is layout only,
+ * for example `min-h-[44px] justify-center`.
+ */
+export function TextAction({
+  label,
+  onPress,
+  disabled,
+  tone = 'primary',
+  icon: Icon,
+  accessibilityLabel,
+  className = '',
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  /** `danger` removes something, `muted` is a quiet way out such as 收起. */
+  tone?: 'primary' | 'danger' | 'muted';
+  icon?: ComponentType<{ size?: number; tint?: string }>;
+  accessibilityLabel?: string;
+  className?: string;
+}) {
+  const text = { primary: 'text-primary', danger: 'text-danger', muted: 'text-muted' }[tone];
+  const tint = { primary: color.primary, danger: color.danger, muted: color.muted }[tone];
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+      className={`flex-row items-center gap-1 ${disabled ? 'opacity-40' : ''} ${className}`}
+    >
+      {Icon ? <Icon size={16} tint={tint} /> : null}
+      <Text className={`text-base ${text}`}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * The "‹ Destination" link at the top of a pushed screen. Name the screen it returns to
+ * ("今天", "訓練"), not the verb. hitSlop lifts the touch area to 44pt without moving the layout.
+ */
+export function BackLink({
+  label,
+  onPress,
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`返回${label}`}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 24 }}
+      className="flex-row items-center gap-0.5 self-start"
+    >
+      <ChevronIcon direction="left" size={18} />
+      <Text className="text-base text-primary">{label}</Text>
+    </Pressable>
+  );
+}
+
+/**
+ * How "selected" looks, so a new control picks one of these instead of inventing a fourth:
+ * - one choice among a few options (Chip, Segmented, the profile Picker): solid ink pill;
+ * - a row picked from a list (ChoiceOption, FoodOptionRow): primary-soft fill and a check;
+ * - where you are (tab bar, StepIndicator): the primary colour.
+ */
 export function Segmented<T extends string>({
   options,
   value,
@@ -383,10 +478,20 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
   );
 }
 
-export function Empty({ children }: { children: React.ReactNode }) {
+/** "Nothing here yet": muted text, plus an optional action when there is a way forward. */
+export function Empty({
+  children,
+  action,
+  compact,
+}: {
+  children: React.ReactNode;
+  action?: ReactNode;
+  compact?: boolean;
+}) {
   return (
-    <View className="items-center gap-2 py-12">
+    <View className={`items-center gap-3 ${compact ? 'py-6' : 'py-12'}`}>
       <Text className="text-center text-base text-muted">{children}</Text>
+      {action}
     </View>
   );
 }

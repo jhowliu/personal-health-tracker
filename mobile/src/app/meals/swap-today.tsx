@@ -6,11 +6,11 @@
  */
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
+import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 
@@ -125,11 +125,9 @@ export default function SwapToday() {
         ) : undefined
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/today')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 今日流程</Text>
-      </Pressable>
+      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
 
-      <Title sub="只換今天這一次,不會改到原本的餐點">換一樣食物</Title>
+      <Title sub="只換今天這一次，不會改到原本的餐點">換一樣食物</Title>
 
       {choices.length ? (
         <View className="gap-1">
@@ -142,7 +140,7 @@ export default function SwapToday() {
         </View>
       ) : null}
 
-      <Hint>同分類的食物,克數已自動換算</Hint>
+      <Hint>同分類的食物，克數已自動換算</Hint>
 
       {options === null ? (
         <ActivityIndicator color={color.primary} />
@@ -174,7 +172,7 @@ export default function SwapToday() {
       )}
 
       {categories.length === 0 ? null : (
-        <Hint>想永久替換,到「餐點」分頁編輯這道餐點。</Hint>
+        <Hint>想永久替換，到「餐點」分頁編輯這道餐點。</Hint>
       )}
     </Screen>
   );

@@ -1,10 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session';
-import { Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { BackLink, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 import { safeReturnTo } from '@/navigation/return-to';
 
@@ -30,16 +30,12 @@ export default function Register() {
   return (
     <Screen>
       <View className="gap-6 pt-16">
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            backOrReplace({ pathname: '/login', params: { returnTo } })
-          }
-        >
-          <Text className="text-base text-primary">‹ 返回</Text>
-        </Pressable>
+        <BackLink
+          label="登入"
+          onPress={() => backOrReplace({ pathname: '/login', params: { returnTo } })}
+        />
 
-        <Title sub="建立帳號後,下一步填個人資料算出每日目標。">註冊新帳號</Title>
+        <Title sub="建立帳號後，下一步填個人資料算出每日目標。">註冊新帳號</Title>
 
         <View className="gap-3">
           <Field

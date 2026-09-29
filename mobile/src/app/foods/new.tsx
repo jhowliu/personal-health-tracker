@@ -1,9 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 
@@ -181,9 +181,7 @@ export default function NewFoodScreen() {
         </>
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace('/meals')} disabled={busy}>
-        <Text className="text-base text-primary">‹ 返回食物庫</Text>
-      </Pressable>
+      <BackLink label="食物庫" onPress={() => backOrReplace('/meals')} disabled={busy} />
       <Title sub="營養以每 100 g 計；編輯後會更新既有餐點，已吃紀錄保留原值。">
         {isNew ? '新增食物' : '編輯食物'}
       </Title>
@@ -248,7 +246,7 @@ export default function NewFoodScreen() {
       </Card>
 
       {isNew ? null : (
-        <PrimaryButton tone="plain" onPress={remove} disabled={busy}>移除這項食物</PrimaryButton>
+        <PrimaryButton tone="danger" onPress={remove} disabled={busy}>移除這項食物</PrimaryButton>
       )}
     </Screen>
   );

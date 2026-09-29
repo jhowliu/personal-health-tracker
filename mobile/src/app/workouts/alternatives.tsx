@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
-import { Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
+import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 import { replacement } from '@/workouts/replacement';
@@ -47,14 +47,12 @@ export default function WorkoutAlternatives() {
 
   return (
     <Screen>
-      <Pressable
-        accessibilityRole="button"
+      <BackLink
+        label="課表"
         onPress={() =>
           backOrReplace({ pathname: '/workouts/[id]', params: { id: templateId ?? 'new' } })
         }
-      >
-        <Text className="text-base text-primary">‹ 課表</Text>
-      </Pressable>
+      />
       <Title sub="選擇後只會更新目前課表草稿；不會改動已排定的當日訓練。">替代 {name ?? '動作'}</Title>
       <View className="flex-row flex-wrap gap-2">
         {REASONS.map((option) => (

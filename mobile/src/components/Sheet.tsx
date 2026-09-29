@@ -2,33 +2,37 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { CheckIcon } from '@/components/icons';
 
 /** One selectable line in a sheet's list; the selected one is tinted and checked. */
 export function ChoiceOption({
   label,
   detail,
   selected,
+  disabled,
   onPress,
 }: {
   label: string;
   detail?: string;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled: Boolean(disabled) }}
+      disabled={disabled}
       onPress={onPress}
       className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-field px-3 py-2 ${
         selected ? 'bg-primary-soft' : 'bg-fill'
-      }`}
+      } ${disabled ? 'opacity-40' : ''}`}
     >
       <View className="flex-1 gap-0.5">
         <Text className="text-base text-ink">{label}</Text>
         {detail ? <Text className="text-sm text-muted">{detail}</Text> : null}
       </View>
-      {selected ? <Text className="text-base text-primary">✓</Text> : null}
+      {selected ? <CheckIcon size={18} /> : null}
     </Pressable>
   );
 }
@@ -52,10 +56,9 @@ export function Sheet({
         <Pressable
           accessible={false}
           onPress={onClose}
-          className="flex-1 justify-end"
-          style={{ backgroundColor: 'rgba(35, 31, 32, 0.35)' }}
+          className="flex-1 justify-end bg-scrim"
         >
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-card bg-bg px-5 pb-3 pt-5">
+          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet bg-bg px-5 pb-3 pt-5">
             <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-3">
               <View className="flex-row items-center justify-between gap-3">
                 <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">

@@ -18,6 +18,7 @@ import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import type { Schema } from '@/api/client';
+import { ChevronIcon } from '@/components/icons';
 import { color } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -144,7 +145,7 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
         onPress={toggle}
         className="min-h-[44px] justify-center gap-2"
       >
-        <View className="flex-row items-baseline justify-between gap-2">
+        <View className="flex-row items-center justify-between gap-2">
           {/* Expanded, the ring already carries the running total — repeating it here
               would just be the same two numbers twice. */}
           {open ? (
@@ -157,9 +158,16 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
               <Text className="text-muted"> / {targets.kcal.toLocaleString()} 大卡</Text>
             </Text>
           )}
-          <Text className={`text-sm ${remaining >= 0 ? 'text-muted' : 'text-warm'}`}>
-            {open ? '⌃' : `${headline} ⌄`}
-          </Text>
+          <View className="flex-row items-center gap-1">
+            {open ? null : (
+              <Text className={`text-sm ${remaining >= 0 ? 'text-muted' : 'text-warm'}`}>{headline}</Text>
+            )}
+            <ChevronIcon
+              direction={open ? 'up' : 'down'}
+              size={16}
+              tint={remaining >= 0 ? color.muted : color.warm}
+            />
+          </View>
         </View>
         {open ? null : (
           <Bar value={kcal} target={targets.kcal} tone={remaining >= 0 ? color.primary : color.warm} />

@@ -5,7 +5,10 @@ import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-n
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { MealCard } from '@/components/MealCard';
+import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';
 import { Card, Chip, Empty, Hint, Rows, Screen, Segmented, Title } from '@/components/ui';
+import { byCategoryOrder } from '@/meals/order';
+import { describeFood, formatPortion } from '@/meals/portion';
 import { color } from '@/theme/tokens';
 
 type Meal = Schema<'MealOut'>;
@@ -22,9 +25,9 @@ const SLOT_FILTERS = [
 ];
 
 const SWAP_HINT: Record<string, string> = {
-  carb: '換成同分類食物時,會依「碳水」換算等量克數。',
-  protein: '換成同分類食物時,會依「蛋白質」換算等量克數。',
-  kcal: '換成同分類食物時,會依「熱量」換算等量克數。',
+  carb: '換成同分類食物時，會依「碳水」換算等量克數。',
+  protein: '換成同分類食物時，會依「蛋白質」換算等量克數。',
+  kcal: '換成同分類食物時，會依「熱量」換算等量克數。',
   none: '這個分類不做等量換算。',
 };
 
@@ -46,16 +49,17 @@ export default function MealsScreen() {
                   onPress={() => router.navigate('/meals/photo?destination=today')}
                   className="h-11 w-11 items-center justify-center rounded-field bg-fill"
                 >
-                  <Text className="text-xl text-primary">⌁</Text>
+                  <CameraIcon size={22} />
                 </Pressable>
               ) : null}
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
-                className="min-h-[44px] justify-center rounded-field bg-primary px-4"
+                className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-field bg-primary px-4"
               >
+                <PlusIcon size={18} tint={color.surface} />
                 <Text className="text-base font-semibold text-white">
-                  {tab === 'mine' ? '+ 新增餐點' : '+ 新增食物'}
+                  {tab === 'mine' ? '新增餐點' : '新增食物'}
                 </Text>
               </Pressable>
             </View>
@@ -129,7 +133,7 @@ function MyMeals() {
         <View className="flex-1 gap-0.5 pr-4">
           <Text className="text-base font-semibold text-ink">每日自動分配</Text>
           <Hint>
-            每天從你的餐點裡隨機排早午晚餐。想換其中一樣,在今日流程按「換」就好。
+            每天從你的餐點裡隨機排早午晚餐。想換其中一樣，在今日流程按「換」就好。
           </Hint>
         </View>
         <Switch
@@ -143,17 +147,19 @@ function MyMeals() {
       {meals === null ? (
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
-        <Empty>還沒有自己的餐點,按右上角新增一道</Empty>
+        <Empty>還沒有自己的餐點，按右上角新增一道</Empty>
       ) : (
-        <Rows>
-          {meals.map((meal) => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              onPress={() => router.navigate(`/meals/${meal.id}`)}
-            />
-          ))}
-        </Rows>
+        <Card className="py-0">
+          <Rows>
+            {meals.map((meal) => (
+              <MealCard
+                key={meal.id}
+                meal={meal}
+                onPress={() => router.navigate(`/meals/${meal.id}`)}
+              />
+            ))}
+          </Rows>
+        </Card>
       )}
     </>
   );
@@ -173,7 +179,7 @@ function CarbScaleNotice() {
         熱量目標更新為 {profile?.targets.kcal.toLocaleString()} 大卡
       </Text>
       <Text className="text-base text-ink">
-        所有餐點的主食份量已自動{direction}約 {percent}%,蛋白質和蔬菜不變。
+        所有餐點的主食份量已自動{direction}約 {percent}%，蛋白質和蔬菜不變。
       </Text>
       <Hint>編輯餐點時看到的仍是基準克數。</Hint>
     </Card>
@@ -230,7 +236,7 @@ function FoodLibrary() {
       ) : (
         <Card className="py-0">
           <Rows>
-            {foods.map((food) => (
+            {byCategoryOrder(foods, categories).map((food) => (
               <Pressable
                 key={food.id}
                 accessibilityRole="button"
@@ -240,13 +246,13 @@ function FoodLibrary() {
               >
                 <View className="flex-1 gap-0.5">
                   <Text className="text-base font-semibold text-ink">{food.name}</Text>
-                  <Text className="text-sm text-muted">{describe(food)}</Text>
+                  <Text className="text-sm text-muted">{describeFood(food)}</Text>
                 </View>
                 <View className="items-end">
                   <Text className="text-xs text-muted">常用</Text>
-                  <Text className="text-sm text-ink">{usualPortion(food)}</Text>
+                  <Text className="text-sm text-ink">{formatPortion(food, food.usual_grams)}</Text>
                 </View>
-                <Text className="text-base text-primary">›</Text>
+                <ChevronIcon direction="right" size={16} tint={color.muted} />
               </Pressable>
             ))}
           </Rows>
@@ -256,24 +262,4 @@ function FoodLibrary() {
   );
 }
 
-function describe(food: Food): string {
-  const per = food.grams_per_unit && food.unit === 'piece' ? `每顆 ${food.grams_per_unit} g` : '每 100 g';
-  const { kcal, protein_g, fat_g, carb_g } = food.per_100g;
-  const factor = food.grams_per_unit && food.unit === 'piece' ? food.grams_per_unit / 100 : 1;
-  const round = (n: number) => Math.round(n * factor);
-  return `${per} ${round(kcal)} 大卡,蛋白質 ${round(protein_g)}、脂肪 ${round(fat_g)}、碳水 ${round(carb_g)} g`;
-}
 
-function usualPortion(food: Food): string {
-  if (food.grams_per_unit && food.unit === 'piece') {
-    return `${Math.round(food.usual_grams / food.grams_per_unit)} 顆`;
-  }
-  if (food.grams_per_unit && food.unit === 'scoop') {
-    const scoops = food.usual_grams / food.grams_per_unit;
-    return scoops % 1 === 0 ? `${scoops} 匙` : `${scoops.toFixed(1)} 匙`;
-  }
-  if (food.unit === 'ml' && food.grams_per_unit) {
-    return `${Math.round(food.usual_grams / food.grams_per_unit)} ml`;
-  }
-  return `${Math.round(food.usual_grams)} g`;
-}

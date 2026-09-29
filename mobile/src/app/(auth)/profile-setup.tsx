@@ -14,17 +14,17 @@ type Activity = 'sedentary' | 'light' | 'moderate' | 'active';
 type Deficit = 10 | 12 | 15 | 20;
 
 const ACTIVITY_LABEL: Record<Activity, string> = {
-  sedentary: '久坐,幾乎不運動',
+  sedentary: '久坐，幾乎不運動',
   light: '每週運動 1–3 天',
   moderate: '每週運動 3–5 天',
   active: '每週運動 6–7 天',
 };
 
 const DEFICIT_LABEL: Record<Deficit, string> = {
-  10: '慢慢來(少吃 10%)',
-  12: '穩定(少吃 12%)',
-  15: '積極(少吃 15%)',
-  20: '最快(少吃 20%)',
+  10: '慢慢來（少吃 10%）',
+  12: '穩定（少吃 12%）',
+  15: '積極（少吃 15%）',
+  20: '最快（少吃 20%）',
 };
 
 export default function ProfileSetup() {
@@ -34,9 +34,10 @@ export default function ProfileSetup() {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
 
   const [sex, setSex] = useState<Sex>('f');
-  const [age, setAge] = useState('31');
-  const [height, setHeight] = useState('164');
-  const [weight, setWeight] = useState('56');
+  // Left empty on purpose: a pre-filled age or weight looks real and gets accepted unread.
+  const [age, setAge] = useState('');
+  const [height, setHeight] = useState('');
+  const [weight, setWeight] = useState('');
   const [waist, setWaist] = useState('');
   const [activity, setActivity] = useState<Activity>('sedentary');
   const [deficit, setDeficit] = useState<Deficit>(12);
@@ -138,14 +139,14 @@ export default function ProfileSetup() {
         </View>
 
         <View className="flex-row gap-3">
-          <Field label="年齡" suffix="歲" value={age} onChangeText={setAge} keyboardType="numeric" />
-          <Field label="身高" suffix="cm" value={height} onChangeText={setHeight} keyboardType="decimal-pad" />
+          <Field label="年齡" suffix="歲" value={age} onChangeText={setAge} placeholder="例如 30" keyboardType="numeric" />
+          <Field label="身高" suffix="cm" value={height} onChangeText={setHeight} placeholder="例如 165" keyboardType="decimal-pad" />
         </View>
 
         <View className="flex-row gap-3">
-          <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
+          <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} placeholder="例如 55" keyboardType="decimal-pad" />
           <Field
-            label="腰圍(選填)"
+            label="腰圍（選填）"
             suffix="cm"
             value={waist}
             onChangeText={setWaist}
@@ -232,7 +233,7 @@ function TargetPreview({ targets }: { targets: Targets | null }) {
       </View>
 
       <Hint>
-        基礎代謝 {targets.bmr.toLocaleString()} 大卡,每日總消耗 {targets.tdee.toLocaleString()} 大卡
+        基礎代謝 {targets.bmr.toLocaleString()} 大卡，每日總消耗 {targets.tdee.toLocaleString()} 大卡
       </Hint>
     </Card>
   );

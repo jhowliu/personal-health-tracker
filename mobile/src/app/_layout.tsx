@@ -9,6 +9,7 @@ import { SessionProvider } from '@/auth/session';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
 import { draft } from '@/meals/draft';
 import { ReminderSync } from '@/notifications/ReminderSync';
+import { color } from '@/theme/tokens';
 import { photoDraft } from '@/meals/photo-draft';
 import { replacement } from '@/workouts/replacement';
 
@@ -25,7 +26,7 @@ export default function RootLayout() {
         <SessionProvider onSignedOut={clearUserState}>
           <StatusBar style="dark" />
           <ReminderSync />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#FBFAF7' } }} />
+          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
           <NumericDoneBar />
         </SessionProvider>
       </SafeAreaProvider>

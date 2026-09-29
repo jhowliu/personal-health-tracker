@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
-import { Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { CameraIcon } from '@/components/icons';
+import { BackLink, Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { photoDraft } from '@/meals/photo-draft';
@@ -24,6 +25,7 @@ export default function MealPhotoCapture() {
     : destination === 'day'
       ? '/today'
       : '/meals';
+  const parentLabel = destination === 'meal' ? '編輯餐點' : destination === 'day' ? '今天' : '餐點';
 
   useEffect(() => {
     if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
@@ -68,16 +70,14 @@ export default function MealPhotoCapture() {
         </PrimaryButton>
       }
     >
-      <Pressable accessibilityRole="button" onPress={() => backOrReplace(parentRoute)} disabled={busy}>
-        <Text className="text-base text-primary">‹ 返回</Text>
-      </Pressable>
+      <BackLink label={parentLabel} onPress={() => backOrReplace(parentRoute)} disabled={busy} />
       <Title sub="拍一張清楚、光線足夠的餐點照，我們會找出食物與估計份量。">辨識餐點照片</Title>
 
       {preview ? (
         <Image source={{ uri: preview }} className="h-64 w-full rounded-card bg-fill" resizeMode="cover" />
       ) : (
         <Card className="items-center gap-2 py-10">
-          <Text className="text-4xl text-primary">⌁</Text>
+          <CameraIcon size={40} />
           <Text className="text-base font-semibold text-ink">尚未選擇照片</Text>
           <Hint>不會自動儲存成餐點，確認後才會加入。</Hint>
         </Card>
