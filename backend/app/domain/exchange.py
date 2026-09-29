@@ -9,10 +9,18 @@ protein foods on protein, everything else on calories. The user can override it 
 calories from the substitute screen.
 """
 
-from app.domain.models import Exchange, Food, Nutrients, SwapBasis
+from collections.abc import Iterable
+
+from app.domain.models import Exchange, Food, FoodCategory, Nutrients, SwapBasis
 
 ROUND_TO_5_BELOW = 100.0
 """Under 100 g round to the nearest 5 g, at or above it round to the nearest 10 g."""
+
+
+def default_basis(categories: Iterable[FoodCategory], category_id: str) -> SwapBasis:
+    """The nutrient a swap holds constant for this category; calories when it is unknown."""
+    category = next((c for c in categories if c.id == category_id), None)
+    return category.swap_by if category else SwapBasis.KCAL
 
 
 def round_grams(food: Food, grams: float) -> float:

@@ -251,17 +251,25 @@ class FoodStore(Protocol):
     ) -> tuple[Food, ...]:
         """Browse active foods owned by the user, matching names and aliases."""
 
-    async def load(self, user_id: str, food_id: str) -> Food | None: ...
+    async def load(self, user_id: str, food_id: str) -> Food | None:
+        """A food the user can pick today: theirs and not archived."""
 
     async def load_referenced(self, user_id: str, food_id: str) -> Food | None:
-        """Existing meals can read an archived food without exposing it to new picks."""
+        """A food the user owns, archived or not: for what already refers to it (meals, days)."""
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         """Swap candidates: everything in the same category."""
 
-    async def save_custom(self, user_id: str, food: Food) -> None: ...
+    async def seed_defaults(self, user_id: str) -> None:
+        """Give the user their own copy of every default food they do not have yet.
 
-    async def archive_custom(self, user_id: str, food_id: str) -> None: ...
+        Never restores or overwrites a copy the user edited or archived.
+        """
+
+    async def save(self, user_id: str, food: Food) -> None:
+        """Insert or update one of the user's own foods; another user's id is left alone."""
+
+    async def archive(self, user_id: str, food_id: str) -> None: ...
 
 
 class MealStore(Protocol):

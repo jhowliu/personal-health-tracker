@@ -8,7 +8,7 @@ import asyncio
 import json
 import sys
 
-from app.adapters.sqlite.foods import seed_user_foods
+from app.adapters.sqlite.foods import SqliteFoodStore
 from app.db import get_conn
 
 # id, category, zh-TW name, state, kcal, protein, fat, carb, unit, g/unit, usual, max
@@ -93,8 +93,9 @@ async def seed() -> int:
         )
         async with conn.execute("SELECT id FROM users") as cursor:
             users = await cursor.fetchall()
+        store = SqliteFoodStore(conn)
         for user in users:
-            await seed_user_foods(conn, user["id"])
+            await store.seed_defaults(user["id"])
     return len(FOODS)
 
 

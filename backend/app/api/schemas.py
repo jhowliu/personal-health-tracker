@@ -41,6 +41,9 @@ from app.domain.workout_execution import (
     WorkoutExecutionItem,
 )
 
+PlannedSlot = Literal["breakfast", "lunch", "dinner"]
+"""The wire form of `PLANNED_SLOTS`; a Literal so OpenAPI lists the allowed values."""
+
 
 def _values(obj: Any) -> dict[str, Any]:
     """Flatten a dataclass into a dict. Not recursive — nested dataclasses convert themselves."""
@@ -658,14 +661,14 @@ class MealOut(BaseModel):
 class MealIn(BaseModel):
     name: str
     tag: Literal["regular", "light", "occasional"] = "regular"
-    meal_times: list[Literal["breakfast", "lunch", "dinner"]]
+    meal_times: list[PlannedSlot]
     items: list[MealItemIn]
 
 
 class MealPatch(BaseModel):
     name: str | None = None
     tag: Literal["regular", "light", "occasional"] | None = None
-    meal_times: list[Literal["breakfast", "lunch", "dinner"]] | None = None
+    meal_times: list[PlannedSlot] | None = None
     items: list[MealItemIn] | None = None
 
 
@@ -734,7 +737,7 @@ class DayPlanOut(BaseModel):
 
 
 class ShuffleIn(BaseModel):
-    meal_time: Literal["breakfast", "lunch", "dinner"] | None = None
+    meal_time: PlannedSlot | None = None
 
 
 class SwapItemIn(BaseModel):

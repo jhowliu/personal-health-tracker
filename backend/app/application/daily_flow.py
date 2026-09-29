@@ -6,7 +6,7 @@ from datetime import date
 from app.application.ports import AccountStore, Clock, DayStore
 from app.domain.daily_flow import resolve_flow
 from app.domain.errors import NotFound, ValidationFailed
-from app.domain.models import DayFlow, MealTime, Targets
+from app.domain.models import PLANNED_SLOTS, DayFlow, MealTime, Targets
 from app.domain.nutrition import compute_targets
 from app.domain.streak import STREAK_WINDOW_DAYS, streak_until
 
@@ -65,6 +65,8 @@ class DailyFlowService:
     async def set_meal_state(
         self, user_id: str, day: date, meal_time: MealTime, state: str
     ) -> TodayView:
+        if meal_time not in PLANNED_SLOTS:
+            raise ValidationFailed("額外餐點不需要標記已吃或跳過")
         if state not in {"eaten", "skipped", "planned"}:
             raise ValidationFailed("無效的餐點狀態")
         await self._days.set_meal_state(user_id, day, meal_time, state, self._clock.now())

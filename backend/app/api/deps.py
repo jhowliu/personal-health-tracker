@@ -31,6 +31,7 @@ from app.application.foods import FoodCatalogService
 from app.application.meal_photos import ExtrasService, MealPhotoService
 from app.application.meals import MealService
 from app.application.planning import DailyPlanService
+from app.application.plate_intake import PlateIntake
 from app.application.profiles import ProfileService
 from app.application.reminders import ReminderService
 from app.application.training import TrainingService
@@ -115,7 +116,12 @@ CurrentUserId = Annotated[str, Depends(current_user_id)]
 
 def accounts(conn: DbConn) -> AccountService:
     return AccountService(
-        SqliteAccountStore(conn), hasher(), token_issuer(), identity_verifier(), clock()
+        SqliteAccountStore(conn),
+        SqliteFoodStore(conn),
+        hasher(),
+        token_issuer(),
+        identity_verifier(),
+        clock(),
     )
 
 
@@ -160,7 +166,7 @@ def daily_plan(conn: DbConn) -> DailyPlanService:
         SqliteFoodStore(conn),
         SqliteAccountStore(conn),
         clock(),
-        SqliteMealPhotoStore(conn),
+        plate_intake(conn),
     )
 
 
@@ -176,12 +182,12 @@ def meal_photos(conn: DbConn) -> MealPhotoService:
     )
 
 
+def plate_intake(conn: DbConn) -> PlateIntake:
+    return PlateIntake(SqliteFoodStore(conn), SqliteMealPhotoStore(conn))
+
+
 def extras(conn: DbConn) -> ExtrasService:
-    return ExtrasService(
-        SqliteDayStore(conn),
-        SqliteFoodStore(conn),
-        SqliteMealPhotoStore(conn),
-    )
+    return ExtrasService(SqliteDayStore(conn), plate_intake(conn))
 
 
 def decisions(conn: DbConn) -> DecisionService:

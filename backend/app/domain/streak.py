@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from app.domain.planning import PLANNED_SLOTS
+from app.domain.models import PLANNED_SLOTS
 
 # How many days back a store is asked to look; a streak cannot be longer than this.
 STREAK_WINDOW_DAYS = 400

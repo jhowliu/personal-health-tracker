@@ -15,44 +15,46 @@ _FROM = "FROM foods f"
 _VISIBLE = "f.user_id = ? AND f.archived_at IS NULL"
 
 
-async def seed_user_foods(conn: aiosqlite.Connection, user_id: str) -> None:
-    """Copy only missing defaults. Archived copies retain their template key and stay hidden."""
-    async with conn.execute(
-        """
-        INSERT INTO foods (
-            id, user_id, template_id, category_id, name, state, kcal_per_100g,
-            protein_per_100g, fat_per_100g, carb_per_100g, fiber_per_100g,
-            unit, grams_per_unit, usual_grams, max_grams
-        )
-        SELECT 'seed:' || ? || ':' || t.id, ?, t.id, t.category_id, t.name, t.state,
-               t.kcal_per_100g, t.protein_per_100g, t.fat_per_100g, t.carb_per_100g,
-               t.fiber_per_100g, t.unit, t.grams_per_unit, t.usual_grams, t.max_grams
-        FROM food_templates t WHERE t.retired_at IS NULL
-        ON CONFLICT DO NOTHING
-        RETURNING id
-        """,
-        (user_id, user_id),
-    ) as cursor:
-        inserted = [row["id"] for row in await cursor.fetchall()]
-    if not inserted:
-        return
-    placeholders = ", ".join("?" for _ in inserted)
-    await conn.execute(
-        f"""
-        INSERT OR IGNORE INTO food_aliases (food_id, alias)
-        SELECT f.id, a.value
-        FROM foods f JOIN food_templates t ON t.id = f.template_id,
-             json_each(t.aliases_json) a
-        WHERE f.user_id = ? AND f.id IN ({placeholders})
-        """,
-        (user_id, *inserted),
-    )
-
-
 class SqliteFoodStore:
     def __init__(self, conn: aiosqlite.Connection, locale: str = "zh-TW") -> None:
         self._conn = conn
         self._locale = locale
+
+    async def seed_defaults(self, user_id: str) -> None:
+        """Copy only missing defaults. Archived copies keep their template key and stay hidden.
+
+        The per-user id is derived from the template id, so running this again is a no-op.
+        """
+        async with self._conn.execute(
+            """
+            INSERT INTO foods (
+                id, user_id, template_id, category_id, name, state, kcal_per_100g,
+                protein_per_100g, fat_per_100g, carb_per_100g, fiber_per_100g,
+                unit, grams_per_unit, usual_grams, max_grams
+            )
+            SELECT 'seed:' || ? || ':' || t.id, ?, t.id, t.category_id, t.name, t.state,
+                   t.kcal_per_100g, t.protein_per_100g, t.fat_per_100g, t.carb_per_100g,
+                   t.fiber_per_100g, t.unit, t.grams_per_unit, t.usual_grams, t.max_grams
+            FROM food_templates t WHERE t.retired_at IS NULL
+            ON CONFLICT DO NOTHING
+            RETURNING id
+            """,
+            (user_id, user_id),
+        ) as cursor:
+            inserted = [row["id"] for row in await cursor.fetchall()]
+        if not inserted:
+            return
+        placeholders = ", ".join("?" for _ in inserted)
+        await self._conn.execute(
+            f"""
+            INSERT OR IGNORE INTO food_aliases (food_id, alias)
+            SELECT f.id, a.value
+            FROM foods f JOIN food_templates t ON t.id = f.template_id,
+                 json_each(t.aliases_json) a
+            WHERE f.user_id = ? AND f.id IN ({placeholders})
+            """,
+            (user_id, *inserted),
+        )
 
     async def categories(self) -> tuple[FoodCategory, ...]:
         async with self._conn.execute(
@@ -98,7 +100,7 @@ class SqliteFoodStore:
             params,
         ) as cursor:
             rows = await cursor.fetchall()
-        return tuple([await self._with_aliases(row) for row in rows])
+        return await self._foods(rows)
 
     async def load(self, user_id: str, food_id: str) -> Food | None:
         async with self._conn.execute(
@@ -106,7 +108,7 @@ class SqliteFoodStore:
             (food_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
-        return await self._with_aliases(row) if row else None
+        return (await self._foods([row]))[0] if row else None
 
     async def load_referenced(self, user_id: str, food_id: str) -> Food | None:
         """Existing meals and day snapshots retain foods archived from the picker."""
@@ -115,12 +117,12 @@ class SqliteFoodStore:
             (food_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
-        return await self._with_aliases(row) if row else None
+        return (await self._foods([row]))[0] if row else None
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         return await self.search(user_id, None, category_id)
 
-    async def save_custom(self, user_id: str, food: Food) -> None:
+    async def save(self, user_id: str, food: Food) -> None:
         await self._conn.execute(
             """
             INSERT INTO foods (
@@ -162,35 +164,45 @@ class SqliteFoodStore:
             ),
         )
 
-    async def archive_custom(self, user_id: str, food_id: str) -> None:
+    async def archive(self, user_id: str, food_id: str) -> None:
         await self._conn.execute(
             "UPDATE foods SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
             " WHERE id = ? AND user_id = ?",
             (food_id, user_id),
         )
 
-    async def _with_aliases(self, row: aiosqlite.Row) -> Food:
+    async def _foods(self, rows: list[aiosqlite.Row]) -> tuple[Food, ...]:
+        """Build Foods from rows, fetching every food's aliases in one query."""
+        if not rows:
+            return ()
+        placeholders = ", ".join("?" for _ in rows)
         async with self._conn.execute(
-            "SELECT alias FROM food_aliases WHERE food_id = ?", (row["id"],)
+            f"SELECT food_id, alias FROM food_aliases WHERE food_id IN ({placeholders})",
+            [row["id"] for row in rows],
         ) as cursor:
-            aliases = tuple(a["alias"] for a in await cursor.fetchall())
+            aliases: dict[str, list[str]] = {}
+            for alias in await cursor.fetchall():
+                aliases.setdefault(alias["food_id"], []).append(alias["alias"])
 
-        return Food(
-            id=row["id"],
-            category_id=row["category_id"],
-            name=row["name"],
-            state=FoodState(row["state"]),
-            per_100g=Nutrients(
-                kcal=row["kcal_per_100g"],
-                protein_g=row["protein_per_100g"],
-                fat_g=row["fat_per_100g"],
-                carb_g=row["carb_per_100g"],
-            ),
-            fiber_per_100g=row["fiber_per_100g"],
-            unit=row["unit"],
-            grams_per_unit=row["grams_per_unit"],
-            usual_grams=row["usual_grams"],
-            max_grams=row["max_grams"],
-            aliases=aliases,
-            template_id=row["template_id"],
+        return tuple(
+            Food(
+                id=row["id"],
+                category_id=row["category_id"],
+                name=row["name"],
+                state=FoodState(row["state"]),
+                per_100g=Nutrients(
+                    kcal=row["kcal_per_100g"],
+                    protein_g=row["protein_per_100g"],
+                    fat_g=row["fat_per_100g"],
+                    carb_g=row["carb_per_100g"],
+                ),
+                fiber_per_100g=row["fiber_per_100g"],
+                unit=row["unit"],
+                grams_per_unit=row["grams_per_unit"],
+                usual_grams=row["usual_grams"],
+                max_grams=row["max_grams"],
+                aliases=tuple(aliases.get(row["id"], ())),
+                template_id=row["template_id"],
+            )
+            for row in rows
         )

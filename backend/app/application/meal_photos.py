@@ -4,6 +4,7 @@ import json
 from datetime import date
 
 from app.application.decisions import DecisionService
+from app.application.plate_intake import PlateIntake
 from app.application.ports import (
     Clock,
     DayStore,
@@ -161,15 +162,7 @@ class MealPhotoService:
 
     async def _candidates(self, user_id: str, label: str) -> tuple[Food, ...]:
         """Shortlist the library foods a label could mean, matching names and aliases."""
-        candidates: list[Food] = []
-        for match in await self._foods.search(user_id, label, None):
-            # Search results are external input too: check visibility before exposing ids.
-            valid = await self._foods.load(user_id, match.id)
-            if valid is not None:
-                candidates.append(valid)
-            if len(candidates) == _CANDIDATE_LIMIT:
-                break
-        return tuple(candidates)
+        return (await self._foods.search(user_id, label, None))[:_CANDIDATE_LIMIT]
 
     async def _pick(self, label: str, candidates: tuple[Food, ...]) -> tuple[Food | None, float]:
         """Ask the decision layer which candidate the label means.
@@ -200,10 +193,9 @@ class MealPhotoService:
 
 
 class ExtrasService:
-    def __init__(self, days: DayStore, foods: FoodStore, photos: MealPhotoStore) -> None:
+    def __init__(self, days: DayStore, intake: PlateIntake) -> None:
         self._days = days
-        self._foods = foods
-        self._photos = photos
+        self._intake = intake
 
     async def add(
         self,
@@ -216,20 +208,17 @@ class ExtrasService:
         nutrients: Nutrients | None,
         photo_id: str | None,
     ) -> PlateItem:
-        if photo_id and await self._photos.load(user_id, photo_id) is None:
-            raise NotFound("找不到這張照片")
-        if food_id:
-            if grams is None or grams <= 0:
-                raise ValidationFailed("已知食物需要大於 0 的份量")
-            food = await self._foods.load(user_id, food_id)
-            if food is None:
-                raise NotFound("找不到這個食物")
-            item = PlateItem(new_id(), food, None, grams, None, photo_id, 0).freeze()
-        elif custom_name and nutrients:
-            item = PlateItem(new_id(), None, custom_name, None, nutrients, photo_id, 0)
-        else:
-            raise ValidationFailed("請提供食物份量或自訂食物營養")
-
+        # Extras are recorded after the fact, so a known food is frozen the moment it is saved.
+        item = (
+            await self._intake.item(
+                user_id,
+                food_id=food_id,
+                grams=grams,
+                custom_name=custom_name,
+                nutrients=nutrients,
+                photo_id=photo_id,
+            )
+        ).freeze()
         await self._days.add_extra(user_id, day, item)
         return item
 

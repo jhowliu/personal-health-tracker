@@ -21,7 +21,7 @@ from app.api.schemas import (
     WorkoutItemIn,
     WorkoutItemPatch,
 )
-from app.domain.models import MealTime, SwapBasis
+from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis
 from app.domain.workout_execution import SetEffort
 
 router = APIRouter(prefix="/days", tags=["days"])
@@ -56,12 +56,8 @@ async def set_meal_state(
     service: DailyFlow,
     payload: MealStateIn | None = None,
 ) -> TodayOut:
-    if meal_time not in {"breakfast", "lunch", "dinner"}:
-        raise HTTPException(status_code=422, detail="meal_time 必須是早餐、午餐或晚餐")
     state = (payload or MealStateIn()).state
-    return TodayOut.of(
-        await service.set_meal_state(user_id, day, MealTime(meal_time), state)
-    )
+    return TodayOut.of(await service.set_meal_state(user_id, day, _meal_time(meal_time), state))
 
 
 @router.get("/{day}/workout", response_model=WorkoutExecutionOut)
@@ -238,6 +234,8 @@ async def delete_extra(day: date, item_id: str, user_id: CurrentUserId, service:
 
 
 def _meal_time(value: str) -> MealTime:
-    if value not in {"breakfast", "lunch", "dinner"}:
+    """A path segment that must name one of the planned Meal slots."""
+    slot = next((s for s in PLANNED_SLOTS if s.value == value), None)
+    if slot is None:
         raise HTTPException(status_code=422, detail="meal_time 必須是早餐、午餐或晚餐")
-    return MealTime(value)
+    return slot

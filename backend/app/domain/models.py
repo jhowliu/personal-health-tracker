@@ -22,6 +22,10 @@ class MealTime(StrEnum):
     EXTRAS = "extras"
 
 
+PLANNED_SLOTS = (MealTime.BREAKFAST, MealTime.LUNCH, MealTime.DINNER)
+"""The Meal slots a plan fills and a user marks eaten or skipped. EXTRAS sits outside them."""
+
+
 class WorkoutTime(StrEnum):
     AM = "am"
     PM = "pm"

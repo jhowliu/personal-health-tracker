@@ -6,8 +6,9 @@ import aiosqlite
 
 from app.adapters.sqlite.rows import to_day
 from app.domain.errors import NotFound
+from app.domain.models import PLANNED_SLOTS
 
-PLANNED_MEALS = ("breakfast", "lunch", "dinner")
+PLANNED_MEALS = tuple(slot.value for slot in PLANNED_SLOTS)
 
 
 async def open_day(conn: aiosqlite.Connection, user_id: str, day: date) -> None:

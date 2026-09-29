@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.application.ports import (
     AccountStore,
     Clock,
+    FoodStore,
     IdentityVerifier,
     PasswordHasher,
     TokenIssuer,
@@ -26,12 +27,14 @@ class AccountService:
     def __init__(
         self,
         store: AccountStore,
+        foods: FoodStore,
         hasher: PasswordHasher,
         tokens: TokenIssuer,
         identities: IdentityVerifier,
         clock: Clock,
     ) -> None:
         self._store = store
+        self._foods = foods
         self._hasher = hasher
         self._tokens = tokens
         self._identities = identities
@@ -46,7 +49,7 @@ class AccountService:
         account = Account(
             id=new_id(), email=email, locale=locale, created_at=self._clock.now()
         )
-        await self._store.create_account(account, self._hasher.hash(password))
+        await self._open_account(account, self._hasher.hash(password))
         return await self._issue(account.id)
 
     async def login(self, email: str, password: str) -> TokenPair:
@@ -75,7 +78,7 @@ class AccountService:
                     locale="zh-TW",
                     created_at=self._clock.now(),
                 )
-                await self._store.create_account(account, None)
+                await self._open_account(account, None)
                 user_id = account.id
             await self._store.link_identity(provider, subject, user_id, email)
 
@@ -93,6 +96,11 @@ class AccountService:
 
     async def delete_account(self, user_id: str) -> None:
         await self._store.delete_account(user_id)
+
+    async def _open_account(self, account: Account, password_hash: str | None) -> None:
+        """Every new account starts with its own editable copy of the default foods."""
+        await self._store.create_account(account, password_hash)
+        await self._foods.seed_defaults(account.id)
 
     async def _issue(self, user_id: str) -> TokenPair:
         raw, token_hash, expires_at = self._tokens.issue_refresh()
