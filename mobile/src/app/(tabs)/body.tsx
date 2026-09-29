@@ -3,8 +3,10 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { useSession } from '@/auth/session';
 import { TrendChart } from '@/components/TrendChart';
 import { Card, Field, Hint, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
 type Summary = Schema<'BodySummaryOut'>;
@@ -18,6 +20,7 @@ function todayISO() {
 }
 
 export default function BodyScreen() {
+  const { profile } = useSession();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [date, setDate] = useState(todayISO());
@@ -54,6 +57,10 @@ export default function BodyScreen() {
       setWeight('');
       setWaist('');
       await load();
+      // Logging today's weigh-in drops today's reminder if it has not fired yet.
+      if (date === todayISO()) {
+        void syncWeighInReminder(profile?.profile.reminder_time ?? null).catch(() => {});
+      }
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {

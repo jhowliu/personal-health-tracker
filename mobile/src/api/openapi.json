@@ -6218,6 +6218,17 @@
               }
             ],
             "title": "Default Location"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
           }
         },
         "type": "object",
@@ -6397,17 +6408,6 @@
               }
             ],
             "title": "Reminder Time"
-          },
-          "timezone": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timezone"
           }
         },
         "type": "object",

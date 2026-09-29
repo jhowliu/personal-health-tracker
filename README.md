@@ -105,8 +105,12 @@ cd mobile && EXPO_PUBLIC_API_URL=http://<你的區網IP>:8010 npx expo start
 兩件事 Expo Go 做不到,要 development build(`npx expo install expo-dev-client` + `eas build --profile development`):
 
 - 推播 — Expo Go 自 SDK 53 起不支援 remote push,而且要先 `eas init` 寫入 `extra.eas.projectId`,
-  否則 `registerPushToken()` 會安靜略過
+  否則 `registerPushToken()` 會安靜略過。iOS 實機還需要付費的 Apple Developer Program
 - Google／Apple 登入 — 需要原生模組與三組 Client ID
+
+「早上提醒量體重」不靠推播:設定頁選好時間後,由手機自己排程本機通知(Expo Go 就能測,不需要
+Apple 付費帳號或後端)。提醒時間存在帳號上,換手機登入會自動重新排;排的是接下來 14 天的
+一次性通知,每次打開 App 都會補滿,今天量過體重就會取消當天那則。
 
 ## 測試
 

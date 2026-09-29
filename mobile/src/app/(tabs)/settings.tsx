@@ -3,7 +3,10 @@ import { Alert, Pressable, Switch, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { ReminderRow } from '@/components/ReminderRow';
+import { TimezoneRow } from '@/components/TimezoneRow';
 import { Card, Hint, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
 const ACTIVITY_LABEL: Record<string, string> = {
@@ -31,6 +34,28 @@ export default function SettingsScreen() {
       Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const saveReminder = async (next: string | null) => {
+    try {
+      await api.patch('/users/me/reminders', { reminder_time: next });
+      await reload();
+      const result = await syncWeighInReminder(next, { askPermission: next !== null });
+      if (result === 'denied') {
+        Alert.alert('通知沒有開', '請到手機的系統設定,允許這個 App 傳送通知,提醒才會響。');
+      }
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  };
+
+  const saveTimezone = async (next: string) => {
+    try {
+      await api.patch('/users/me/profile', { timezone: next });
+      await reload();
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
     }
   };
 
@@ -85,7 +110,8 @@ export default function SettingsScreen() {
         <Rows>
           <Row label="運動時間預設" value={me.workout_time === 'am' ? '早餐後' : '晚餐前'} />
           <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
-          <Row label="早上提醒量體重" value={me.reminder_time ?? '不提醒'} />
+          <TimezoneRow value={me.timezone} onSave={saveTimezone} />
+          <ReminderRow value={me.reminder_time} onSave={saveReminder} />
           <View className="flex-row items-center justify-between py-3">
             <View className="flex-1 gap-0.5 pr-4">
               <Text className="text-base text-ink">主食份量自動調整</Text>
