@@ -1479,6 +1479,8 @@ export interface components {
             workout_time?: ("am" | "pm") | null;
             /** Default Location */
             default_location?: ("home" | "gym") | null;
+            /** Timezone */
+            timezone?: string | null;
         };
         /** ProfileWithTargetsOut */
         ProfileWithTargetsOut: {
@@ -1541,8 +1543,6 @@ export interface components {
         RemindersPatch: {
             /** Reminder Time */
             reminder_time?: string | null;
-            /** Timezone */
-            timezone?: string | null;
         };
         /** SaveDayTemplateIn */
         SaveDayTemplateIn: {

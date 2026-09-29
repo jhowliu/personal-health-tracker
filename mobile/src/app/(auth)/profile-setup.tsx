@@ -6,6 +6,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Card, Field, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
+import { deviceTimezone } from '@/timezone';
 
 type Targets = Schema<'TargetsOut'>;
 type Sex = 'f' | 'm';
@@ -26,10 +27,10 @@ const DEFICIT_LABEL: Record<Deficit, string> = {
   20: '最快(少吃 20%)',
 };
 
-const TIMEZONE = 'Asia/Taipei';
-
 export default function ProfileSetup() {
-  const { reload } = useSession();
+  const { reload, profile: existing } = useSession();
+  // A new account starts on the phone's own zone; editing keeps whatever was chosen.
+  const timezone = existing?.profile.timezone ?? deviceTimezone();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
 
   const [sex, setSex] = useState<Sex>('f');
@@ -56,9 +57,9 @@ export default function ProfileSetup() {
       weight_kg,
       activity_level: activity,
       deficit_pct: deficit,
-      timezone: TIMEZONE,
+      timezone,
     };
-  }, [sex, age, height, weight, activity, deficit]);
+  }, [sex, age, height, weight, activity, deficit, timezone]);
 
   useEffect(() => {
     if (!payload) return;

@@ -5,9 +5,10 @@ Deliberately separate from the domain models, so changing the API never touches 
 
 from dataclasses import fields
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
@@ -43,6 +44,20 @@ from app.domain.workout_execution import (
 
 PlannedSlot = Literal["breakfast", "lunch", "dinner"]
 """The wire form of `PLANNED_SLOTS`; a Literal so OpenAPI lists the allowed values."""
+
+
+def _known_timezone(name: str) -> str:
+    """An IANA name the server can compute a local date in; anything else would break every
+    screen that asks what day it is.
+    """
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError, OSError) as e:
+        raise ValueError("不認得這個時區,請用 Asia/Taipei 這樣的名稱") from e
+    return name
+
+
+Timezone = Annotated[str, AfterValidator(_known_timezone)]
 
 
 def _values(obj: Any) -> dict[str, Any]:
@@ -91,7 +106,7 @@ class ProfileIn(BaseModel):
     workout_time: Literal["am", "pm"] = "pm"
     default_location: Literal["home", "gym"] = "home"
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
-    timezone: str = "Australia/Brisbane"
+    timezone: Timezone = "Australia/Brisbane"
 
 
 class ProfilePatch(BaseModel):
@@ -105,11 +120,11 @@ class ProfilePatch(BaseModel):
     auto_assign_meals: bool | None = None
     workout_time: Literal["am", "pm"] | None = None
     default_location: Literal["home", "gym"] | None = None
+    timezone: Timezone | None = None
 
 
 class RemindersPatch(BaseModel):
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
-    timezone: str | None = None
 
 
 class TargetsOut(BaseModel):

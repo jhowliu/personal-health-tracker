@@ -1,17 +1,26 @@
 import { useState } from 'react';
 import { Alert, Pressable, Switch, Text, View } from 'react-native';
 
-import { ApiError, api } from '@/api/client';
+import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
-import { Card, Hint, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
+import { ReminderRow } from '@/components/ReminderRow';
+import { TimezoneRow } from '@/components/TimezoneRow';
+import { Card, LabelWithTip, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
-const ACTIVITY_LABEL: Record<string, string> = {
-  sedentary: '久坐',
-  light: '每週 1–3 天',
-  moderate: '每週 3–5 天',
-  active: '每週 6–7 天',
-};
+const SEX_OPTIONS = [
+  { value: 'f' as const, label: '女' },
+  { value: 'm' as const, label: '男' },
+];
+const ACTIVITY_OPTIONS = [
+  { value: 'sedentary' as const, label: '久坐' },
+  { value: 'light' as const, label: '每週 1–3 天' },
+  { value: 'moderate' as const, label: '每週 3–5 天' },
+  { value: 'active' as const, label: '每週 6–7 天' },
+];
+const DEFICIT_OPTIONS = ([10, 12, 15, 20] as const).map((value) => ({ value, label: `少吃 ${value}%` }));
 
 export default function SettingsScreen() {
   const { profile, signOut, reload } = useSession();
@@ -34,6 +43,30 @@ export default function SettingsScreen() {
     }
   };
 
+  const saveReminder = async (next: string | null) => {
+    try {
+      await api.patch('/users/me/reminders', { reminder_time: next });
+      await reload();
+      const result = await syncWeighInReminder(next, { askPermission: next !== null });
+      if (result === 'denied') {
+        Alert.alert('通知沒有開', '請到手機的系統設定,允許這個 App 傳送通知,提醒才會響。');
+      }
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  };
+
+  const patchProfile = async (changes: Schema<'ProfilePatch'>) => {
+    try {
+      await api.patch('/users/me/profile', changes);
+      await reload();
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  };
+
+  const saveTimezone = (timezone: string) => patchProfile({ timezone });
+
   const confirmDelete = () =>
     Alert.alert('刪除帳號', '所有紀錄會一起刪掉,無法復原。', [
       { text: '取消', style: 'cancel' },
@@ -54,17 +87,53 @@ export default function SettingsScreen() {
     <Screen footerSafeArea={false}>
       <Title>設定</Title>
 
-      <SectionHeading action={<Text className="text-base text-primary">編輯</Text>}>
-        個人資料
-      </SectionHeading>
+      <SectionHeading>個人資料</SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="性別" value={me.sex === 'f' ? '女' : '男'} />
-          <Row label="年齡" value={`${age} 歲`} />
-          <Row label="身高" value={`${me.height_cm} cm`} />
-          <Row label="體重" value={`${me.weight_kg} kg`} />
-          <Row label="平常活動量" value={ACTIVITY_LABEL[me.activity_level] ?? me.activity_level} />
-          <Row label="減脂速度" value={`少吃 ${me.deficit_pct}%`} />
+          <ChoiceRow
+            label="性別"
+            value={me.sex}
+            options={SEX_OPTIONS}
+            onSave={(sex) => patchProfile({ sex })}
+          />
+          <NumberRow
+            label="年齡"
+            unit="歲"
+            value={age}
+            min={10}
+            max={100}
+            onSave={(years) => patchProfile({ birth_date: `${new Date().getFullYear() - years}-01-01` })}
+          />
+          <NumberRow
+            label="身高"
+            unit="cm"
+            value={me.height_cm}
+            min={100}
+            max={250}
+            decimal
+            onSave={(height_cm) => patchProfile({ height_cm })}
+          />
+          <NumberRow
+            label="體重"
+            unit="kg"
+            value={me.weight_kg}
+            min={30}
+            max={300}
+            decimal
+            onSave={(weight_kg) => patchProfile({ weight_kg })}
+          />
+          <ChoiceRow
+            label="平常活動量"
+            value={me.activity_level}
+            options={ACTIVITY_OPTIONS}
+            onSave={(activity_level) => patchProfile({ activity_level })}
+          />
+          <ChoiceRow
+            label="減脂速度"
+            value={me.deficit_pct}
+            options={DEFICIT_OPTIONS}
+            onSave={(deficit_pct) => patchProfile({ deficit_pct })}
+          />
         </Rows>
       </Card>
 
@@ -85,12 +154,10 @@ export default function SettingsScreen() {
         <Rows>
           <Row label="運動時間預設" value={me.workout_time === 'am' ? '早餐後' : '晚餐前'} />
           <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
-          <Row label="早上提醒量體重" value={me.reminder_time ?? '不提醒'} />
+          <TimezoneRow value={me.timezone} onSave={saveTimezone} />
+          <ReminderRow value={me.reminder_time} onSave={saveReminder} />
           <View className="flex-row items-center justify-between py-3">
-            <View className="flex-1 gap-0.5 pr-4">
-              <Text className="text-base text-ink">主食份量自動調整</Text>
-              <Hint>熱量目標改變時,自動增減主食份量。蛋白質和蔬菜不變。</Hint>
-            </View>
+            <LabelWithTip label="主食份量自動調整" tip="熱量目標改變時,自動增減主食份量。蛋白質和蔬菜不變。" />
             <Switch
               value={me.auto_scale_carbs}
               onValueChange={toggleAutoCarbs}
