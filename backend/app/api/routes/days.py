@@ -10,17 +10,20 @@ from app.api.schemas import (
     ExtraItemOut,
     MealStateIn,
     PlanItemPatchIn,
+    SaveDayTemplateIn,
     SetLogIn,
     SetLogResultOut,
     ShuffleIn,
     SwapItemIn,
+    TemplateOut,
     TodayOut,
     WorkoutExecutionOut,
     WorkoutItemIn,
     WorkoutItemPatch,
 )
-from app.domain.models import MealTime, SwapBasis
-from app.domain.workout_execution import SetEffort
+from app.application.commands import DayAdjustment, WorkoutItemChange
+from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis, WorkoutTime
+from app.domain.workout_execution import ReplacementReason, SetEffort
 
 router = APIRouter(prefix="/days", tags=["days"])
 
@@ -34,16 +37,12 @@ async def read_day(day: date, user_id: CurrentUserId, service: DailyFlow) -> Tod
 async def update_day(
     day: date, payload: DayPatch, user_id: CurrentUserId, service: DailyFlow
 ) -> TodayOut:
-    changes = payload.model_dump(exclude_unset=True, exclude={"workout_done", "workout_skipped"})
-    return TodayOut.of(
-        await service.adjust(
-            user_id,
-            day,
-            workout_done=payload.workout_done,
-            workout_skipped=payload.workout_skipped,
-            **changes,
-        )
+    change = DayAdjustment(
+        workout_time=WorkoutTime(payload.workout_time) if payload.workout_time else None,
+        workout_done=payload.workout_done,
+        workout_skipped=payload.workout_skipped,
     )
+    return TodayOut.of(await service.adjust(user_id, day, change))
 
 
 @router.patch("/{day}/meals/{meal_time}", response_model=TodayOut)
@@ -54,12 +53,8 @@ async def set_meal_state(
     service: DailyFlow,
     payload: MealStateIn | None = None,
 ) -> TodayOut:
-    if meal_time not in {"breakfast", "lunch", "dinner"}:
-        raise HTTPException(status_code=422, detail="meal_time 必須是早餐、午餐或晚餐")
     state = (payload or MealStateIn()).state
-    return TodayOut.of(
-        await service.set_meal_state(user_id, day, MealTime(meal_time), state)
-    )
+    return TodayOut.of(await service.set_meal_state(user_id, day, _meal_time(meal_time), state))
 
 
 @router.get("/{day}/workout", response_model=WorkoutExecutionOut)
@@ -67,6 +62,13 @@ async def read_workout(
     day: date, user_id: CurrentUserId, service: WorkoutExecution
 ) -> WorkoutExecutionOut:
     return WorkoutExecutionOut.of(await service.view(user_id, day))
+
+
+@router.post("/{day}/workout/save-as-template", response_model=TemplateOut, status_code=201)
+async def save_day_as_template(
+    day: date, payload: SaveDayTemplateIn, user_id: CurrentUserId, service: WorkoutExecution
+) -> TemplateOut:
+    return TemplateOut.of(await service.save_as_template(user_id, day, payload.name))
 
 
 @router.post("/{day}/workout/items", response_model=WorkoutExecutionOut, status_code=201)
@@ -94,7 +96,7 @@ async def update_workout_item(
     service: WorkoutExecution,
 ) -> WorkoutExecutionOut:
     return WorkoutExecutionOut.of(
-        await service.update_item(user_id, day, item_id, payload.model_dump(exclude_unset=True))
+        await service.update_item(user_id, day, item_id, _item_change(payload))
     )
 
 
@@ -228,7 +230,16 @@ async def delete_extra(day: date, item_id: str, user_id: CurrentUserId, service:
     await service.remove(user_id, day, item_id)
 
 
+def _item_change(payload: WorkoutItemPatch) -> WorkoutItemChange:
+    given = payload.model_dump(exclude_unset=True)
+    if given.get("replacement_reason") is not None:
+        given["replacement_reason"] = ReplacementReason(given["replacement_reason"])
+    return WorkoutItemChange(**given)
+
+
 def _meal_time(value: str) -> MealTime:
-    if value not in {"breakfast", "lunch", "dinner"}:
+    """A path segment that must name one of the planned Meal slots."""
+    slot = next((s for s in PLANNED_SLOTS if s.value == value), None)
+    if slot is None:
         raise HTTPException(status_code=422, detail="meal_time 必須是早餐、午餐或晚餐")
-    return MealTime(value)
+    return slot

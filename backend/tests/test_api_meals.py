@@ -1,9 +1,14 @@
 from httpx import AsyncClient
 
+from tests.factories import seeded_food_id
+
 TODAY = "2026-09-22"
 
 
 async def test_meal_round_trip(with_foods: AsyncClient):
+    rice = await seeded_food_id(with_foods, "brown-rice-cooked")
+    chicken = await seeded_food_id(with_foods, "chicken-breast-cooked")
+    broccoli = await seeded_food_id(with_foods, "broccoli-cooked")
     created = await with_foods.post(
         "/meals",
         json={
@@ -11,9 +16,9 @@ async def test_meal_round_trip(with_foods: AsyncClient):
             "tag": "regular",
             "meal_times": ["lunch", "dinner"],
             "items": [
-                {"food_id": "brown-rice-cooked", "grams": 120},
-                {"food_id": "chicken-breast-cooked", "grams": 100},
-                {"food_id": "broccoli-cooked", "grams": 150},
+                {"food_id": rice, "grams": 120},
+                {"food_id": chicken, "grams": 100},
+                {"food_id": broccoli, "grams": 150},
             ],
         },
     )
@@ -49,14 +54,15 @@ async def test_searching_by_name(with_meals: AsyncClient):
 
 async def test_editing_replaces_the_items(with_meals: AsyncClient):
     meal = (await with_meals.get("/meals?meal_time=breakfast")).json()[0]
+    banana = await seeded_food_id(with_meals, "banana")
 
     updated = await with_meals.patch(
         f"/meals/{meal['id']}",
-        json={"items": [{"food_id": "banana", "grams": 100}]},
+        json={"items": [{"food_id": banana, "grams": 100}]},
     )
 
     assert updated.status_code == 200
-    assert [i["food"]["id"] for i in updated.json()["items"]] == ["banana"]
+    assert [i["food"]["id"] for i in updated.json()["items"]] == [banana]
     assert updated.json()["name"] == meal["name"], "untouched fields stay put"
 
 
@@ -74,12 +80,14 @@ async def test_unknown_food_is_rejected(with_foods: AsyncClient):
 
 class TestCalculate:
     async def test_totals_without_saving(self, with_foods: AsyncClient):
+        rice = await seeded_food_id(with_foods, "brown-rice-cooked")
+        chicken = await seeded_food_id(with_foods, "chicken-breast-cooked")
         response = await with_foods.post(
             "/meals/calculate",
             json={
                 "items": [
-                    {"food_id": "brown-rice-cooked", "grams": 120},
-                    {"food_id": "chicken-breast-cooked", "grams": 100},
+                    {"food_id": rice, "grams": 120},
+                    {"food_id": chicken, "grams": 100},
                 ]
             },
         )
@@ -117,10 +125,11 @@ class TestDailyPlan:
         plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
         lunch = next(m for m in plan["meals"] if m["meal_time"] == "lunch")
         before = lunch["nutrients"]["kcal"]
+        oil = await seeded_food_id(with_meals, "olive-oil")
 
         await with_meals.patch(
             f"/meals/{lunch['meal_id']}",
-            json={"items": [{"food_id": "olive-oil", "grams": 100}]},
+            json={"items": [{"food_id": oil, "grams": 100}]},
         )
 
         after = (await with_meals.get(f"/days/{TODAY}/plan")).json()
@@ -143,22 +152,24 @@ class TestDailyPlan:
         plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
         lunch = next(m for m in plan["meals"] if m["meal_time"] == "lunch")
         protein = next(i for i in lunch["items"] if i["category_id"] == "protein")
+        tofu_id = await seeded_food_id(with_meals, "firm-tofu")
 
         swapped = await with_meals.patch(
             f"/days/{TODAY}/plan/lunch/items",
-            json={"item_id": protein["id"], "to_food_id": "firm-tofu"},
+            json={"item_id": protein["id"], "to_food_id": tofu_id},
         )
 
         assert swapped.status_code == 200
         new_lunch = next(m for m in swapped.json()["meals"] if m["meal_time"] == "lunch")
-        tofu = next(i for i in new_lunch["items"] if i["food"]["id"] == "firm-tofu")
+        tofu = next(i for i in new_lunch["items"] if i["food"]["id"] == tofu_id)
         assert tofu["grams"] > protein["grams"], "tofu is far less protein-dense"
 
     async def test_swapping_an_unknown_item_is_rejected(self, with_meals: AsyncClient):
         await with_meals.get(f"/days/{TODAY}/plan")
+        tofu_id = await seeded_food_id(with_meals, "firm-tofu")
         response = await with_meals.patch(
             f"/days/{TODAY}/plan/lunch/items",
-            json={"item_id": "nope", "to_food_id": "firm-tofu"},
+            json={"item_id": "nope", "to_food_id": tofu_id},
         )
         assert response.status_code == 404
 

@@ -4,6 +4,7 @@ Meals hold *baseline* grams. Scaling to the current calorie target happens when 
 planned, not here — see `DailyPlanService`.
 """
 
+from collections.abc import Set as AbstractSet
 from dataclasses import replace
 
 from app.application.ports import FoodStore, MealStore
@@ -64,7 +65,12 @@ class MealService:
             name=name if name is not None else current.name,
             tag=tag if tag is not None else current.tag,
             meal_times=meal_times if meal_times is not None else current.meal_times,
-            items=await self._resolve(user_id, items) if items is not None else current.items,
+            items=(
+                await self._resolve(
+                    user_id, items, keep={item.food.id for item in current.items}
+                )
+                if items is not None else current.items
+            ),
         )
         await self._meals.save(user_id, meal)
         return meal
@@ -79,17 +85,29 @@ class MealService:
         The edit screen calls this on every portion change, so the number the user sees
         while typing comes from the same code that computes the saved meal.
         """
-        return total(await self._resolve(user_id, items))
+        return total(await self._resolve(user_id, items, keep={food_id for food_id, _ in items}))
 
     async def _resolve(
-        self, user_id: str, items: tuple[tuple[str, float], ...]
+        self,
+        user_id: str,
+        items: tuple[tuple[str, float], ...],
+        *,
+        keep: AbstractSet[str] = frozenset(),
     ) -> tuple[MealItem, ...]:
-        """Turn (food_id, grams) pairs into items, rejecting unknown foods up front."""
+        """Turn (food_id, grams) pairs into items, rejecting unknown foods up front.
+
+        Only active foods can be newly picked. Ids in `keep` are foods the meal already
+        uses, so they stay usable even after being archived.
+        """
         resolved: list[MealItem] = []
         for order, (food_id, grams) in enumerate(items):
             if grams <= 0:
                 raise ValidationFailed("份量要大於 0")
-            food = await self._foods.load(user_id, food_id)
+            food = await (
+                self._foods.load_referenced(user_id, food_id)
+                if food_id in keep
+                else self._foods.load(user_id, food_id)
+            )
             if food is None:
                 raise NotFound(f"找不到食物 {food_id}")
             resolved.append(

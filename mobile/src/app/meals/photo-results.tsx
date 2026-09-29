@@ -13,11 +13,24 @@ type ReviewItem = RecognizedItem & { skipped: boolean; selected: RecognizedFood 
 const today = () => new Date().toLocaleDateString('en-CA');
 const kcalFromMacros = (protein: number, carbs: number, fat: number) =>
   protein * 4 + carbs * 4 + fat * 9;
+const SLOT_LABEL: Record<string, string> = {
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐',
+};
 
 export default function MealPhotoResults() {
-  const { destination = 'today', meal_id, analysis_id: analysisId } = useLocalSearchParams<{
-    destination?: 'meal' | 'today';
+  const {
+    destination = 'today',
+    meal_id,
+    date: dayDate,
+    slot,
+    analysis_id: analysisId,
+  } = useLocalSearchParams<{
+    destination?: 'meal' | 'day' | 'today';
     meal_id?: string;
+    date?: string;
+    slot?: string;
     analysis_id?: string;
   }>();
   const analysis = photoDraft.get(analysisId);
@@ -34,7 +47,7 @@ export default function MealPhotoResults() {
         : null,
     })),
   );
-  const [date, setDate] = useState(today);
+  const [recordDate, setRecordDate] = useState(today);
   const [busy, setBusy] = useState(false);
 
   if (!analysis) {
@@ -44,7 +57,10 @@ export default function MealPhotoResults() {
         <Hint>請先選擇餐點照片再進行辨識。</Hint>
         <PrimaryButton
           onPress={() =>
-            router.replace({ pathname: '/meals/photo', params: { destination, meal_id } })
+            router.replace({
+              pathname: '/meals/photo',
+              params: { destination, meal_id, date: dayDate, slot },
+            })
           }
         >
           選擇照片
@@ -136,7 +152,7 @@ export default function MealPhotoResults() {
   };
 
   const recordToday = async () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) {
       Alert.alert('日期格式不正確', '請輸入 YYYY-MM-DD，例如 2026-09-23。');
       return;
     }
@@ -145,7 +161,7 @@ export default function MealPhotoResults() {
       const foods = await resolveIncludedFoods();
       await Promise.all(
         foods.map(({ item, food }) =>
-          api.post(`/days/${date}/meals/extras/items`, {
+          api.post(`/days/${recordDate}/meals/extras/items`, {
             food_id: food.id,
             grams: item.grams,
             photo_id: analysis.id,
@@ -153,11 +169,42 @@ export default function MealPhotoResults() {
         ),
       );
       photoDraft.clear(analysisId);
-      Alert.alert('已記錄', `已將 ${included.length} 項食物記錄到 ${date}。`, [
+      Alert.alert('已記錄', `已將 ${included.length} 項食物記錄到 ${recordDate}。`, [
         { text: '好', onPress: () => router.dismissTo('/today') },
       ]);
     } catch (error) {
       Alert.alert('記錄失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addToDay = async () => {
+    if (!dayDate || !slot || !SLOT_LABEL[slot]) {
+      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。');
+      return;
+    }
+    setBusy(true);
+    try {
+      const foods = await resolveIncludedFoods();
+      for (const { item, food } of foods) {
+        await api.post(`/days/${dayDate}/plan/${slot}/items`, {
+          food_id: food.id,
+          grams: item.grams,
+          photo_id: analysis.id,
+        });
+      }
+      photoDraft.clear(analysisId);
+      router.dismissTo('/today');
+    } catch (error) {
+      Alert.alert(
+        '加入餐次失敗',
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : '請稍後再試。',
+      );
     } finally {
       setBusy(false);
     }
@@ -170,10 +217,16 @@ export default function MealPhotoResults() {
           <PrimaryButton onPress={addToMeal} disabled={included.length === 0} busy={busy}>
             {busy ? '加入中…' : `加入目前餐點 (${included.length})`}
           </PrimaryButton>
+        ) : destination === 'day' ? (
+          <PrimaryButton onPress={addToDay} disabled={included.length === 0} busy={busy}>
+            {busy
+              ? '加入中…'
+              : `加入${slot ? SLOT_LABEL[slot] ?? '目前餐次' : '目前餐次'} (${included.length})`}
+          </PrimaryButton>
         ) : (
           <View className="gap-2">
             <View className="flex-row items-baseline justify-between">
-              <Text className="text-sm text-muted">{date}</Text>
+              <Text className="text-sm text-muted">{recordDate}</Text>
               <Text className="text-sm text-muted">已選 {included.length} 項</Text>
             </View>
             <PrimaryButton onPress={recordToday} disabled={included.length === 0} busy={busy}>
@@ -187,7 +240,10 @@ export default function MealPhotoResults() {
         accessibilityRole="button"
         onPress={() => {
           photoDraft.clear(analysisId);
-          router.replace({ pathname: '/meals/photo', params: { destination, meal_id } });
+          router.replace({
+            pathname: '/meals/photo',
+            params: { destination, meal_id, date: dayDate, slot },
+          });
         }}
         disabled={busy}
       >
@@ -197,9 +253,18 @@ export default function MealPhotoResults() {
 
       {destination === 'today' ? (
         <View className="gap-2">
-          <Field label="記錄日期" value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" />
+          <Field
+            label="記錄日期"
+            value={recordDate}
+            onChangeText={setRecordDate}
+            placeholder="YYYY-MM-DD"
+          />
           <View className="flex-row">
-            <Chip label="今天" selected={date === today()} onPress={() => setDate(today())} />
+            <Chip
+              label="今天"
+              selected={recordDate === today()}
+              onPress={() => setRecordDate(today())}
+            />
           </View>
         </View>
       ) : null}
@@ -281,7 +346,11 @@ export default function MealPhotoResults() {
           ))}
         </Rows>
       </Card>
-      <Hint>「只記錄這一天」會新增每日額外食物，不會建立或覆寫命名餐點。</Hint>
+      {destination === 'today' ? (
+        <Hint>「只記錄這一天」會新增每日額外食物，不會建立或覆寫命名餐點。</Hint>
+      ) : destination === 'day' ? (
+        <Hint>確認後會加入今天的{slot ? SLOT_LABEL[slot] ?? '目前餐次' : '目前餐次'}，不會修改原本的命名餐點。</Hint>
+      ) : null}
     </Screen>
   );
 }

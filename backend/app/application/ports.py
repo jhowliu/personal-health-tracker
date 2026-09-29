@@ -9,7 +9,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from app.domain.decisions import DecisionRequest, DecisionResult
-from app.domain.meal_photos import ExtraItem, MealPhoto, Recognition
+from app.domain.meal_photos import MealPhoto, Recognition
 from app.domain.models import (
     Account,
     BodyLog,
@@ -20,13 +20,14 @@ from app.domain.models import (
     Meal,
     MealItem,
     MealTime,
-    PlannedItem,
     PlannedMeal,
+    PlateItem,
     Profile,
     ScheduleEntry,
     TemplateItem,
     WorkoutTemplate,
 )
+from app.domain.streak import DayRecord
 from app.domain.workout_execution import DayWorkoutItem, SetLog, WorkoutExecution
 
 
@@ -44,6 +45,13 @@ class DueReminder:
     locale: str
 
 
+class UnitOfWork(Protocol):
+    """The request's transaction: committed when the request succeeds, rolled back when it fails."""
+
+    async def commit(self) -> None:
+        """Make everything written so far durable, even if the request fails afterwards."""
+
+
 class Clock(Protocol):
     def now(self) -> datetime: ...
 
@@ -58,6 +66,9 @@ class PasswordHasher(Protocol):
 
 class TokenIssuer(Protocol):
     def issue_access(self, user_id: str) -> str: ...
+
+    def user_id_from_access(self, token: str) -> str | None:
+        """The user an access token was issued to; None when it is invalid or expired."""
 
     def issue_refresh(self) -> tuple[str, str, datetime]:
         """Returns (raw token, hash to store, expiry)."""
@@ -146,13 +157,12 @@ class TrainingStore(Protocol):
 
 
 class WorkoutExecutionStore(Protocol):
-    async def load(self, user_id: str, day: date, profile: Profile) -> WorkoutExecution: ...
+    async def load(self, user_id: str, day: date) -> WorkoutExecution:
+        """The day's workout, opening the day and copying the scheduled template if needed."""
 
     async def load_visible_exercise(self, user_id: str, exercise_id: str) -> Exercise | None: ...
 
-    async def add_item(
-        self, user_id: str, day: date, profile: Profile, item: DayWorkoutItem
-    ) -> None: ...
+    async def add_item(self, user_id: str, day: date, item: DayWorkoutItem) -> None: ...
 
     async def update_item(
         self,
@@ -165,7 +175,7 @@ class WorkoutExecutionStore(Protocol):
 
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool: ...
 
-    async def log_set(self, user_id: str, day: date, profile: Profile, log: SetLog) -> None: ...
+    async def log_set(self, user_id: str, day: date, log: SetLog) -> None: ...
 
     async def apply_template_weight(
         self, user_id: str, template_id: str, item_id: str, weight_kg: float
@@ -173,18 +183,19 @@ class WorkoutExecutionStore(Protocol):
 
 
 class DayStore(Protocol):
-    async def load_facts(self, user_id: str, day: date, profile: Profile) -> DayFacts:
-        """Assemble the facts needed to derive the flow, creating the day row if missing."""
+    """Everything stored about one Day. Every method opens the Day first (idempotent), so
+    callers never create it themselves; a user without a profile gets NotFound.
+    """
+
+    async def load_facts(self, user_id: str, day: date) -> DayFacts:
+        """Assemble the facts needed to derive the flow."""
 
     async def update_day(
         self,
         user_id: str,
         day: date,
-        profile: Profile,
         *,
         workout_time: str | None = None,
-        location: str | None = None,
-        steps: int | None = None,
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
     ) -> None: ...
@@ -196,22 +207,10 @@ class DayStore(Protocol):
         meal_time: MealTime,
         state: str,
         at: datetime,
-        profile: Profile,
     ) -> None: ...
 
-    async def log_set(
-        self,
-        user_id: str,
-        day: date,
-        template_item_id: str,
-        exercise_id: str,
-        set_index: int,
-        reps_done: int | None,
-        weight_kg: float | None,
-        done_at: datetime,
-    ) -> None: ...
-
-    async def streak_until(self, user_id: str, day: date) -> int: ...
+    async def recent_days(self, user_id: str, until: date, limit: int) -> tuple[DayRecord, ...]:
+        """Up to `limit` opened days ending at `until`, newest first."""
 
     async def load_plan(self, user_id: str, day: date) -> tuple[PlannedMeal, ...]:
         """What is on the plate today, as stored — grams already scaled and swapped."""
@@ -221,12 +220,8 @@ class DayStore(Protocol):
         user_id: str,
         day: date,
         meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
-        profile: Profile,
     ) -> None:
         """Write the snapshot for the given slots as (meal_id, name, items).
-
-        Takes the profile because day_meals hangs off a days row, which may not exist
-        yet — the plan can be the first thing that touches a given date.
 
         Slots already marked eaten are left alone: what someone already ate is a fact,
         not something a reshuffle gets to rewrite.
@@ -238,7 +233,7 @@ class DayStore(Protocol):
         """Swap one food in today's plate, keeping its position in the meal."""
 
     async def add_plan_item(
-        self, user_id: str, day: date, meal_time: MealTime, item: PlannedItem, profile: Profile
+        self, user_id: str, day: date, meal_time: MealTime, item: PlateItem
     ) -> None: ...
 
     async def update_plan_item(
@@ -249,11 +244,9 @@ class DayStore(Protocol):
         self, user_id: str, day: date, meal_time: MealTime, item_id: str
     ) -> bool: ...
 
-    async def load_extras(self, user_id: str, day: date) -> tuple[ExtraItem, ...]: ...
+    async def load_extras(self, user_id: str, day: date) -> tuple[PlateItem, ...]: ...
 
-    async def add_extra(
-        self, user_id: str, day: date, item: ExtraItem, profile: Profile
-    ) -> None: ...
+    async def add_extra(self, user_id: str, day: date, item: PlateItem) -> None: ...
 
     async def delete_extra(self, user_id: str, day: date, item_id: str) -> bool: ...
 
@@ -264,18 +257,27 @@ class FoodStore(Protocol):
     async def search(
         self, user_id: str, query: str | None, category_id: str | None
     ) -> tuple[Food, ...]:
-        """Browse or search the library. Matches names and aliases; built-ins plus the
-        user's own foods.
-        """
+        """Browse active foods owned by the user, matching names and aliases."""
 
-    async def load(self, user_id: str, food_id: str) -> Food | None: ...
+    async def load(self, user_id: str, food_id: str) -> Food | None:
+        """A food the user can pick today: theirs and not archived."""
+
+    async def load_referenced(self, user_id: str, food_id: str) -> Food | None:
+        """A food the user owns, archived or not: for what already refers to it (meals, days)."""
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         """Swap candidates: everything in the same category."""
 
-    async def save_custom(self, user_id: str, food: Food) -> None: ...
+    async def seed_defaults(self, user_id: str) -> None:
+        """Give the user their own copy of every default food they do not have yet.
 
-    async def archive_custom(self, user_id: str, food_id: str) -> None: ...
+        Never restores or overwrites a copy the user edited or archived.
+        """
+
+    async def save(self, user_id: str, food: Food) -> None:
+        """Insert or update one of the user's own foods; another user's id is left alone."""
+
+    async def archive(self, user_id: str, food_id: str) -> None: ...
 
 
 class MealStore(Protocol):

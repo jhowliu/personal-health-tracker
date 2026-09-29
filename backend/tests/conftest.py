@@ -57,7 +57,7 @@ async def with_profile(signed_in: AsyncClient) -> AsyncClient:
 
 @pytest.fixture
 async def with_foods(with_profile: AsyncClient) -> AsyncClient:
-    """A profile plus the built-in food library — the starting point for P2 tests."""
+    """A profile plus its private food library — the starting point for P2 tests."""
     await seed_foods()
     return with_profile
 
@@ -90,6 +90,10 @@ async def with_meals(with_foods: AsyncClient) -> AsyncClient:
             ],
         ),
     ]
+    template_ids = {
+        food["template_id"]: food["id"]
+        for food in (await with_foods.get("/foods")).json()
+    }
     for name, slots, items in recipes:
         response = await with_foods.post(
             "/meals",
@@ -97,7 +101,7 @@ async def with_meals(with_foods: AsyncClient) -> AsyncClient:
                 "name": name,
                 "tag": "regular",
                 "meal_times": slots,
-                "items": [{"food_id": fid, "grams": g} for fid, g in items],
+                "items": [{"food_id": template_ids[fid], "grams": g} for fid, g in items],
             },
         )
         assert response.status_code == 201, response.text

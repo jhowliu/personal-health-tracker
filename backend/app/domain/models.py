@@ -1,10 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.domain.meal_photos import ExtraItem
 
 
 class Sex(StrEnum):
@@ -24,6 +20,10 @@ class MealTime(StrEnum):
     LUNCH = "lunch"
     DINNER = "dinner"
     EXTRAS = "extras"
+
+
+PLANNED_SLOTS = (MealTime.BREAKFAST, MealTime.LUNCH, MealTime.DINNER)
+"""The Meal slots a plan fills and a user marks eaten or skipped. EXTRAS sits outside them."""
 
 
 class WorkoutTime(StrEnum):
@@ -260,7 +260,7 @@ class Food:
     usual_grams: float
     max_grams: float
     aliases: tuple[str, ...] = ()
-    is_builtin: bool = True
+    template_id: str | None = None
 
     def nutrients_for(self, grams: float) -> Nutrients:
         factor = grams / 100.0
@@ -321,7 +321,7 @@ class PlannedMeal:
     name: str
     eaten_at: datetime | None
     skipped_at: datetime | None
-    items: tuple["PlannedItem", ...]
+    items: tuple["PlateItem", ...]
 
     @property
     def eaten(self) -> bool:
@@ -333,8 +333,34 @@ class PlannedMeal:
 
 
 @dataclass(frozen=True, slots=True)
-class PlannedItem:
-    """An item in a day snapshot, either a library food or fixed custom nutrition."""
+class FrozenNutrition:
+    """A Plate item's nutrition as recorded when it was eaten, for `grams` of food.
+
+    Editing the Food afterwards never changes it; changing the portion rescales it
+    proportionally.
+    """
+
+    grams: float
+    nutrients: Nutrients
+
+    def at(self, grams: float) -> Nutrients:
+        factor = grams / self.grams
+        return Nutrients(
+            kcal=self.nutrients.kcal * factor,
+            protein_g=self.nutrients.protein_g * factor,
+            fat_g=self.nutrients.fat_g * factor,
+            carb_g=self.nutrients.carb_g * factor,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PlateItem:
+    """One food on the plate: a Food at a portion, or custom items with fixed nutrition.
+
+    Sits in a meal slot or in Extras. A Food item is *live* (follows the Food) until it is
+    frozen, which happens when its meal is eaten or, for Extras, when it is recorded.
+    Custom items carry fixed nutrition and never freeze.
+    """
 
     id: str
     food: Food | None
@@ -343,9 +369,13 @@ class PlannedItem:
     custom_nutrients: Nutrients | None
     photo_id: str | None
     sort_order: int
+    frozen: FrozenNutrition | None = None
 
     @property
     def nutrients(self) -> Nutrients:
+        if self.frozen is not None:
+            assert self.grams is not None
+            return self.frozen.at(self.grams)
         if self.food is not None:
             assert self.grams is not None
             return self.food.nutrients_for(self.grams)
@@ -356,12 +386,27 @@ class PlannedItem:
     def category_id(self) -> str | None:
         return self.food.category_id if self.food else None
 
+    @property
+    def food_id(self) -> str | None:
+        return self.food.id if self.food else None
+
+    def freeze(self) -> "PlateItem":
+        """Record the Food's current nutrition at the current portion."""
+        if self.food is None or self.grams is None:
+            return self
+        now = FrozenNutrition(self.grams, self.food.nutrients_for(self.grams))
+        return replace(self, frozen=now)
+
+    def unfreeze(self) -> "PlateItem":
+        """Go back to following the Food."""
+        return replace(self, frozen=None)
+
 
 @dataclass(frozen=True, slots=True)
 class DayPlan:
     date: date
     meals: tuple[PlannedMeal, ...]
-    extras: tuple["ExtraItem", ...] = ()
+    extras: tuple[PlateItem, ...] = ()
 
     def slot(self, meal_time: MealTime) -> PlannedMeal | None:
         return next((m for m in self.meals if m.meal_time is meal_time), None)

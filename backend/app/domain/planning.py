@@ -10,9 +10,7 @@ same plan and tests can assert on it.
 
 import random
 
-from app.domain.models import Meal, MealTag, MealTime
-
-PLANNED_SLOTS = (MealTime.BREAKFAST, MealTime.LUNCH, MealTime.DINNER)
+from app.domain.models import PLANNED_SLOTS, Meal, MealTag, MealTime
 
 
 def assign(

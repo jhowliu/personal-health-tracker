@@ -1,12 +1,14 @@
 from dataclasses import replace
 from datetime import date
 
+from app.application.commands import WorkoutItemChange, applied
 from app.application.ports import AccountStore, Clock, WorkoutExecutionStore
+from app.application.training import TrainingService
 from app.domain.errors import NotFound, ValidationFailed
 from app.domain.ids import new_id
+from app.domain.models import Location, TemplateItem, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
-    ReplacementReason,
     SetEffort,
     SetLog,
     SetLogResult,
@@ -20,15 +22,52 @@ class WorkoutExecutionService:
     """Daily workout facts and progression, isolated from editable template management."""
 
     def __init__(
-        self, store: WorkoutExecutionStore, accounts: AccountStore, clock: Clock
+        self,
+        store: WorkoutExecutionStore,
+        accounts: AccountStore,
+        clock: Clock,
+        training: TrainingService,
     ) -> None:
         self._store = store
         self._accounts = accounts
         self._clock = clock
+        self._training = training
+
+    async def save_as_template(
+        self, user_id: str, day: date, name: str
+    ) -> WorkoutTemplate:
+        workout = await self.view(user_id, day)
+        if not name.strip() or not workout.items:
+            raise ValidationFailed("請輸入課表名稱並至少保留一個動作")
+        template = WorkoutTemplate(
+            id=new_id(),
+            category_id=workout.template.category_id if workout.template else "strength",
+            name=name.strip(),
+            location=Location.HOME.value,
+            duration_min=workout.template.duration_min if workout.template else None,
+            is_builtin=False,
+            items=tuple(
+                TemplateItem(
+                    id=new_id(),
+                    exercise_id=entry.item.exercise_id,
+                    exercise_name=entry.item.exercise_name,
+                    sort_order=index,
+                    sets=entry.item.sets,
+                    reps=entry.item.reps,
+                    duration_sec=entry.item.duration_sec,
+                    weight_kg=entry.item.weight_kg,
+                    rest_sec=entry.item.rest_sec,
+                    note=entry.item.note,
+                )
+                for index, entry in enumerate(workout.items)
+            ),
+        )
+        stored = await self._training.save_template(user_id, template)
+        return await self._training.template(user_id, stored.id)
 
     async def view(self, user_id: str, day: date) -> WorkoutExecution:
         profile = await self._profile(user_id)
-        workout = await self._store.load(user_id, day, profile)
+        workout = await self._store.load(user_id, day)
         return replace(
             workout, estimated_burn_kcal=estimate_burn_kcal(workout, profile.weight_kg)
         )
@@ -46,15 +85,12 @@ class WorkoutExecutionService:
         rest_sec: int,
         note: str | None,
     ) -> WorkoutExecution:
-        profile = await self._profile(user_id)
-        await self.view(user_id, day)  # Materialise any scheduled snapshot before appending.
         exercise = await self._store.load_visible_exercise(user_id, exercise_id)
         if exercise is None:
             raise NotFound("找不到可使用的動作")
         await self._store.add_item(
             user_id,
             day,
-            profile,
             DayWorkoutItem(
                 id=new_id(),
                 exercise_id=exercise.id,
@@ -75,26 +111,24 @@ class WorkoutExecutionService:
         return await self.view(user_id, day)
 
     async def update_item(
-        self, user_id: str, day: date, item_id: str, changes: dict[str, object]
+        self, user_id: str, day: date, item_id: str, change: WorkoutItemChange
     ) -> WorkoutExecution:
         workout = await self.view(user_id, day)
         current = next((entry.item for entry in workout.items if entry.item.id == item_id), None)
         if current is None:
             raise NotFound("找不到今天排定的動作")
 
-        requested_exercise_id = changes.pop("exercise_id", None)
-        requested_reason = changes.pop("replacement_reason", None)
         replacing = (
-            requested_exercise_id is not None and requested_exercise_id != current.exercise_id
+            change.exercise_id is not None and change.exercise_id != current.exercise_id
         )
-        if requested_reason is not None and not replacing:
+        if change.replacement_reason is not None and not replacing:
             raise ValidationFailed("替換動作時才需要替換原因")
-        if replacing and requested_reason is None:
+        if replacing and change.replacement_reason is None:
             raise ValidationFailed("替換動作需要說明原因")
 
         item = current
         if replacing:
-            exercise = await self._store.load_visible_exercise(user_id, str(requested_exercise_id))
+            exercise = await self._store.load_visible_exercise(user_id, str(change.exercise_id))
             if exercise is None:
                 raise NotFound("找不到可使用的替代動作")
             item = replace(
@@ -102,11 +136,12 @@ class WorkoutExecutionService:
                 exercise_id=exercise.id,
                 exercise_name=exercise.name,
                 met=exercise.met,
-                replacement_reason=ReplacementReason(str(requested_reason)),
+                replacement_reason=change.replacement_reason,
             )
+        edits = applied(change)
         for field in ("sets", "reps", "duration_sec", "weight_kg", "rest_sec", "note"):
-            if field in changes:
-                item = replace(item, **{field: changes[field]})
+            if field in edits:
+                item = replace(item, **{field: edits[field]})
         if (item.reps is None) == (item.duration_sec is None):
             raise ValidationFailed("動作需要次數或時間，但不能同時提供")
         if not await self._store.update_item(user_id, day, item, replacing=replacing):
@@ -114,7 +149,6 @@ class WorkoutExecutionService:
         return await self.view(user_id, day)
 
     async def delete_item(self, user_id: str, day: date, item_id: str) -> None:
-        await self.view(user_id, day)
         if not await self._store.delete_item(user_id, day, item_id):
             raise NotFound("找不到今天排定的動作")
 
@@ -134,7 +168,6 @@ class WorkoutExecutionService:
         await self._store.log_set(
             user_id,
             day,
-            await self._profile(user_id),
             SetLog(
                 day_workout_item_id=day_workout_item_id,
                 exercise_id=exercise_id,

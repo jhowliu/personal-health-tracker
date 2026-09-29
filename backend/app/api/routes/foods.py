@@ -38,20 +38,25 @@ async def suggest_category(
 
 @router.post("/foods", response_model=FoodOut, status_code=status.HTTP_201_CREATED)
 async def add_food(payload: FoodIn, user_id: CurrentUserId, service: Foods) -> FoodOut:
-    return FoodOut.of(await service.add_custom(user_id, _to_food("", payload)))
+    return FoodOut.of(await service.add(user_id, _to_food("", payload)))
+
+
+@router.get("/foods/{food_id}", response_model=FoodOut)
+async def read_food(food_id: str, user_id: CurrentUserId, service: Foods) -> FoodOut:
+    return FoodOut.of(await service.get(user_id, food_id))
 
 
 @router.patch("/foods/{food_id}", response_model=FoodOut)
 async def edit_food(
     food_id: str, payload: FoodIn, user_id: CurrentUserId, service: Foods
 ) -> FoodOut:
-    await service.edit_custom(user_id, _to_food(food_id, payload))
+    await service.edit(user_id, _to_food(food_id, payload))
     return FoodOut.of(await service.get(user_id, food_id))
 
 
 @router.delete("/foods/{food_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_food(food_id: str, user_id: CurrentUserId, service: Foods) -> None:
-    await service.remove_custom(user_id, food_id)
+    await service.remove(user_id, food_id)
 
 
 @router.get("/foods/{food_id}/exchanges", response_model=list[ExchangeOut])
@@ -65,9 +70,7 @@ async def list_exchanges(
     """Same-category swaps. `grams` defaults to the food's usual portion, `match` to
     the category's own rule.
     """
-    source = await service.get(user_id, food_id)
-    basis = SwapBasis(match) if match else None
-    swaps = await service.exchanges(user_id, food_id, grams or source.usual_grams, basis)
+    swaps = await service.exchanges(user_id, food_id, grams, SwapBasis(match) if match else None)
     return [ExchangeOut.of(e) for e in swaps]
 
 
@@ -83,10 +86,10 @@ def _to_food(food_id: str, payload: FoodIn) -> Food:
             fat_g=payload.fat_per_100g,
             carb_g=payload.carb_per_100g,
         ),
-        fiber_per_100g=None,
+        fiber_per_100g=payload.fiber_per_100g,
         unit=payload.unit,
         grams_per_unit=payload.grams_per_unit,
         usual_grams=payload.usual_grams,
-        max_grams=max(payload.max_grams, payload.usual_grams),
-        is_builtin=False,
+        max_grams=payload.max_grams,
+        template_id=None,
     )

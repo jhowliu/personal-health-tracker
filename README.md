@@ -67,7 +67,12 @@ cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.workout_templates
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.sample_meals
 ```
 
-內建食物、動作與公用課表 seed 都可重複執行:只會更新同 id 的內建資料；範例餐點會跳過已經有餐點的使用者。
+食物 seed 會更新起始範本、只替現有帳號補上新的私人食物；已修改或移除的食物不會被覆寫／補回。
+動作與公用課表 seed 可重複執行；範例餐點會跳過已經有餐點的使用者。
+
+食物庫的每項食物都屬於帳號，可直接編輯或移除；既有餐點仍能引用已移除的食物。
+編輯食物會更新既有餐點與未來計畫，不會改寫已吃紀錄的營養值。今日訓練可另存成私人課表，
+不會修改原課表或每週排程。
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite JWT_SECRET=$(openssl rand -hex 32) .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
@@ -107,6 +112,13 @@ cd mobile && EXPO_PUBLIC_API_URL=http://<你的區網IP>:8010 npx expo start
 
 ```bash
 cd backend && .venv/bin/python -m pytest
+```
+
+依賴規則(`api > adapters > application > domain`,規則寫在 `backend/pyproject.toml`)用
+`import-linter` 檢查,CI 會擋:
+
+```bash
+cd backend && .venv/bin/lint-imports
 ```
 
 ```bash

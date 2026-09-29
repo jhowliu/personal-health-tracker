@@ -7,6 +7,7 @@ out of sync with the profile.
 from dataclasses import replace
 from datetime import date
 
+from app.application.commands import ProfileChange, applied
 from app.application.ports import AccountStore, Clock
 from app.domain.errors import NotFound
 from app.domain.models import Profile, Targets
@@ -36,8 +37,8 @@ class ProfileService:
         await self._store.save_profile(profile)
         return profile, compute_targets(profile, today)
 
-    async def update(self, user_id: str, changes: dict[str, object]) -> tuple[Profile, Targets]:
-        profile = replace(await self.get(user_id), **changes)
+    async def update(self, user_id: str, change: ProfileChange) -> tuple[Profile, Targets]:
+        profile = replace(await self.get(user_id), **applied(change))
         await self._store.save_profile(profile)
         return profile, compute_targets(profile, self._clock.today(profile.timezone))
 

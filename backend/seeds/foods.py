@@ -1,16 +1,14 @@
-"""Seed the built-in food library.
+"""Seed default food templates and give each account its own editable copies.
 
-Demo figures, not sourced nutrition data — `source` is set to 'user' so the row can be
-overwritten id-for-id once AFCD/TFDA numbers are pulled in. Re-runnable: rows are keyed
-by id and updated in place.
-
-Watch the `state` column: brown rice raw and cooked differ by nearly 3x in calories per
-100 g, so every food says which one it is.
+Re-running updates the defaults and fills missing foods, never overwriting or restoring
+an account's edited/archived copy. Values are illustrative, not sourced nutrition data.
 """
 
 import asyncio
+import json
 import sys
 
+from app.adapters.sqlite.foods import SqliteFoodStore
 from app.db import get_conn
 
 # id, category, zh-TW name, state, kcal, protein, fat, carb, unit, g/unit, usual, max
@@ -71,11 +69,11 @@ async def seed() -> int:
     async with get_conn() as conn:
         await conn.executemany(
             """
-            INSERT INTO foods (
+            INSERT INTO food_templates (
                 id, category_id, name, state,
                 kcal_per_100g, protein_per_100g, fat_per_100g, carb_per_100g,
-                unit, grams_per_unit, usual_grams, max_grams, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'user')
+                unit, grams_per_unit, usual_grams, max_grams, aliases_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
                 category_id = excluded.category_id,
                 name = excluded.name,
@@ -88,15 +86,16 @@ async def seed() -> int:
                 grams_per_unit = excluded.grams_per_unit,
                 usual_grams = excluded.usual_grams,
                 max_grams = excluded.max_grams,
+                aliases_json = excluded.aliases_json,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             """,
-            FOODS,
+            [(*row, json.dumps(ALIASES.get(row[0], ()), ensure_ascii=False)) for row in FOODS],
         )
-        await conn.executemany(
-            "INSERT INTO food_aliases (food_id, alias) VALUES (?, ?)"
-            " ON CONFLICT (food_id, alias) DO NOTHING",
-            [(food_id, alias) for food_id, names in ALIASES.items() for alias in names],
-        )
+        async with conn.execute("SELECT id FROM users") as cursor:
+            users = await cursor.fetchall()
+        store = SqliteFoodStore(conn)
+        for user in users:
+            await store.seed_defaults(user["id"])
     return len(FOODS)
 
 

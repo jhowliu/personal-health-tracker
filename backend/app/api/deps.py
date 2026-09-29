@@ -21,6 +21,7 @@ from app.adapters.sqlite.meal_photos import SqliteMealPhotoStore
 from app.adapters.sqlite.meals import SqliteMealStore
 from app.adapters.sqlite.reminders import SqliteReminderStore
 from app.adapters.sqlite.training import SqliteTrainingStore
+from app.adapters.sqlite.unit_of_work import SqliteUnitOfWork
 from app.adapters.sqlite.workout_execution import SqliteWorkoutExecutionStore
 from app.adapters.storage.s3 import S3MealPhotoStorage
 from app.application.accounts import AccountService
@@ -31,6 +32,7 @@ from app.application.foods import FoodCatalogService
 from app.application.meal_photos import ExtrasService, MealPhotoService
 from app.application.meals import MealService
 from app.application.planning import DailyPlanService
+from app.application.plate_intake import PlateIntake
 from app.application.profiles import ProfileService
 from app.application.reminders import ReminderService
 from app.application.training import TrainingService
@@ -101,13 +103,10 @@ DbConn = Annotated[aiosqlite.Connection, Depends(db_dep)]
 async def current_user_id(authorization: Annotated[str | None, Header()] = None) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "缺少存取權杖")
-    try:
-        payload = token_issuer().decode_access(authorization.split(" ", 1)[1])
-    except Exception as e:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "存取權杖無效") from e
-    if not (sub := payload.get("sub")):
+    user_id = token_issuer().user_id_from_access(authorization.split(" ", 1)[1])
+    if user_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "存取權杖無效")
-    return sub
+    return user_id
 
 
 CurrentUserId = Annotated[str, Depends(current_user_id)]
@@ -115,7 +114,12 @@ CurrentUserId = Annotated[str, Depends(current_user_id)]
 
 def accounts(conn: DbConn) -> AccountService:
     return AccountService(
-        SqliteAccountStore(conn), hasher(), token_issuer(), identity_verifier(), clock()
+        SqliteAccountStore(conn),
+        SqliteFoodStore(conn),
+        hasher(),
+        token_issuer(),
+        identity_verifier(),
+        clock(),
     )
 
 
@@ -131,13 +135,21 @@ def training(conn: DbConn) -> TrainingService:
     return TrainingService(SqliteTrainingStore(conn), decisions(conn))
 
 
+def day_store(conn: DbConn) -> SqliteDayStore:
+    return SqliteDayStore(conn, SqliteFoodStore(conn))
+
+
+def meal_store(conn: DbConn) -> SqliteMealStore:
+    return SqliteMealStore(conn, SqliteFoodStore(conn))
+
+
 def daily_flow(conn: DbConn) -> DailyFlowService:
-    return DailyFlowService(SqliteDayStore(conn), SqliteAccountStore(conn), clock())
+    return DailyFlowService(day_store(conn), SqliteAccountStore(conn), clock())
 
 
 def workout_execution(conn: DbConn) -> WorkoutExecutionService:
     return WorkoutExecutionService(
-        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock()
+        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock(), training(conn)
     )
 
 
@@ -150,17 +162,17 @@ def foods(conn: DbConn) -> FoodCatalogService:
 
 
 def meals(conn: DbConn) -> MealService:
-    return MealService(SqliteMealStore(conn), SqliteFoodStore(conn))
+    return MealService(meal_store(conn), SqliteFoodStore(conn))
 
 
 def daily_plan(conn: DbConn) -> DailyPlanService:
     return DailyPlanService(
-        SqliteDayStore(conn),
-        SqliteMealStore(conn),
+        day_store(conn),
+        meal_store(conn),
         SqliteFoodStore(conn),
         SqliteAccountStore(conn),
         clock(),
-        SqliteMealPhotoStore(conn),
+        plate_intake(conn),
     )
 
 
@@ -172,17 +184,17 @@ def meal_photos(conn: DbConn) -> MealPhotoService:
         SqliteFoodStore(conn),
         decisions(conn),
         clock(),
+        SqliteUnitOfWork(conn),
         settings.daily_ai_image_quota,
     )
 
 
+def plate_intake(conn: DbConn) -> PlateIntake:
+    return PlateIntake(SqliteFoodStore(conn), SqliteMealPhotoStore(conn))
+
+
 def extras(conn: DbConn) -> ExtrasService:
-    return ExtrasService(
-        SqliteDayStore(conn),
-        SqliteFoodStore(conn),
-        SqliteMealPhotoStore(conn),
-        SqliteAccountStore(conn),
-    )
+    return ExtrasService(day_store(conn), plate_intake(conn))
 
 
 def decisions(conn: DbConn) -> DecisionService:

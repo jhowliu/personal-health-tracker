@@ -1209,6 +1209,75 @@
         }
       }
     },
+    "/days/{day}/workout/save-as-template": {
+      "post": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Save Day As Template",
+        "operationId": "save_day_as_template_days__day__workout_save_as_template_post",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveDayTemplateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/days/{day}/workout/items": {
       "post": {
         "tags": [
@@ -2280,6 +2349,62 @@
       }
     },
     "/foods/{food_id}": {
+      "get": {
+        "tags": [
+          "foods"
+        ],
+        "summary": "Read Food",
+        "operationId": "read_food_foods__food_id__get",
+        "parameters": [
+          {
+            "name": "food_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Food Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoodOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "foods"
@@ -4369,33 +4494,6 @@
             ],
             "title": "Workout Time"
           },
-          "location": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "home",
-                  "gym"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Location"
-          },
-          "steps": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Steps"
-          },
           "workout_done": {
             "type": "boolean",
             "title": "Workout Done",
@@ -5059,6 +5157,18 @@
             "minimum": 0.0,
             "title": "Carb Per 100G"
           },
+          "fiber_per_100g": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiber Per 100G"
+          },
           "unit": {
             "type": "string",
             "enum": [
@@ -5128,6 +5238,17 @@
           "per_100g": {
             "$ref": "#/components/schemas/NutrientsOut"
           },
+          "fiber_per_100g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiber Per 100G"
+          },
           "unit": {
             "type": "string",
             "title": "Unit"
@@ -5158,9 +5279,16 @@
             "type": "array",
             "title": "Aliases"
           },
-          "is_builtin": {
-            "type": "boolean",
-            "title": "Is Builtin"
+          "template_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Id"
           }
         },
         "type": "object",
@@ -5170,12 +5298,13 @@
           "name",
           "state",
           "per_100g",
+          "fiber_per_100g",
           "unit",
           "grams_per_unit",
           "usual_grams",
           "max_grams",
           "aliases",
-          "is_builtin"
+          "template_id"
         ],
         "title": "FoodOut"
       },
@@ -6283,6 +6412,20 @@
         },
         "type": "object",
         "title": "RemindersPatch"
+      },
+      "SaveDayTemplateIn": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SaveDayTemplateIn"
       },
       "ScheduleEntryIn": {
         "properties": {

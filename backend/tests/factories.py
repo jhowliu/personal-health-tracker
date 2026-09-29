@@ -1,5 +1,7 @@
 """Builders for domain objects used across the pure-domain tests."""
 
+from httpx import AsyncClient
+
 from app.domain.models import (
     Food,
     FoodState,
@@ -9,6 +11,13 @@ from app.domain.models import (
     MealTime,
     Nutrients,
 )
+
+
+async def seeded_food_id(client: AsyncClient, template_id: str) -> str:
+    """Resolve an account's personal food row for a stable default template key."""
+    response = await client.get("/foods")
+    assert response.status_code == 200
+    return next(food["id"] for food in response.json() if food["template_id"] == template_id)
 
 
 def food(

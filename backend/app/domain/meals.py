@@ -1,20 +1,33 @@
-"""Totalling a meal, and scaling its staples to the current calorie target.
+"""Totalling a meal or a day, and scaling staples to the current calorie target.
 
 Meals store *baseline* grams. When the calorie target moves, only the staple portions
 follow it — protein and vegetables stay put, because the point of the deficit is to eat
 the same amount of protein on fewer calories.
 """
 
+from collections.abc import Iterable
 from dataclasses import replace
+from typing import Protocol
 
-from app.domain.models import ZERO_NUTRIENTS, Meal, MealItem, Nutrients
+from app.domain.models import ZERO_NUTRIENTS, DayPlan, Meal, MealItem, Nutrients
 
 STAPLE_CATEGORY = "staple"
 
 
-def total(items: tuple[MealItem, ...]) -> Nutrients:
+class _HasNutrients(Protocol):
+    @property
+    def nutrients(self) -> Nutrients: ...
+
+
+def total(items: Iterable[_HasNutrients]) -> Nutrients:
     """Calories and macros for a set of items, computed from the food library."""
     return sum((item.nutrients for item in items), ZERO_NUTRIENTS).rounded()
+
+
+def planned_total(plan: DayPlan) -> Nutrients:
+    """What the day adds up to if everything not skipped gets eaten, plus Extras."""
+    meals = (item for meal in plan.meals if not meal.skipped for item in meal.items)
+    return total((*meals, *plan.extras))
 
 
 def apply_carb_scale(items: tuple[MealItem, ...], carb_scale: float) -> tuple[MealItem, ...]:

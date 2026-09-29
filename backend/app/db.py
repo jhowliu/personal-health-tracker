@@ -16,12 +16,19 @@ async def _init_conn(conn: aiosqlite.Connection) -> None:
 
 @asynccontextmanager
 async def get_conn() -> AsyncIterator[aiosqlite.Connection]:
+    """One connection, one transaction: committed if the block finishes, rolled back if it raises.
+
+    The request is the unit of work. A use case that must keep something even though it
+    then fails (a FAILED status, say) commits it first through `UnitOfWork.commit`.
+    """
     async with aiosqlite.connect(settings.db_path) as conn:
         await _init_conn(conn)
         try:
             yield conn
-        finally:
-            await conn.commit()
+        except BaseException:
+            await conn.rollback()
+            raise
+        await conn.commit()
 
 
 async def db_dep() -> AsyncIterator[aiosqlite.Connection]:

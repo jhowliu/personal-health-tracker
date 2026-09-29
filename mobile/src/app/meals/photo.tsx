@@ -11,15 +11,18 @@ import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 export default function MealPhotoCapture() {
-  const { destination = 'today', meal_id } = useLocalSearchParams<{
-    destination?: 'meal' | 'today';
+  const { destination = 'today', meal_id, date, slot } = useLocalSearchParams<{
+    destination?: 'meal' | 'day' | 'today';
     meal_id?: string;
+    date?: string;
+    slot?: string;
   }>();
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const parentRoute =
-    destination === 'meal'
-      ? ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const)
+  const parentRoute = destination === 'meal'
+    ? ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const)
+    : destination === 'day'
+      ? '/today'
       : '/meals';
 
   useEffect(() => {
@@ -27,8 +30,12 @@ export default function MealPhotoCapture() {
       Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。', [
         { text: '返回餐點', onPress: () => router.replace('/meals') },
       ]);
+    } else if (destination === 'day' && (!date || !slot)) {
+      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。', [
+        { text: '返回今天', onPress: () => router.replace('/today') },
+      ]);
     }
-  }, [destination, meal_id]);
+  }, [date, destination, meal_id, slot]);
 
   const choose = async () => {
     setBusy(true);
@@ -38,7 +45,7 @@ export default function MealPhotoCapture() {
       photoDraft.set(analysis);
       router.replace({
         pathname: '/meals/photo-results',
-        params: { destination, meal_id, analysis_id: analysis.id },
+        params: { destination, meal_id, date, slot, analysis_id: analysis.id },
       });
     } catch (error) {
       const message =

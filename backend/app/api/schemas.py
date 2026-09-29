@@ -12,8 +12,8 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
 from app.domain.decisions import DecisionResult
-from app.domain.meal_photos import ExtraItem, MealPhoto, RecognizedItem
-from app.domain.meals import total
+from app.domain.meal_photos import MealPhoto, RecognizedItem
+from app.domain.meals import planned_total, total
 from app.domain.models import (
     BodyLog,
     BodySummary,
@@ -26,8 +26,8 @@ from app.domain.models import (
     Meal,
     MealItem,
     Nutrients,
-    PlannedItem,
     PlannedMeal,
+    PlateItem,
     Profile,
     ScheduleEntry,
     Targets,
@@ -40,6 +40,9 @@ from app.domain.workout_execution import (
     WorkoutExecution,
     WorkoutExecutionItem,
 )
+
+PlannedSlot = Literal["breakfast", "lunch", "dinner"]
+"""The wire form of `PLANNED_SLOTS`; a Literal so OpenAPI lists the allowed values."""
 
 
 def _values(obj: Any) -> dict[str, Any]:
@@ -221,8 +224,6 @@ class TodayOut(BaseModel):
 
 class DayPatch(BaseModel):
     workout_time: Literal["am", "pm"] | None = None
-    location: Literal["home", "gym"] | None = None
-    steps: int | None = Field(default=None, ge=0)
     workout_done: bool = False
     workout_skipped: bool = False
 
@@ -378,6 +379,10 @@ class TemplateOut(BaseModel):
 
 class TemplateWeightIn(BaseModel):
     weight_kg: float = Field(ge=0)
+
+
+class SaveDayTemplateIn(BaseModel):
+    name: str = Field(min_length=1)
 
 
 class WorkoutItemIn(BaseModel):
@@ -549,12 +554,13 @@ class FoodOut(BaseModel):
     name: str
     state: str
     per_100g: NutrientsOut
+    fiber_per_100g: float | None
     unit: str
     grams_per_unit: float | None
     usual_grams: float
     max_grams: float
     aliases: list[str]
-    is_builtin: bool
+    template_id: str | None
 
     @classmethod
     def of(cls, food: Food) -> "FoodOut":
@@ -564,12 +570,13 @@ class FoodOut(BaseModel):
             name=food.name,
             state=food.state.value,
             per_100g=NutrientsOut.of(food.per_100g),
+            fiber_per_100g=food.fiber_per_100g,
             unit=food.unit,
             grams_per_unit=food.grams_per_unit,
             usual_grams=food.usual_grams,
             max_grams=food.max_grams,
             aliases=list(food.aliases),
-            is_builtin=food.is_builtin,
+            template_id=food.template_id,
         )
 
 
@@ -581,6 +588,7 @@ class FoodIn(BaseModel):
     protein_per_100g: float = Field(ge=0)
     fat_per_100g: float = Field(ge=0)
     carb_per_100g: float = Field(ge=0)
+    fiber_per_100g: float | None = Field(default=None, ge=0)
     unit: Literal["g", "ml", "piece", "scoop", "bowl"] = "g"
     grams_per_unit: float | None = Field(default=None, gt=0)
     usual_grams: float = Field(gt=0)
@@ -651,14 +659,14 @@ class MealOut(BaseModel):
 class MealIn(BaseModel):
     name: str
     tag: Literal["regular", "light", "occasional"] = "regular"
-    meal_times: list[Literal["breakfast", "lunch", "dinner"]]
+    meal_times: list[PlannedSlot]
     items: list[MealItemIn]
 
 
 class MealPatch(BaseModel):
     name: str | None = None
     tag: Literal["regular", "light", "occasional"] | None = None
-    meal_times: list[Literal["breakfast", "lunch", "dinner"]] | None = None
+    meal_times: list[PlannedSlot] | None = None
     items: list[MealItemIn] | None = None
 
 
@@ -698,7 +706,7 @@ class PlannedMealItemOut(BaseModel):
     photo_id: str | None
 
     @classmethod
-    def of(cls, item: PlannedItem) -> "PlannedMealItemOut":
+    def of(cls, item: PlateItem) -> "PlannedMealItemOut":
         return cls(
             id=item.id,
             food=FoodOut.of(item.food) if item.food else None,
@@ -718,19 +726,16 @@ class DayPlanOut(BaseModel):
 
     @classmethod
     def of(cls, plan: DayPlan) -> "DayPlanOut":
-        nutrients = total(tuple(i for m in plan.meals if not m.skipped for i in m.items))
-        for extra in plan.extras:
-            nutrients += extra.nutrients
         return cls(
             date=plan.date,
             meals=[PlannedMealOut.of(m) for m in plan.meals],
             extras=[ExtraItemOut.of(extra) for extra in plan.extras],
-            nutrients=NutrientsOut.of(nutrients),
+            nutrients=NutrientsOut.of(planned_total(plan)),
         )
 
 
 class ShuffleIn(BaseModel):
-    meal_time: Literal["breakfast", "lunch", "dinner"] | None = None
+    meal_time: PlannedSlot | None = None
 
 
 class SwapItemIn(BaseModel):
@@ -842,7 +847,7 @@ class ExtraItemOut(BaseModel):
     photo_id: str | None
 
     @classmethod
-    def of(cls, item: ExtraItem) -> "ExtraItemOut":
+    def of(cls, item: PlateItem) -> "ExtraItemOut":
         return cls(
             id=item.id,
             food_id=item.food_id,

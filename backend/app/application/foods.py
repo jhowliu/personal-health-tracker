@@ -1,10 +1,10 @@
-"""The food library: browsing, searching, custom entries, and swap candidates."""
+"""The food library: browsing, searching, the user's own edits, and swap candidates."""
 
 from dataclasses import replace
 
 from app.application.ports import FoodStore
-from app.domain.errors import NotFound, PermissionDenied
-from app.domain.exchange import options
+from app.domain.errors import NotFound
+from app.domain.exchange import default_basis, options
 from app.domain.ids import new_id
 from app.domain.models import Exchange, Food, FoodCategory, SwapBasis
 
@@ -27,37 +27,41 @@ class FoodCatalogService:
             raise NotFound("找不到這個食物")
         return found
 
-    async def add_custom(self, user_id: str, draft: Food) -> Food:
-        food = replace(draft, id=new_id(), is_builtin=False)
-        await self._store.save_custom(user_id, food)
+    async def add(self, user_id: str, draft: Food) -> Food:
+        food = replace(_clamped(draft), id=new_id(), template_id=None)
+        await self._store.save(user_id, food)
         return food
 
-    async def edit_custom(self, user_id: str, food: Food) -> None:
+    async def edit(self, user_id: str, food: Food) -> None:
         existing = await self.get(user_id, food.id)
-        if existing.is_builtin:
-            raise PermissionDenied("內建食物不能修改,請先複製一份")
-        await self._store.save_custom(user_id, food)
+        await self._store.save(user_id, replace(_clamped(food), template_id=existing.template_id))
 
-    async def remove_custom(self, user_id: str, food_id: str) -> None:
-        existing = await self.get(user_id, food_id)
-        if existing.is_builtin:
-            raise PermissionDenied("內建食物不能刪除")
-        await self._store.archive_custom(user_id, food_id)
+    async def remove(self, user_id: str, food_id: str) -> None:
+        await self.get(user_id, food_id)
+        await self._store.archive(user_id, food_id)
 
     async def exchanges(
-        self, user_id: str, food_id: str, grams: float, basis: SwapBasis | None = None
+        self,
+        user_id: str,
+        food_id: str,
+        grams: float | None = None,
+        basis: SwapBasis | None = None,
     ) -> tuple[Exchange, ...]:
         """Same-category swaps for one food at a given portion.
 
-        The basis defaults to the category's own rule (staples on carbs, protein on
-        protein); the substitute screen can override it to calories.
+        The portion defaults to the food's usual one. The basis defaults to the category's
+        own rule (staples on carbs, protein on protein); the substitute screen can
+        override it to calories.
         """
         source = await self.get(user_id, food_id)
         candidates = await self._store.in_category(user_id, source.category_id)
 
         if basis is None:
-            by_id = {c.id: c for c in await self._store.categories()}
-            category = by_id.get(source.category_id)
-            basis = category.swap_by if category else SwapBasis.KCAL
+            basis = default_basis(await self._store.categories(), source.category_id)
 
-        return options(source, grams, candidates, basis)
+        return options(source, grams or source.usual_grams, candidates, basis)
+
+
+def _clamped(food: Food) -> Food:
+    """The largest portion is never smaller than the usual one."""
+    return replace(food, max_grams=max(food.max_grams, food.usual_grams))

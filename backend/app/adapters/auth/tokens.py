@@ -1,7 +1,6 @@
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import jwt
 
@@ -22,8 +21,13 @@ class JwtTokenIssuer:
             algorithm=ALGORITHM,
         )
 
-    def decode_access(self, token: str) -> dict[str, Any]:
-        return jwt.decode(token, self._secret, algorithms=[ALGORITHM])
+    def user_id_from_access(self, token: str) -> str | None:
+        try:
+            payload = jwt.decode(token, self._secret, algorithms=[ALGORITHM])
+        except jwt.PyJWTError:
+            return None
+        sub = payload.get("sub")
+        return sub if isinstance(sub, str) and sub else None
 
     def issue_refresh(self) -> tuple[str, str, datetime]:
         raw = secrets.token_urlsafe(48)
