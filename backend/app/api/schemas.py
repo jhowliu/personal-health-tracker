@@ -224,8 +224,6 @@ class TodayOut(BaseModel):
 
 class DayPatch(BaseModel):
     workout_time: Literal["am", "pm"] | None = None
-    location: Literal["home", "gym"] | None = None
-    steps: int | None = Field(default=None, ge=0)
     workout_done: bool = False
     workout_skipped: bool = False
 

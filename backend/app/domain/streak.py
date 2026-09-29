@@ -24,12 +24,14 @@ class DayRecord:
 
 
 def streak_until(records: Iterable[DayRecord], day: date) -> int:
-    """Complete days in a row ending on `day` itself.
+    """Complete days in a row ending on `day`, or on the day before while `day` is unfinished.
 
-    A day that is not complete yet ends the count, so the streak reads 0 until today has
-    been logged, even when every earlier day was complete.
+    Today only counts once it is complete, but being unfinished does not break the streak:
+    the count so far stands until the day is over.
     """
     complete = {record.date for record in records if record.complete}
+    if day not in complete:
+        day -= timedelta(days=1)
     count = 0
     while day in complete:
         count += 1

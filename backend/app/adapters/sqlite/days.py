@@ -76,18 +76,13 @@ class SqliteDayStore:
         day: date,
         *,
         workout_time: str | None = None,
-        location: str | None = None,
-        steps: int | None = None,
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
     ) -> None:
         await open_day(self._conn, user_id, day)
-        changes = {
-            "workout_time": workout_time,
-            "location": location,
-            "steps": steps,
-        }
-        applied = {k: v for k, v in changes.items() if v is not None}
+        applied: dict[str, str | None] = {}
+        if workout_time is not None:
+            applied["workout_time"] = workout_time
         if workout_state == "done":
             applied["workout_done_at"] = to_iso(workout_state_at)
             applied["workout_skipped_at"] = None

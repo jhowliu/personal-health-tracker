@@ -11,7 +11,8 @@ def test_existing_shared_food_references_are_moved_to_each_owner(tmp_path):
     migrations = read_migrations(str(MIGRATIONS_DIR))
     with backend.lock():
         backend.apply_migrations(
-            backend.to_apply(migrations).filter(lambda m: m.id != "0013_private_food_catalog")
+            # The database as it stood before this migration.
+            backend.to_apply(migrations).filter(lambda m: m.id < "0013_private_food_catalog")
         )
 
     with sqlite3.connect(db_path) as conn:
@@ -82,10 +83,12 @@ def test_existing_shared_food_references_are_moved_to_each_owner(tmp_path):
 
     with backend.lock():
         backend.rollback_migrations(
-            backend.to_rollback(migrations).filter(lambda m: m.id == "0013_private_food_catalog")
+            backend.to_rollback(migrations).filter(lambda m: m.id >= "0013_private_food_catalog")
         )
     with sqlite3.connect(db_path) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
         assert conn.execute("SELECT COUNT(*) FROM foods").fetchone()[0] == 4
         assert conn.execute("SELECT COUNT(*) FROM meal_items").fetchone()[0] == 2
+        # Rolling back the later migration 0014 gives days their location column back.
+        assert conn.execute("SELECT location FROM days").fetchone() == ("home",)

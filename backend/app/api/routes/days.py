@@ -22,7 +22,7 @@ from app.api.schemas import (
     WorkoutItemPatch,
 )
 from app.application.commands import DayAdjustment, WorkoutItemChange
-from app.domain.models import PLANNED_SLOTS, Location, MealTime, SwapBasis, WorkoutTime
+from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis, WorkoutTime
 from app.domain.workout_execution import ReplacementReason, SetEffort
 
 router = APIRouter(prefix="/days", tags=["days"])
@@ -39,8 +39,6 @@ async def update_day(
 ) -> TodayOut:
     change = DayAdjustment(
         workout_time=WorkoutTime(payload.workout_time) if payload.workout_time else None,
-        location=Location(payload.location) if payload.location else None,
-        steps=payload.steps,
         workout_done=payload.workout_done,
         workout_skipped=payload.workout_skipped,
     )

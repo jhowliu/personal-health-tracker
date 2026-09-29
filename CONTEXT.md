@@ -45,5 +45,5 @@ The ordered steps a Day walks through (body log, meals, workout) and which are c
 _Avoid_: Timeline, checklist
 
 **Streak**:
-Consecutive days, counted back from a given date, on which the body was logged and all three Meal slots were eaten or skipped.
+Consecutive days on which the body was logged and all three Meal slots were eaten or skipped, counted back from a given date. A date that is not finished yet does not break it; the count then ends on the day before.
 _Avoid_: Chain, run

@@ -52,8 +52,6 @@ class DayAdjustment:
     """What the user changed about a Day. `None` and `False` mean "not part of this change"."""
 
     workout_time: WorkoutTime | None = None
-    location: Location | None = None
-    steps: int | None = None
     workout_done: bool = False
     workout_skipped: bool = False
 

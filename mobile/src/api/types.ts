@@ -955,10 +955,6 @@ export interface components {
         DayPatch: {
             /** Workout Time */
             workout_time?: ("am" | "pm") | null;
-            /** Location */
-            location?: ("home" | "gym") | null;
-            /** Steps */
-            steps?: number | null;
             /**
              * Workout Done
              * @default false

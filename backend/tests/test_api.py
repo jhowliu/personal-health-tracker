@@ -146,6 +146,25 @@ async def test_streak_counts_a_fully_logged_day(with_profile: AsyncClient):
     assert day["streak"] == 1
 
 
+async def test_the_streak_survives_the_morning_before_today_is_logged(
+    with_profile: AsyncClient,
+):
+    for day in ("2026-09-20", "2026-09-21"):
+        await with_profile.get(f"/days/{day}")
+        await with_profile.put(f"/body-logs/{day}", json={"weight_kg": 56.1})
+        for meal in ("breakfast", "lunch", "dinner"):
+            await with_profile.patch(f"/days/{day}/meals/{meal}")
+
+    morning = (await with_profile.get(f"/days/{TODAY}")).json()
+    assert morning["flow"]["current"] == "body"
+    assert morning["streak"] == 2
+
+    await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.0})
+    for meal in ("breakfast", "lunch", "dinner"):
+        await with_profile.patch(f"/days/{TODAY}/meals/{meal}")
+    assert (await with_profile.get(f"/days/{TODAY}")).json()["streak"] == 3
+
+
 async def test_meal_states_complete_flow_and_skips_count_toward_streak(with_profile: AsyncClient):
     await with_profile.get(f"/days/{TODAY}")
     await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1})

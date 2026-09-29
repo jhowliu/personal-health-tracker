@@ -4494,33 +4494,6 @@
             ],
             "title": "Workout Time"
           },
-          "location": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "home",
-                  "gym"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Location"
-          },
-          "steps": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Steps"
-          },
           "workout_done": {
             "type": "boolean",
             "title": "Workout Done",

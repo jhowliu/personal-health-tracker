@@ -30,9 +30,17 @@ def test_a_missing_day_ends_the_streak():
     assert streak_until([day(0), day(2)], TODAY) == 1
 
 
-def test_the_streak_reads_zero_until_today_is_complete():
-    # Pinned on purpose: yesterday and the day before were complete, but today is not yet.
-    assert streak_until([day(0, meals=1), day(1), day(2)], TODAY) == 0
+def test_an_unfinished_today_does_not_erase_the_streak_so_far():
+    assert streak_until([day(0, meals=1), day(1), day(2)], TODAY) == 2
+    assert streak_until([day(1), day(2)], TODAY) == 2, "today has no record yet"
+
+
+def test_finishing_today_extends_the_streak():
+    assert streak_until([day(0), day(1), day(2)], TODAY) == 3
+
+
+def test_an_unfinished_today_after_a_broken_yesterday_reads_zero():
+    assert streak_until([day(0, meals=1), day(1, meals=2), day(2)], TODAY) == 0
 
 
 def test_days_after_the_given_date_are_ignored():

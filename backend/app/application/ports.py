@@ -196,8 +196,6 @@ class DayStore(Protocol):
         day: date,
         *,
         workout_time: str | None = None,
-        location: str | None = None,
-        steps: int | None = None,
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
     ) -> None: ...

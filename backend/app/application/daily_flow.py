@@ -50,8 +50,6 @@ class DailyFlowService:
             user_id,
             day,
             workout_time=change.workout_time.value if change.workout_time else None,
-            location=change.location.value if change.location else None,
-            steps=change.steps,
             workout_state=state,
             workout_state_at=self._clock.now() if state else None,
         )

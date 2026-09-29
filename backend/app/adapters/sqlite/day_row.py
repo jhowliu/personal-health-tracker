@@ -15,11 +15,11 @@ async def open_day(conn: aiosqlite.Connection, user_id: str, day: date) -> None:
     """Materialise the user's Day: its row, its scheduled workout and its meal slots.
 
     Idempotent, and safe to call at the start of every read or write. The row copies the
-    profile's workout time and default location the first time the day is opened.
+    profile's workout time the first time the day is opened.
     """
     await conn.execute(
-        "INSERT INTO days (user_id, date, workout_time, location)"
-        " SELECT user_id, ?, workout_time, default_location FROM profiles WHERE user_id = ?"
+        "INSERT INTO days (user_id, date, workout_time)"
+        " SELECT user_id, ?, workout_time FROM profiles WHERE user_id = ?"
         " ON CONFLICT (user_id, date) DO NOTHING",
         (to_day(day), user_id),
     )
