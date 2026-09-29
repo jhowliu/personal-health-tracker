@@ -6,7 +6,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { MealCard } from '@/components/MealCard';
 import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';
-import { Card, Chip, Empty, Hint, Rows, Screen, Segmented, Title } from '@/components/ui';
+import { Card, Chip, Empty, Hint, Rows, Screen, Segmented } from '@/components/ui';
 import { byCategoryOrder } from '@/meals/order';
 import { describeFood, formatPortion } from '@/meals/portion';
 import { color } from '@/theme/tokens';
@@ -40,7 +40,9 @@ export default function MealsScreen() {
       pinnedHeader={
         <>
           <View className="flex-row items-center justify-between">
-            <Title>餐點</Title>
+            <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+              餐點
+            </Text>
             <View className="flex-row items-center gap-2">
               {tab === 'mine' ? (
                 <Pressable
@@ -85,7 +87,9 @@ function MyMeals() {
   const { profile, reload } = useSession();
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [slot, setSlot] = useState('all');
-  const [busy, setBusy] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [settingsBusy, setSettingsBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -103,16 +107,39 @@ function MyMeals() {
   );
 
   const toggleAutoAssign = async (next: boolean) => {
-    setBusy(true);
+    setSettingsBusy(true);
     try {
       await api.patch('/users/me/profile', { auto_assign_meals: next });
       await reload();
     } catch (error) {
       Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
-      setBusy(false);
+      setSettingsBusy(false);
     }
   };
+
+  const removeMeal = (meal: Meal) =>
+    Alert.alert('刪除餐點', '之後的自動分配不會再排到這道。已經吃過的紀錄不受影響。', [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '刪除',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setRemovingId(meal.id);
+            try {
+              await api.delete(`/meals/${meal.id}`);
+              setMeals((current) => current?.filter((candidate) => candidate.id !== meal.id) ?? current);
+              setExpandedId((current) => (current === meal.id ? null : current));
+            } catch (error) {
+              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+            } finally {
+              setRemovingId(null);
+            }
+          })();
+        },
+      },
+    ]);
 
   return (
     <>
@@ -122,7 +149,10 @@ function MyMeals() {
             key={option.id}
             label={option.label}
             selected={slot === option.id}
-            onPress={() => setSlot(option.id)}
+            onPress={() => {
+              setSlot(option.id);
+              setExpandedId(null);
+            }}
           />
         ))}
       </View>
@@ -132,14 +162,12 @@ function MyMeals() {
       <Card className="flex-row items-center justify-between">
         <View className="flex-1 gap-0.5 pr-4">
           <Text className="text-base font-semibold text-ink">每日自動分配</Text>
-          <Hint>
-            每天從你的餐點裡隨機排早午晚餐。想換其中一樣，在今日流程按「換」就好。
-          </Hint>
+          <Hint>每天從你的餐點裡隨機排早午晚餐。</Hint>
         </View>
         <Switch
           value={profile?.profile.auto_assign_meals ?? true}
           onValueChange={toggleAutoAssign}
-          disabled={busy}
+          disabled={settingsBusy}
           trackColor={{ true: color.good, false: color.line }}
         />
       </Card>
@@ -149,17 +177,19 @@ function MyMeals() {
       ) : meals.length === 0 ? (
         <Empty>還沒有自己的餐點，按右上角新增一道</Empty>
       ) : (
-        <Card className="py-0">
-          <Rows>
-            {meals.map((meal) => (
-              <MealCard
-                key={meal.id}
-                meal={meal}
-                onPress={() => router.navigate(`/meals/${meal.id}`)}
-              />
-            ))}
-          </Rows>
-        </Card>
+        <View className="gap-3">
+          {meals.map((meal) => (
+            <MealCard
+              key={meal.id}
+              meal={meal}
+              expanded={expandedId === meal.id}
+              busy={removingId === meal.id}
+              onToggle={() => setExpandedId((current) => (current === meal.id ? null : meal.id))}
+              onEdit={() => router.navigate(`/meals/${meal.id}`)}
+              onDelete={() => removeMeal(meal)}
+            />
+          ))}
+        </View>
       )}
     </>
   );
@@ -261,5 +291,3 @@ function FoodLibrary() {
     </>
   );
 }
-
-

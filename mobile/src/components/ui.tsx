@@ -4,6 +4,7 @@ import {
   Fragment,
   type ComponentType,
   type ReactNode,
+  useContext,
   useId,
   useRef,
   useState,
@@ -11,7 +12,6 @@ import {
 import {
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -25,6 +25,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppModal } from '@/components/AppModal';
+import { FrameHostContext } from '@/components/frame-host';
 import { ChevronIcon } from '@/components/icons';
 import { color } from '@/theme/tokens';
 
@@ -389,6 +391,26 @@ export function Chip({
   );
 }
 
+/** A small label pill inside a list card, such as 肌力 or 在家. */
+export function Tag({
+  label,
+  tone = 'neutral',
+}: {
+  label: string;
+  tone?: 'neutral' | 'primary' | 'good' | 'warm';
+}) {
+  const skin = { neutral: 'bg-fill', primary: 'bg-primary-soft', good: 'bg-good-soft', warm: 'bg-warm-soft' }[
+    tone
+  ];
+  const text = { neutral: 'text-muted', primary: 'text-primary', good: 'text-good', warm: 'text-warm' }[tone];
+
+  return (
+    <View className={`rounded-full px-2 py-0.5 ${skin}`}>
+      <Text className={`text-xs ${text}`}>{label}</Text>
+    </View>
+  );
+}
+
 export function Hint({ children }: { children: React.ReactNode }) {
   return <Text className="text-sm text-muted">{children}</Text>;
 }
@@ -407,10 +429,16 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
     null,
   );
-  const screen = useWindowDimensions();
+  const window = useWindowDimensions();
+  // In the web phone frame the modal covers the frame, not the browser window, so measure against it.
+  const frame = useContext(FrameHostContext);
+  const screen = frame ? { width: frame.clientWidth, height: frame.clientHeight } : window;
 
   const show = () =>
-    button.current?.measureInWindow((x, y, width, height) => setAnchor({ x, y, width, height }));
+    button.current?.measureInWindow((x, y, width, height) => {
+      const origin = frame?.getBoundingClientRect();
+      setAnchor({ x: x - (origin?.left ?? 0), y: y - (origin?.top ?? 0), width, height });
+    });
   const hide = () => setAnchor(null);
 
   // Centre the bubble on the button, then keep it inside the screen. Below the button unless the
@@ -469,11 +497,11 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
         <Text className="text-xs font-bold text-muted">i</Text>
       </Pressable>
       {/* Translucent status bar keeps the modal's coordinates the same as measureInWindow's on Android. */}
-      <Modal visible={anchor !== null} transparent statusBarTranslucent animationType="fade" onRequestClose={hide}>
+      <AppModal visible={anchor !== null} transparent statusBarTranslucent animationType="fade" onRequestClose={hide}>
         <Pressable accessible={false} onPress={hide} className="flex-1">
           {bubble}
         </Pressable>
-      </Modal>
+      </AppModal>
     </View>
   );
 }

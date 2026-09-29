@@ -3,25 +3,24 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { PlusIcon } from '@/components/icons';
+import { ChevronIcon, PlusIcon } from '@/components/icons';
 import { ChoiceOption, Sheet } from '@/components/Sheet';
+import { TemplateCard } from '@/components/TemplateCard';
 import { Card, Chip, Empty, Hint, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { workoutCategory } from '@/workouts/category';
 
 type Template = Schema<'TemplateOut'>;
 type ScheduleEntry = Schema<'ScheduleEntryOut'>;
 
 const WEEKDAYS = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
-const CATEGORY_TONE = {
-  strength: { label: '肌力', tone: 'primary' as const },
-  cardio: { label: '有氧', tone: 'good' as const },
-  mobility: { label: '伸展', tone: 'neutral' as const },
-};
 
 export default function WorkoutsScreen() {
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [editingDay, setEditingDay] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [workingId, setWorkingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -62,6 +61,55 @@ export default function WorkoutsScreen() {
     }
   };
 
+  // A copy is the only way to change a built-in template, so it opens straight into editing.
+  const copyTemplate = async (template: Template) => {
+    setWorkingId(template.id);
+    try {
+      const copied: Template = await api.post(`/workout-templates/${template.id}/copy`);
+      router.navigate(`/workouts/${copied.id}`);
+    } catch (error) {
+      Alert.alert('複製不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setWorkingId(null);
+    }
+  };
+
+  const removeTemplate = (template: Template) => {
+    // The schedule points at its templates, so a scheduled one cannot go until it is replaced.
+    const days = schedule
+      .filter((entry) => entry.template_id === template.id)
+      .map((entry) => WEEKDAYS[entry.weekday]);
+    if (days.length > 0) {
+      Alert.alert(
+        '這份課表還在排程裡',
+        `「${template.name}」排在${days.join('、')}。先到一週排程改成休息日或別的課表，才能刪除。`,
+      );
+      return;
+    }
+
+    Alert.alert('刪除課表', `確定刪除「${template.name}」？刪除後無法復原。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '刪除',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            setWorkingId(template.id);
+            try {
+              await api.delete(`/workout-templates/${template.id}`);
+              setTemplates((current) => current?.filter((item) => item.id !== template.id) ?? current);
+              setExpandedId((current) => (current === template.id ? null : current));
+            } catch (error) {
+              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+            } finally {
+              setWorkingId(null);
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   if (!templates) {
     return (
       <Screen scroll={false} footerSafeArea={false}>
@@ -77,6 +125,19 @@ export default function WorkoutsScreen() {
   const ownedTemplates = templates.filter((template) => !template.is_builtin);
   const editingEntry = schedule.find((item) => item.weekday === editingDay);
   const editingTemplate = editingEntry ? byId.get(editingEntry.template_id) : undefined;
+
+  const renderTemplate = (template: Template) => (
+    <TemplateCard
+      key={template.id}
+      template={template}
+      expanded={expandedId === template.id}
+      busy={workingId === template.id}
+      onToggle={() => setExpandedId((current) => (current === template.id ? null : template.id))}
+      onOpen={() => router.navigate(`/workouts/${template.id}`)}
+      onCopy={() => copyTemplate(template)}
+      onDelete={() => removeTemplate(template)}
+    />
+  );
 
   return (
     <Screen
@@ -104,15 +165,14 @@ export default function WorkoutsScreen() {
           {WEEKDAYS.map((label, weekday) => {
             const entry = schedule.find((item) => item.weekday === weekday);
             const template = entry ? byId.get(entry.template_id) : undefined;
-            const category = template
-              ? CATEGORY_TONE[template.category_id as keyof typeof CATEGORY_TONE]
-              : undefined;
+            const category = template ? workoutCategory(template.category_id) : undefined;
             const open = editingDay === weekday;
 
             return (
               <View key={label}>
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={`更改${label}的課表`}
                   accessibilityState={{ expanded: open }}
                   disabled={busy}
                   onPress={() => setEditingDay(open ? null : weekday)}
@@ -123,9 +183,8 @@ export default function WorkoutsScreen() {
                     <Text className="text-sm text-muted">{template?.name ?? '休息日'}</Text>
                   </View>
                   {category ? <Chip label={category.label} tone={category.tone} /> : null}
-                  <Text className="text-base text-primary">{open ? '收起' : '更改'}</Text>
+                  <ChevronIcon direction="right" size={16} tint={color.muted} />
                 </Pressable>
-
               </View>
             );
           })}
@@ -136,13 +195,7 @@ export default function WorkoutsScreen() {
         <>
           <SectionHeading>公用課表</SectionHeading>
           <Hint>公用課表可直接排程；要調整內容時，先複製成自己的課表。</Hint>
-          <Card className="py-0">
-            <Rows>
-              {builtinTemplates.map((template) => (
-                <TemplateRow key={template.id} template={template} />
-              ))}
-            </Rows>
-          </Card>
+          <View className="gap-3">{builtinTemplates.map(renderTemplate)}</View>
         </>
       ) : null}
 
@@ -150,13 +203,7 @@ export default function WorkoutsScreen() {
       {ownedTemplates.length === 0 ? (
         <Empty>還沒有自己的課表，可新增或從公用課表複製</Empty>
       ) : (
-        <Card className="py-0">
-          <Rows>
-            {ownedTemplates.map((template) => (
-              <TemplateRow key={template.id} template={template} />
-            ))}
-          </Rows>
-        </Card>
+        <View className="gap-3">{ownedTemplates.map(renderTemplate)}</View>
       )}
 
       <Sheet
@@ -189,27 +236,6 @@ export default function WorkoutsScreen() {
     </Screen>
   );
 }
-
-function TemplateRow({ template }: { template: Template }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => router.navigate(`/workouts/${template.id}`)}
-      className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
-    >
-      <View className="flex-1 gap-0.5">
-        <Text className="text-base font-semibold text-ink">{template.name}</Text>
-        <Text className="text-sm text-muted">{describe(template)}</Text>
-      </View>
-      <Chip
-        label={template.location === 'gym' ? '健身房' : '在家'}
-        tone={template.location === 'gym' ? 'primary' : 'neutral'}
-      />
-      <Text className="text-base text-primary">{template.is_builtin ? '查看' : '編輯'}</Text>
-    </Pressable>
-  );
-}
-
 
 function describe(template: Template): string {
   const minutes = template.duration_min ? `，約 ${template.duration_min} 分鐘` : '';

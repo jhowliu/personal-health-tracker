@@ -1,10 +1,11 @@
-/** A meal in the list, grouped by food category the way the wireframe shows it. */
-import { Pressable, Text, View } from 'react-native';
+/** A saved meal that expands in place to show its composition and actions. */
+import { Text, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
-import { ChevronIcon } from '@/components/icons';
+import { ExpandableCard } from '@/components/ExpandableCard';
+import { PencilIcon, TrashIcon } from '@/components/icons';
 import { formatPortion } from '@/meals/portion';
-import { color } from '@/theme/tokens';
+import { color, foodCategoryColor } from '@/theme/tokens';
 
 type Meal = Schema<'MealOut'>;
 
@@ -24,10 +25,28 @@ const SLOT_LABEL: Record<string, string> = {
   dinner: '晚餐',
 };
 
+// The API returns a meal's slots in no particular order; show them the way the day runs.
+const SLOT_ORDER = ['breakfast', 'lunch', 'dinner'];
+
 const TAG_LABEL: Record<string, string> = {
   regular: '',
   light: '清淡',
   occasional: '偶爾吃',
+};
+
+const SLOT_TONE: Record<string, { backgroundColor: string; color: string }> = {
+  breakfast: {
+    backgroundColor: foodCategoryColor.staple.soft,
+    color: foodCategoryColor.staple.accent,
+  },
+  lunch: {
+    backgroundColor: foodCategoryColor.protein.soft,
+    color: foodCategoryColor.protein.accent,
+  },
+  dinner: {
+    backgroundColor: foodCategoryColor.fat_sauce.soft,
+    color: foodCategoryColor.fat_sauce.accent,
+  },
 };
 
 export function formatGrams(item: Schema<'MealItemOut'>): string {
@@ -48,43 +67,96 @@ export function groupByCategory(items: Schema<'MealItemOut'>[]) {
   }));
 }
 
-export function MealCard({ meal, onPress }: { meal: Meal; onPress?: () => void }) {
+export function MealCard({
+  meal,
+  expanded,
+  busy,
+  onToggle,
+  onEdit,
+  onDelete,
+}: {
+  meal: Meal;
+  expanded: boolean;
+  busy?: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const groups = groupByCategory(meal.items);
+  const summary = meal.items.map((item) => item.food.name).join('・');
+  const slots = [...meal.meal_times].sort((a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b));
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`編輯${meal.name}`}
-      onPress={onPress}
-      className="min-h-[52px] flex-row items-center gap-3 py-3"
-    >
-      <View className="flex-1 gap-2">
-        <View className="flex-row items-baseline justify-between gap-3">
-          <Text className="flex-1 text-base font-semibold text-ink">{meal.name}</Text>
-          <Text className="text-base text-muted">{Math.round(meal.nutrients.kcal)} 大卡</Text>
-        </View>
-
-        {groupByCategory(meal.items).map((group) => (
-          <View key={group.category} className="flex-row gap-3">
-            <Text className="w-20 text-sm text-muted">{group.label}</Text>
-            <Text className="flex-1 text-sm text-ink">
-              {group.items.map(formatGrams).join('、')}
-            </Text>
+    <ExpandableCard
+      name={meal.name}
+      expanded={expanded}
+      busy={busy}
+      onToggle={onToggle}
+      summary={
+        <>
+          <View className="flex-row items-baseline justify-between gap-3">
+            <Text className="flex-1 text-base font-semibold text-ink">{meal.name}</Text>
+            <Text className="text-base text-muted">{Math.round(meal.nutrients.kcal)} 大卡</Text>
           </View>
-        ))}
 
-        <View className="flex-row flex-wrap gap-1.5 pt-1">
-          {meal.meal_times.map((slot) => (
-            <View key={slot} className="rounded-full bg-fill px-2 py-0.5">
-              <Text className="text-xs text-muted">{SLOT_LABEL[slot] ?? slot}</Text>
+          <View className="flex-row flex-wrap gap-1.5">
+            {slots.map((slot) => {
+              const tone = SLOT_TONE[slot];
+              return (
+                <View
+                  key={slot}
+                  className="rounded-full px-2 py-0.5"
+                  style={{ backgroundColor: tone?.backgroundColor ?? color.fill }}
+                >
+                  <Text className="text-xs" style={{ color: tone?.color ?? color.muted }}>
+                    {SLOT_LABEL[slot] ?? slot}
+                  </Text>
+                </View>
+              );
+            })}
+            {TAG_LABEL[meal.tag] ? (
+              <View className="rounded-full bg-warm-soft px-2 py-0.5">
+                <Text className="text-xs text-warm">{TAG_LABEL[meal.tag]}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <Text className="text-sm text-muted" numberOfLines={1}>
+            {summary || '還沒有食物'}
+          </Text>
+        </>
+      }
+      details={groups.map((group, groupIndex) => (
+        <View key={group.category}>
+          {groupIndex > 0 ? <View className="h-px bg-line" /> : null}
+          <View className="flex-row items-start gap-3 py-3">
+            <Text className="w-20 text-sm font-semibold text-ink">{group.label}</Text>
+            <View className="flex-1 gap-1.5">
+              {group.items.map((item) => (
+                <View key={item.id} className="flex-row items-baseline justify-between gap-2">
+                  <Text className="flex-1 text-sm text-ink">{item.food.name}</Text>
+                  <Text className="text-sm text-muted">{formatPortion(item.food, item.grams)}</Text>
+                </View>
+              ))}
             </View>
-          ))}
-          {TAG_LABEL[meal.tag] ? (
-            <View className="rounded-full bg-warm-soft px-2 py-0.5">
-              <Text className="text-xs text-warm">{TAG_LABEL[meal.tag]}</Text>
-            </View>
-          ) : null}
+          </View>
         </View>
-      </View>
-      <ChevronIcon direction="right" size={16} tint={color.muted} />
-    </Pressable>
+      ))}
+      actions={[
+        {
+          label: '編輯餐點',
+          accessibilityLabel: `編輯${meal.name}`,
+          icon: PencilIcon,
+          onPress: onEdit,
+        },
+        {
+          label: '刪除',
+          accessibilityLabel: `刪除${meal.name}`,
+          icon: TrashIcon,
+          onPress: onDelete,
+          tone: 'danger',
+        },
+      ]}
+    />
   );
 }

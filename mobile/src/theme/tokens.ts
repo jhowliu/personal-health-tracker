@@ -17,5 +17,19 @@ export const color = {
   placeholder: '#9C9599',
 } as const;
 
+/** Category accents used by meal composition cards and their generated SVG icons. */
+export const foodCategoryColor = {
+  staple: { accent: '#C77A08', soft: '#FFF1D8' },
+  protein: { accent: '#D94B67', soft: '#FCE6EB' },
+  vegetable: { accent: '#4F8E3C', soft: '#E8F3E4' },
+  fruit: { accent: '#A3245F', soft: '#F6E3EC' },
+  fat_sauce: { accent: '#7650B5', soft: '#EEE7F8' },
+  other: { accent: '#5E585B', soft: '#EFEBE5' },
+} as const;
+
+export function foodCategoryTone(category: string | null | undefined) {
+  return foodCategoryColor[category as keyof typeof foodCategoryColor] ?? foodCategoryColor.other;
+}
+
 /** Tap targets are at least 44 px, per the spec's component rules. */
 export const MIN_TAP_SIZE = 44;
