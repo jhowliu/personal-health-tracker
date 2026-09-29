@@ -61,6 +61,8 @@ def test_existing_shared_food_references_are_moved_to_each_owner(tmp_path):
     with sqlite3.connect(db_path) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         assert conn.execute("PRAGMA foreign_key_check").fetchall() == []
+        day_columns = {row[1] for row in conn.execute("PRAGMA table_info(days)")}
+        assert not day_columns & {"location", "steps", "carb_scale"}
         assert conn.execute("SELECT COUNT(*) FROM food_templates").fetchone()[0] == 1
         assert conn.execute(
             "SELECT COUNT(*) FROM foods WHERE template_id = 'shared'"
@@ -92,3 +94,5 @@ def test_existing_shared_food_references_are_moved_to_each_owner(tmp_path):
         assert conn.execute("SELECT COUNT(*) FROM meal_items").fetchone()[0] == 2
         # Rolling back the later migration 0014 gives days their location column back.
         assert conn.execute("SELECT location FROM days").fetchone() == ("home",)
+        # ...and 0015 gives back steps and carb_scale, empty and at their defaults.
+        assert conn.execute("SELECT steps, carb_scale FROM days").fetchone() == (None, 1.0)
