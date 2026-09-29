@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SessionProvider } from '@/auth/session';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
+import { PhoneFrame } from '@/components/PhoneFrame';
 import { draft } from '@/meals/draft';
 import { ReminderSync } from '@/notifications/ReminderSync';
 import { color } from '@/theme/tokens';
@@ -22,14 +23,16 @@ function clearUserState() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <SessionProvider onSignedOut={clearUserState}>
-          <StatusBar style="dark" />
-          <ReminderSync />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
-          <NumericDoneBar />
-        </SessionProvider>
-      </SafeAreaProvider>
+      <PhoneFrame>
+        <SafeAreaProvider>
+          <SessionProvider onSignedOut={clearUserState}>
+            <StatusBar style="dark" />
+            <ReminderSync />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+            <NumericDoneBar />
+          </SessionProvider>
+        </SafeAreaProvider>
+      </PhoneFrame>
     </GestureHandlerRootView>
   );
 }
