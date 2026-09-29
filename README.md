@@ -1,45 +1,22 @@
-# 每日減脂計畫
+# 每日減脂計畫 (Daily Fat-Loss Plan)
 
-把量身形、三餐和運動串成「今日流程」的 iPhone／Android App。規格書見 `spec.pdf`,畫面設計見 `wireframe.pdf`。
+An iPhone/Android app that ties body tracking, meals and workouts into one daily flow.
+Spec: `spec.pdf` · Wireframes: `wireframe.pdf` · Domain terms: [`CONTEXT.md`](CONTEXT.md)
 
-目前完成到第三階段:
+- **P1** Accounts, daily targets, body tracking, workouts, daily flow
+- **P2** Food catalog, meals, substitution, auto-plan
+- **P3** Meal-photo recognition (OpenAI), workout swaps. Without `OPENAI_API_KEY` those endpoints
+  answer "not configured"; nothing is made up.
 
-- **P1** 帳號、個人資料與每日目標、身形追蹤、訓練課表與排程、今日流程、推播骨架
-- **P2** 食物庫、自建餐點、等量替換、每日自動分配、主食隨目標自動調整
-- **P3** 餐點拍照辨識與確認、額外食物、AI 分類建議、今日替代動作與重量回饋
+## Architecture
 
-P3 以 OpenAI 做圖片辨識與限定候選的決策；營養、換算與訓練重量規則仍由程式處理。未設定
-`OPENAI_API_KEY` 時，辨識與建議端點會明確回傳服務未設定，不會產生虛構結果。
+Backend layers, dependencies point inward: `api` → `adapters` → `application` → `domain`.
+Rules live in `backend/app/domain/`, pure Python with no framework. In `mobile/src/`, `app/` is
+routes only; logic lives in `api/`, `auth/` and `components/`.
 
-## 架構
+## Run
 
-後端分四層,依賴只往內指:
-
-```
-api/          FastAPI 路由與 DTO — 只做 HTTP ↔ use case 的轉換
-application/  use case 與 ports — 規則的編排,只認 Protocol 不認 SQLite
-domain/       純 Python:公式、狀態機、趨勢計算,不 import 任何框架
-adapters/     SQLite、argon2/JWT、Google/Apple、Expo 推播 — 實作 ports
-```
-
-規則集中在 `domain/`,三個檔案是這個專案真正的核心:
-
-| 檔案 | 負責 |
-| --- | --- |
-| [`nutrition.py`](backend/app/domain/nutrition.py) | Mifflin-St Jeor、活動係數、減脂幅度、三大營養素、`carb_scale` |
-| [`daily_flow.py`](backend/app/domain/daily_flow.py) | 今日流程的步驟順序與目前位置(不存 DB,由當天事實推算) |
-| [`body_trend.py`](backend/app/domain/body_trend.py) | 7 天移動平均、本週與上週的差 |
-| [`exchange.py`](backend/app/domain/exchange.py) | 等量替換的換算、取整與份量上限 |
-| [`meals.py`](backend/app/domain/meals.py) | 營養合計,以及 carb_scale 只乘主食 |
-| [`planning.py`](backend/app/domain/planning.py) | 每日自動分配,午晚餐不重複 |
-
-它們是純函式,不碰 DB 也不碰 HTTP,所以測試直接呼叫就好。
-
-前端 `mobile/src/` 同樣分層:`app/` 只有路由,規則與狀態在 `api/`、`auth/`、`components/`。
-
-## 跑起來
-
-後端:
+Backend:
 
 ```bash
 cd backend && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
@@ -61,24 +38,17 @@ cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.exercises
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.workout_templates
 ```
 
-可選的範例餐點,讓新帳號一進來今日流程就有東西可排:
+Optional sample meals, so a new account has something to plan:
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.sample_meals
 ```
 
-食物 seed 會更新起始範本、只替現有帳號補上新的私人食物；已修改或移除的食物不會被覆寫／補回。
-動作與公用課表 seed 可重複執行；範例餐點會跳過已經有餐點的使用者。
-
-食物庫的每項食物都屬於帳號，可直接編輯或移除；既有餐點仍能引用已移除的食物。
-編輯食物會更新既有餐點與未來計畫，不會改寫已吃紀錄的營養值。今日訓練可另存成私人課表，
-不會修改原課表或每週排程。
-
 ```bash
 cd backend && DB_PATH=./dev.sqlite JWT_SECRET=$(openssl rand -hex 32) .venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
 ```
 
-API 文件在 http://localhost:8010/docs。`--host 0.0.0.0` 是給實體手機連的,只在模擬器上跑可以省略。
+API docs: http://localhost:8010/docs. `--host 0.0.0.0` is for a real phone; drop it for a simulator.
 
 App:
 
@@ -90,36 +60,21 @@ cd mobile && npm install
 cd mobile && EXPO_PUBLIC_API_URL=http://localhost:8010 npm run ios
 ```
 
-`npm run web` 可以在瀏覽器快速看畫面(token 退回 localStorage,僅供開發)。
-
-## 在實體手機上跑
-
-手機上的 `localhost` 是手機自己,所以要換成 Mac 的區網 IP(`ipconfig getifaddr en0`),
-手機與電腦要在同一個 Wi-Fi:
+On a real phone, `localhost` is the phone itself. Use the Mac's LAN IP (`ipconfig getifaddr en0`)
+on the same Wi-Fi and scan the QR code with Expo Go:
 
 ```bash
-cd mobile && EXPO_PUBLIC_API_URL=http://<你的區網IP>:8010 npx expo start
+cd mobile && EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:8010 npx expo start
 ```
 
-用 Expo Go 掃 QR code 即可,已裝的原生模組都內建在裡面。
-兩件事 Expo Go 做不到,要 development build(`npx expo install expo-dev-client` + `eas build --profile development`):
+Push notifications and Google/Apple sign-in need a development build. The morning weigh-in reminder
+is a local notification and works in Expo Go.
 
-- 推播 — Expo Go 自 SDK 53 起不支援 remote push,而且要先 `eas init` 寫入 `extra.eas.projectId`,
-  否則 `registerPushToken()` 會安靜略過。iOS 實機還需要付費的 Apple Developer Program
-- Google／Apple 登入 — 需要原生模組與三組 Client ID
-
-「早上提醒量體重」不靠推播:設定頁選好時間後,由手機自己排程本機通知(Expo Go 就能測,不需要
-Apple 付費帳號或後端)。提醒時間存在帳號上,換手機登入會自動重新排;排的是接下來 14 天的
-一次性通知,每次打開 App 都會補滿,今天量過體重就會取消當天那則。
-
-## 測試
+## Test
 
 ```bash
 cd backend && .venv/bin/python -m pytest
 ```
-
-依賴規則(`api > adapters > application > domain`,規則寫在 `backend/pyproject.toml`)用
-`import-linter` 檢查,CI 會擋:
 
 ```bash
 cd backend && .venv/bin/lint-imports
@@ -129,23 +84,21 @@ cd backend && .venv/bin/lint-imports
 cd mobile && npm run typecheck && npm run lint
 ```
 
-## 改了 API 之後
+## After changing the API
 
-後端改完路由要重新產生前端型別,否則兩邊會對不上:
+Regenerate the mobile types, or the two sides drift apart:
 
 ```bash
 cd backend && .venv/bin/python -m scripts.export_openapi && cd ../mobile && npm run api:types
 ```
 
-忘了跑的話,前端的 `tsc` 會看著舊的 `openapi.json` 安靜通過,錯誤要到 App 畫面上才出現。
-CI 會擋:
+CI checks that they match:
 
 ```bash
 cd backend && .venv/bin/python -m scripts.check_openapi
 ```
 
-## 部署
+## Deploy
 
-`docker compose up` 起 api 與 minio 兩個容器,各掛持久 volume。
-SQLite 只能有一個寫入者,所以 Uvicorn 固定單 worker,APScheduler 跟 API 同程序。
-備份用 `ops/litestream.yml`,目的地必須在主機以外。
+`docker compose up` starts the api and minio containers. SQLite has one writer, so Uvicorn runs a
+single worker. Back up with `ops/litestream.yml` to a destination off the host.
