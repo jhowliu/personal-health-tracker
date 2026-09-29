@@ -1,9 +1,10 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { Sheet } from '@/components/Sheet';
 import { TrendChart } from '@/components/TrendChart';
 import { Card, Field, Hint, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { syncWeighInReminder } from '@/notifications/reminder';
@@ -14,19 +15,37 @@ type Log = Schema<'BodyLogOut'>;
 
 const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
+/** Waist is measured about once a week; inside this many days the form stops asking for it. */
+const WAIST_INTERVAL_DAYS = 7;
+
+type LogEntry = { date: string; weight: number | null; waist: number | null };
+
+function isoDay(day: Date) {
+  return new Date(day.getTime() - day.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
 function todayISO() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  return isoDay(new Date());
+}
+
+function yesterdayISO() {
+  const day = new Date();
+  day.setDate(day.getDate() - 1);
+  return isoDay(day);
+}
+
+function daysBetween(from: string, to: string) {
+  const ms = new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime();
+  return Math.round(ms / 86400000);
 }
 
 export default function BodyScreen() {
   const { profile } = useSession();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
-  const [date, setDate] = useState(todayISO());
-  const [weight, setWeight] = useState('');
-  const [waist, setWaist] = useState('');
-  const [busy, setBusy] = useState(false);
+  // The mode stays put while the sheet slides out, so its content does not change mid-animation.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'today' | 'other'>('today');
 
   const load = useCallback(async () => {
     try {
@@ -47,24 +66,25 @@ export default function BodyScreen() {
     }, [load]),
   );
 
-  const save = async () => {
-    setBusy(true);
+  const openSheet = (mode: 'today' | 'other') => {
+    setSheetMode(mode);
+    setSheetOpen(true);
+  };
+
+  /** Resolves true when the entry was saved, so the form knows whether to stay open. */
+  const save = async (entry: LogEntry): Promise<boolean> => {
     try {
-      await api.put(`/body-logs/${date}`, {
-        weight_kg: weight ? Number(weight) : null,
-        waist_cm: waist ? Number(waist) : null,
-      });
-      setWeight('');
-      setWaist('');
+      await api.put(`/body-logs/${entry.date}`, { weight_kg: entry.weight, waist_cm: entry.waist });
       await load();
+      setSheetOpen(false);
       // Logging today's weigh-in drops today's reminder if it has not fired yet.
-      if (date === todayISO()) {
+      if (entry.date === todayISO()) {
         void syncWeighInReminder(profile?.profile.reminder_time ?? null).catch(() => {});
       }
+      return true;
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setBusy(false);
+      return false;
     }
   };
 
@@ -78,21 +98,86 @@ export default function BodyScreen() {
     );
   }
 
+  // `logs` is newest first.
+  const today = todayISO();
+  const todayLog = logs.find((log) => log.date === today);
+  const waistLog = logs.find((log) => log.waist_cm !== null);
+  const lastWaist =
+    waistLog && waistLog.waist_cm !== null
+      ? { cm: waistLog.waist_cm, days: daysBetween(waistLog.date, today) }
+      : null;
+  const waistDue = !lastWaist || lastWaist.days >= WAIST_INTERVAL_DAYS;
+
   return (
     <Screen footerSafeArea={false}>
       <Title>身形追蹤</Title>
 
       <Card className="gap-3">
-        <Field label="日期" value={date} onChangeText={setDate} autoCapitalize="none" />
-        <View className="flex-row gap-3">
-          <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
-          <Field label="腰圍" suffix="cm" value={waist} onChangeText={setWaist} keyboardType="decimal-pad" />
-        </View>
-        <PrimaryButton onPress={save} disabled={busy || (!weight && !waist)}>
-          {busy ? '儲存中…' : '儲存紀錄'}
-        </PrimaryButton>
-        <Hint>兩個可以只填一個。腰圍一週量一次就好。</Hint>
+        {todayLog ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="修改今天的紀錄"
+            onPress={() => openSheet('today')}
+            className="gap-2"
+          >
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm text-muted">今天已記錄</Text>
+              <Text className="text-base text-primary">修改 ›</Text>
+            </View>
+            <View className="flex-row gap-3">
+              <Stat
+                label="體重"
+                value={todayLog.weight_kg !== null ? `${todayLog.weight_kg.toFixed(1)} kg` : '—'}
+              />
+              {todayLog.waist_cm !== null ? (
+                <Stat label="腰圍" value={`${todayLog.waist_cm.toFixed(1)} cm`} />
+              ) : lastWaist ? (
+                <Stat label="腰圍" value={`${lastWaist.cm.toFixed(1)} cm`} note={`${lastWaist.days} 天前量的`} />
+              ) : (
+                <Stat label="腰圍" value="—" />
+              )}
+            </View>
+          </Pressable>
+        ) : (
+          <LogForm
+            initial={{ date: today, weight: null, waist: null }}
+            dateEditable={false}
+            showWaist={waistDue}
+            onSave={save}
+          />
+        )}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => openSheet('other')}
+          className="min-h-[44px] justify-center self-start"
+        >
+          <Text className="text-sm text-primary">補記其他天</Text>
+        </Pressable>
       </Card>
+
+      <Sheet
+        visible={sheetOpen}
+        title={sheetMode === 'today' ? '修改今天的紀錄' : '補記其他天'}
+        onClose={() => setSheetOpen(false)}
+      >
+        <View className="pb-4">
+          {sheetMode === 'today' ? (
+            <LogForm
+              initial={{ date: today, weight: todayLog?.weight_kg ?? null, waist: todayLog?.waist_cm ?? null }}
+              dateEditable={false}
+              showWaist
+              onSave={save}
+            />
+          ) : (
+            <LogForm
+              initial={{ date: yesterdayISO(), weight: null, waist: null }}
+              dateEditable
+              showWaist
+              onSave={save}
+            />
+          )}
+        </View>
+      </Sheet>
 
       <View className="flex-row gap-2">
         <Kpi label="本週平均" value={summary.week_avg_weight?.toFixed(1) ?? '—'} />
@@ -145,6 +230,67 @@ export default function BodyScreen() {
         )}
       </Card>
     </Screen>
+  );
+}
+
+/** Weight and waist inputs with a save button. Owns its own drafts, so each mount starts from `initial`. */
+function LogForm({
+  initial,
+  dateEditable,
+  showWaist,
+  onSave,
+}: {
+  initial: LogEntry;
+  dateEditable: boolean;
+  showWaist: boolean;
+  onSave: (entry: LogEntry) => Promise<boolean>;
+}) {
+  const [date, setDate] = useState(initial.date);
+  const [weight, setWeight] = useState(initial.weight === null ? '' : initial.weight.toFixed(1));
+  const [waist, setWaist] = useState(initial.waist === null ? '' : initial.waist.toFixed(1));
+  const [busy, setBusy] = useState(false);
+
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
+  const hasValue = weight !== '' || (showWaist && waist !== '');
+
+  const submit = async () => {
+    setBusy(true);
+    await onSave({
+      date,
+      weight: weight ? Number(weight) : null,
+      waist: showWaist && waist ? Number(waist) : null,
+    });
+    setBusy(false);
+  };
+
+  return (
+    <View className="gap-3">
+      {dateEditable ? (
+        <View className="flex-row">
+          <Field label="日期" value={date} onChangeText={setDate} autoCapitalize="none" />
+        </View>
+      ) : null}
+      <View className="flex-row gap-3">
+        <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} keyboardType="decimal-pad" />
+        {showWaist ? (
+          <Field label="腰圍" suffix="cm" value={waist} onChangeText={setWaist} keyboardType="decimal-pad" />
+        ) : null}
+      </View>
+      <PrimaryButton onPress={submit} disabled={busy || !validDate || !hasValue}>
+        {busy ? '儲存中…' : '儲存紀錄'}
+      </PrimaryButton>
+      {showWaist ? <Hint>兩個可以只填一個。腰圍一週量一次就好。</Hint> : null}
+    </View>
+  );
+}
+
+function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <View className="flex-1 gap-0.5">
+      <Text className="text-sm text-muted">{label}</Text>
+      <Text className="font-display text-2xl font-bold text-ink">{value}</Text>
+      {note ? <Text className="text-xs text-muted">{note}</Text> : null}
+    </View>
   );
 }
 
