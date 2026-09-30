@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
+import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 import { replacement } from '@/workouts/replacement';
@@ -67,7 +68,9 @@ export default function WorkoutAlternatives() {
         <Card className="px-4 py-0">
           <Rows>
             {alternatives.map((alternative) => (
-              <View key={alternative.exercise.id} className="gap-1 py-3">
+              <View key={alternative.exercise.id} className="flex-row items-start gap-3 py-3">
+                <ExerciseFigure exerciseId={alternative.exercise.id} name={alternative.exercise.name} mode="single" />
+                <View className="flex-1 gap-1">
                 <View className="flex-row items-center gap-2">
                   <Text className="flex-1 text-base font-semibold text-ink">{alternative.exercise.name}</Text>
                   {alternative.recommended ? <Chip label="最推薦" tone="good" /> : null}
@@ -91,6 +94,7 @@ export default function WorkoutAlternatives() {
                     <Text className="text-base text-primary">換成這個動作</Text>
                   </Pressable>
                 ) : null}
+                </View>
               </View>
             ))}
           </Rows>
