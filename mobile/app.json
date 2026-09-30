@@ -50,7 +50,8 @@
           "color": "#A3245F"
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

@@ -9,6 +9,7 @@
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",
     "expo-file-system": "~57.0.7",
+    "expo-image": "~57.0.5",
     "expo-image-manipulator": "~57.0.19",
     "expo-image-picker": "~57.0.19",
     "expo-linking": "~57.0.10",
@@ -41,6 +42,7 @@
   },
   "scripts": {
     "api:types": "npx --yes openapi-typescript@7 src/api/openapi.json -o src/api/types.ts",
+    "exercise-images": "node scripts/exercise-images.mjs",
     "typecheck": "tsc --noEmit",
     "start": "expo start",
     "android": "expo start --android",

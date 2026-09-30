@@ -1,18 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { Card, Chip, Field, Hint } from '@/components/ui';
+import { CheckIcon, ChevronIcon, PlusIcon } from '@/components/icons';
+import { ShowMore, usePaged } from '@/components/paging';
+import { Sheet } from '@/components/Sheet';
+import { Chip, Field, Hint, PrimaryButton, Tag } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 
 export type Exercise = Schema<'ExerciseOut'>;
+
 
 export function ExerciseLibrary({
   onSelect,
   selectLabel = '加入',
+  addedIds,
 }: {
   onSelect: (exercise: Exercise) => void;
   selectLabel?: string;
+  /** Exercises that are already in place: their card turns green and cannot be added again. */
+  addedIds?: ReadonlySet<string>;
 }) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +28,10 @@ export function ExerciseLibrary({
   const [category, setCategory] = useState('all');
   const [bodyRegion, setBodyRegion] = useState('all');
   const [equipment, setEquipment] = useState('all');
+  const [previewing, setPreviewing] = useState<Exercise | null>(null);
   const loadVersion = useRef(0);
+  // The whole catalogue comes back in one response; only a page of rows is drawn at a time.
+  const { visible, remaining, showMore } = usePaged(exercises, exercises);
 
   useEffect(() => {
     const version = ++loadVersion.current;
@@ -47,22 +58,25 @@ export function ExerciseLibrary({
   }, [bodyRegion, category, equipment, query]);
 
   return (
-    <Card className="gap-3 border-primary">
-      <Text className="text-base font-semibold text-ink">動作庫</Text>
+    <View className="gap-3">
       <Field value={query} onChangeText={setQuery} placeholder="搜尋動作名稱" />
-      <View className="gap-1">
-        <Text className="text-sm text-muted">篩選</Text>
-        <View className="flex-row flex-wrap gap-2">
+      {/* One line each, swiped sideways: three wrapped rows of chips pushed the list off the screen. */}
+      <View className="-mx-4">
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4">
           {['all', 'strength', 'cardio', 'mobility'].map((value) => (
             <Chip key={value} label={categoryLabel(value)} selected={category === value} onPress={() => setCategory(value)} />
           ))}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4">
           {['all', 'upper_body', 'lower_body', 'core', 'full_body', 'mobility'].map((value) => (
             <Chip key={value} label={bodyLabel(value)} selected={bodyRegion === value} onPress={() => setBodyRegion(value)} />
           ))}
+        </ScrollView>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4">
           {['all', 'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'resistance_band', 'treadmill'].map((value) => (
             <Chip key={value} label={equipmentLabel(value)} selected={equipment === value} onPress={() => setEquipment(value)} />
           ))}
-        </View>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -71,28 +85,99 @@ export function ExerciseLibrary({
         <Hint>找不到符合的動作，請調整搜尋或篩選。</Hint>
       ) : (
         <View className="gap-2">
-          {exercises.map((exercise) => (
-            <Pressable
+          <Hint>共 {exercises.length} 個動作</Hint>
+          {visible.map((exercise) => (
+            // The thumbnail and 查看動作 preview, the button adds; three sibling targets, since a
+            // button inside a button is invalid on web.
+            <View
               key={exercise.id}
-              accessibilityRole="button"
-              onPress={() => onSelect(exercise)}
-              className="min-h-[52px] gap-1 rounded-field bg-fill px-3 py-2"
+              className={`flex-row gap-3 rounded-card border p-3 ${
+                addedIds?.has(exercise.id) ? 'border-good bg-good-soft/40' : 'border-line bg-surface'
+              }`}
             >
-              <View className="flex-row items-center justify-between gap-2">
-                <Text className="flex-1 text-base font-semibold text-ink">{exercise.name}</Text>
-                <Text className="text-sm text-primary">{selectLabel}</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`查看${exercise.name}的動作示範`}
+                onPress={() => setPreviewing(exercise)}
+                className="self-start"
+              >
+                <ExerciseFigure exerciseId={exercise.id} name={exercise.name} mode="single" size={88} />
+              </Pressable>
+              <View className="min-w-0 flex-1 gap-2">
+                <Text className="text-base font-semibold text-ink">{exercise.name}</Text>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {[categoryLabel(exercise.category_id), bodyLabel(exercise.body_region), equipmentLabel(exercise.equipment)]
+                    .filter(Boolean)
+                    .map((label) => (
+                      <Tag key={label} label={label} />
+                    ))}
+                </View>
+                {exercise.description ? (
+                  <Text className="text-sm text-muted" numberOfLines={2}>
+                    {exercise.description}
+                  </Text>
+                ) : null}
+                <View className="flex-row items-center justify-between gap-2">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`查看${exercise.name}的動作示範`}
+                    onPress={() => setPreviewing(exercise)}
+                    hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+                    className="flex-row items-center gap-0.5"
+                  >
+                    <Text className="text-sm font-semibold text-primary">查看動作</Text>
+                    <ChevronIcon direction="right" size={16} tint={color.primary} />
+                  </Pressable>
+                  {addedIds?.has(exercise.id) ? (
+                    <View
+                      accessibilityRole="text"
+                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-full bg-good-soft px-4"
+                    >
+                      <CheckIcon size={16} tint={color.good} />
+                      <Text className="text-sm font-semibold text-good">已加入</Text>
+                    </View>
+                  ) : (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => onSelect(exercise)}
+                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4 active:opacity-80"
+                    >
+                      <PlusIcon size={16} tint={color.surface} />
+                      <Text className="text-sm font-semibold text-white">{selectLabel}</Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
-              <Text className="text-sm text-muted">
-                {[categoryLabel(exercise.category_id), bodyLabel(exercise.body_region), equipmentLabel(exercise.equipment)]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-              {exercise.description ? <Hint>{exercise.description}</Hint> : null}
-            </Pressable>
+            </View>
           ))}
+          <ShowMore remaining={remaining} onPress={showMore} />
         </View>
       )}
-    </Card>
+
+      <Sheet visible={previewing !== null} title={previewing?.name ?? '動作'} onClose={() => setPreviewing(null)}>
+        {previewing ? (
+          <>
+            <ExerciseFigure exerciseId={previewing.id} name={previewing.name} mode="pair" />
+            {previewing.description ? <Hint>{previewing.description}</Hint> : null}
+            {addedIds?.has(previewing.id) ? (
+              <PrimaryButton tone="plain" icon={CheckIcon} disabled>
+                已加入
+              </PrimaryButton>
+            ) : (
+              <PrimaryButton
+                onPress={() => {
+                  const chosen = previewing;
+                  setPreviewing(null);
+                  onSelect(chosen);
+                }}
+              >
+                {selectLabel}
+              </PrimaryButton>
+            )}
+          </>
+        ) : null}
+      </Sheet>
+    </View>
   );
 }
 

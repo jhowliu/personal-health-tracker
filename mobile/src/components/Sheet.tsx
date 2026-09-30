@@ -1,7 +1,9 @@
 /** Bottom sheet and the selectable lines that go in it. */
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AppModal } from '@/components/AppModal';
 import { CheckIcon } from '@/components/icons';
 
 /** One selectable line in a sheet's list; the selected one is tinted and checked. */
@@ -50,7 +52,7 @@ export function Sheet({
   children: ReactNode;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <AppModal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* Lifts the sheet above the keyboard when the content has a text field. */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1">
         <Pressable
@@ -77,6 +79,6 @@ export function Sheet({
           </SafeAreaView>
         </Pressable>
       </KeyboardAvoidingView>
-    </Modal>
+    </AppModal>
   );
 }

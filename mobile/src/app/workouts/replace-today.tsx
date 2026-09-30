@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
+import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 
@@ -98,15 +99,18 @@ export default function ReplaceTodayWorkout() {
                 accessibilityRole="button"
                 disabled={busy}
                 onPress={() => replace(alternative.exercise.id)}
-                className={`min-h-[64px] gap-1 py-3 ${busy ? 'opacity-40' : ''}`}
+                className={`min-h-[64px] flex-row items-start gap-3 py-3 ${busy ? 'opacity-40' : ''}`}
               >
-                <View className="flex-row items-center gap-2">
-                  <Text className="flex-1 text-base font-semibold text-ink">{alternative.exercise.name}</Text>
-                  {alternative.recommended ? <Chip label="推薦" tone="good" /> : null}
+                <ExerciseFigure exerciseId={alternative.exercise.id} name={alternative.exercise.name} mode="single" />
+                <View className="flex-1 gap-1">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="flex-1 text-base font-semibold text-ink">{alternative.exercise.name}</Text>
+                    {alternative.recommended ? <Chip label="推薦" tone="good" /> : null}
+                  </View>
+                  {alternative.exercise.description ? <Hint>{alternative.exercise.description}</Hint> : null}
+                  <Hint>{alternative.hint}</Hint>
+                  <Text className="text-base text-primary">換成這個動作</Text>
                 </View>
-                {alternative.exercise.description ? <Hint>{alternative.exercise.description}</Hint> : null}
-                <Hint>{alternative.hint}</Hint>
-                <Text className="text-base text-primary">換成這個動作</Text>
               </Pressable>
             ))}
           </Rows>

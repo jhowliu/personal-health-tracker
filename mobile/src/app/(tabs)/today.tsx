@@ -5,7 +5,6 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   Text,
@@ -14,12 +13,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
+import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
 import { CheckIcon, ChevronIcon, PlusIcon, TrashIcon } from '@/components/icons';
+import { Sheet } from '@/components/Sheet';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Card, Chip, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
-import { color } from '@/theme/tokens';
+import { color, foodCategoryTone } from '@/theme/tokens';
+import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
+import { formatPrescription } from '@/workouts/prescription';
 
 type Today = Schema<'TodayOut'>;
 type PlannedMealItem = {
@@ -306,6 +310,7 @@ function MealStep({
   const [busy, setBusy] = useState(false);
   const [portionItem, setPortionItem] = useState<PlannedMealItem | null>(null);
   const [portion, setPortion] = useState('');
+  const [actionItem, setActionItem] = useState<PlannedMealItem | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -377,6 +382,22 @@ function MealStep({
         },
       },
     ]);
+  };
+
+  const replaceItem = (item: PlannedMealItem) => {
+    const food = item.food;
+    if (!food || item.grams === null) return;
+    setActionItem(null);
+    requestAnimationFrame(() =>
+      router.navigate(
+        `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${food.id}&grams=${item.grams}`,
+      ),
+    );
+  };
+
+  const requestRemoveItem = (item: PlannedMealItem) => {
+    setActionItem(null);
+    requestAnimationFrame(() => removeItem(item));
   };
 
   // A shuffle also throws away foods the user added by hand, so it asks first.
@@ -463,14 +484,16 @@ function MealStep({
     );
   }
 
+  // Pinned under the main button so the total stays in view while the list scrolls.
+  const total = (
+    <View className="flex-row items-baseline justify-between px-1">
+      <Text className="text-sm text-muted">整份熱量</Text>
+      <Text className="text-lg font-bold text-ink">{Math.round(meal.nutrients.kcal)} 大卡</Text>
+    </View>
+  );
+
   const footer = (
     <>
-      <View className="flex-row items-baseline justify-between">
-        <Text className="text-sm text-muted">本餐</Text>
-        <Text className="font-display text-xl font-bold text-ink">
-          {meal.skipped ? '未計入' : `${Math.round(meal.nutrients.kcal)} 大卡`}
-        </Text>
-      </View>
       {meal.skipped ? (
         <>
           <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
@@ -486,6 +509,7 @@ function MealStep({
       ) : meal.eaten ? (
         <>
           <Hint>這餐已標記吃完。</Hint>
+          {total}
           <TextAction
             label="改回未吃"
             disabled={busy}
@@ -498,6 +522,7 @@ function MealStep({
           <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
             {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完，下一步：${after}`}
           </PrimaryButton>
+          {total}
           <TextAction
             label="今天略過這餐"
             disabled={busy}
@@ -517,11 +542,16 @@ function MealStep({
         {meal.name ? (
           <>
             <Hint>今天的{STEP_LABEL[step]}</Hint>
-            <Title>{meal.name}</Title>
+            <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+              {meal.name}
+            </Text>
           </>
         ) : (
-          <Title>今天的{STEP_LABEL[step]}</Title>
+          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+            今天的{STEP_LABEL[step]}
+          </Text>
         )}
+        <Hint>點食物列可以替換或移除，點份量可以調整。</Hint>
       </View>
 
       {meal.skipped ? (
@@ -531,77 +561,77 @@ function MealStep({
         </Card>
       ) : (
         <>
-          <Card className="gap-3">
-            <Hint>點食物名稱可以替換，點份量可以調整。</Hint>
+          <Card className="gap-3 p-2">
             {groupPlanItems(meal.items).map((group) => (
-              <View key={group.category} className="gap-2">
-                <Text className="text-sm text-muted">{group.label}</Text>
-                {group.items.map((item) => {
-                  const food = item.food;
-                  const itemName = item.food?.name ?? item.custom_name ?? '未命名食物';
-                  const canEditGrams = food !== null && item.grams !== null;
-                  return (
-                    <View key={item.id} className="min-h-[52px] flex-row items-center gap-2">
-                      {food && item.grams !== null ? (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`替換${itemName}`}
-                          onPress={() =>
-                            router.navigate(
-                              `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${food.id}&grams=${item.grams}`,
-                            )
-                          }
-                          className="min-h-[44px] flex-1 justify-center rounded-field px-1 active:bg-fill"
-                        >
-                          <Text className="text-base text-ink">{itemName}</Text>
-                        </Pressable>
-                      ) : (
-                        <View className="min-h-[44px] flex-1 justify-center px-1">
-                          <Text className="text-base text-ink">{itemName}</Text>
+              <View
+                key={group.category}
+                className="overflow-hidden rounded-card"
+                style={{ backgroundColor: foodCategoryTone(group.category).soft }}
+              >
+                <View className="min-h-[52px] flex-row items-center gap-3 px-3 py-2">
+                  <FoodCategoryIcon category={group.category} size="sm" solid />
+                  <Text className="flex-1 text-lg font-semibold text-ink">{group.label}</Text>
+                  <Text className="text-base text-muted">{group.items.length} 項</Text>
+                </View>
+
+                <View className="bg-surface">
+                  {group.items.map((item, itemIndex) => {
+                    const food = item.food;
+                    const itemName = food?.name ?? item.custom_name ?? '未命名食物';
+                    const canEditGrams = food !== null && item.grams !== null;
+                    return (
+                      <View key={item.id}>
+                        {itemIndex > 0 ? <View className="mx-3 h-px bg-line" /> : null}
+                        <View className="min-h-[60px] flex-row items-center gap-2 px-3 py-2">
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`開啟${itemName}操作`}
+                            accessibilityState={{ disabled: busy }}
+                            disabled={busy}
+                            onPress={() => setActionItem(item)}
+                            className="min-h-[44px] flex-1 justify-center active:opacity-60"
+                          >
+                            <Text className="text-base font-semibold text-ink">{itemName}</Text>
+                          </Pressable>
+                          {canEditGrams ? (
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`調整${itemName}份量，目前${formatPlanAmount(item)}`}
+                              disabled={busy}
+                              onPress={() => editPortion(item)}
+                              className="min-h-[44px] flex-row items-center justify-center gap-1 rounded-full bg-fill px-3 active:opacity-70"
+                            >
+                              <Text className="text-base font-semibold text-ink">{formatPlanAmount(item)}</Text>
+                              <ChevronIcon direction="down" size={14} tint={color.muted} />
+                            </Pressable>
+                          ) : null}
+                          <View aria-hidden className="h-11 w-6 items-center justify-center">
+                            <ChevronIcon direction="right" size={18} tint={color.muted} />
+                          </View>
                         </View>
-                      )}
-                      {canEditGrams ? (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`調整${itemName}份量，目前${formatPlanAmount(item)}`}
-                          disabled={busy}
-                          onPress={() => editPortion(item)}
-                          className="min-h-[44px] flex-row items-center justify-center gap-1 rounded-full bg-fill px-3"
-                        >
-                          <Text className="text-base font-semibold text-ink">{formatPlanAmount(item)}</Text>
-                          <ChevronIcon direction="right" size={14} tint={color.muted} />
-                        </Pressable>
-                      ) : null}
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`移除${itemName}`}
-                        disabled={busy}
-                        onPress={() => removeItem(item)}
-                        className="h-11 w-11 items-center justify-center rounded-full active:bg-fill"
-                      >
-                        <TrashIcon tint={color.muted} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             ))}
-            <View className="flex-row items-baseline justify-between border-t border-line pt-3">
-              <Text className="text-base font-semibold text-ink">整份</Text>
-              <Text className="text-base font-semibold text-ink">{Math.round(meal.nutrients.kcal)} 大卡</Text>
-            </View>
           </Card>
 
-          <PrimaryButton tone="plain" icon={PlusIcon} onPress={addFood} disabled={busy}>
-            加入食物
-          </PrimaryButton>
-
-          <TextAction
-            label="整道換掉"
-            disabled={busy}
-            onPress={shuffle}
-            className="min-h-[44px] justify-center"
-          />
+          <View className="flex-row items-center justify-center gap-8">
+            <TextAction
+              icon={PlusIcon}
+              label="加入食物"
+              disabled={busy}
+              onPress={addFood}
+              className="min-h-[44px] justify-center"
+            />
+            <TextAction
+              label="整道換掉"
+              disabled={busy}
+              onPress={shuffle}
+              className="min-h-[44px] justify-center"
+            />
+          </View>
         </>
       )}
 
@@ -615,6 +645,28 @@ function MealStep({
         onCancel={() => setPortionItem(null)}
         onSave={savePortion}
       />
+
+      <Sheet
+        visible={actionItem !== null}
+        title={actionItem?.food?.name ?? actionItem?.custom_name ?? '食物操作'}
+        onClose={() => setActionItem(null)}
+      >
+        {actionItem?.food && actionItem.grams !== null ? (
+          <PrimaryButton tone="plain" onPress={() => replaceItem(actionItem)} disabled={busy}>
+            替換食物
+          </PrimaryButton>
+        ) : null}
+        {actionItem ? (
+          <PrimaryButton
+            tone="danger"
+            icon={TrashIcon}
+            onPress={() => requestRemoveItem(actionItem)}
+            disabled={busy}
+          >
+            移除這項食物
+          </PrimaryButton>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
@@ -632,11 +684,14 @@ function groupPlanItems(items: PlannedMealItem[]) {
     const category = item.category_id ?? 'other';
     groups.set(category, [...(groups.get(category) ?? []), item]);
   }
-  return [...groups].map(([category, groupedItems]) => ({
-    category,
-    label: labels[category] ?? '其他',
-    items: groupedItems,
-  }));
+  const order = ['staple', 'protein', 'vegetable', 'fruit', 'fat_sauce', 'other'];
+  return [...groups]
+    .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
+    .map(([category, groupedItems]) => ({
+      category,
+      label: labels[category] ?? '其他',
+      items: groupedItems,
+    }));
 }
 
 function formatEditablePortion(item: PlannedMealItem) {
@@ -698,7 +753,7 @@ function PortionEditor({
   };
 
   return (
-    <Modal visible={item !== null} transparent animationType="slide" onRequestClose={close}>
+    <AppModal visible={item !== null} transparent animationType="slide" onRequestClose={close}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
@@ -725,15 +780,19 @@ function PortionEditor({
                   <Text className="text-base text-muted">{itemName}</Text>
                 </View>
               )}
-              <Field
-                label="份量"
-                value={value}
-                onChangeText={onChange}
-                suffix={unit.label}
-                keyboardType="decimal-pad"
-                selectTextOnFocus
-                onSubmitEditing={Keyboard.dismiss}
-              />
+              {/* Field is flex-1: as a direct child of this column in a sheet its height basis is 0 and it
+                  collapses to a line. In a row the flex-1 is horizontal, and the height follows the input. */}
+              <View className="flex-row">
+                <Field
+                  label="份量"
+                  value={value}
+                  onChangeText={onChange}
+                  suffix={unit.label}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                  onSubmitEditing={Keyboard.dismiss}
+                />
+              </View>
               {unit.gramsPerUnit === 1 || !valid ? null : (
                 <Hint>約 {readableAmount(amount * unit.gramsPerUnit)} g</Hint>
               )}
@@ -759,7 +818,7 @@ function PortionEditor({
           </SafeAreaView>
         </Pressable>
       </KeyboardAvoidingView>
-    </Modal>
+    </AppModal>
   );
 }
 
@@ -784,6 +843,7 @@ function WorkoutStep({
   const [pendingEffort, setPendingEffort] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Record<string, number>>({});
   const [minutes, setMinutes] = useState<Record<string, string>>({});
+  const [actionItem, setActionItem] = useState<WorkoutItem | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -933,6 +993,24 @@ function WorkoutStep({
     }
   };
 
+  // The sheet opens from an exercise's title; each choice closes it before acting.
+  const replaceExercise = (item: WorkoutItem) => {
+    setActionItem(null);
+    router.navigate(
+      `/workouts/replace-today?date=${date}&item_id=${item.item.id}&exercise_id=${item.item.exercise_id}&name=${encodeURIComponent(item.item.exercise_name)}`,
+    );
+  };
+
+  const editExercise = (item: WorkoutItem) => {
+    setActionItem(null);
+    startEdit(item);
+  };
+
+  const removeExercise = (item: WorkoutItem) => {
+    setActionItem(null);
+    deleteItem(item);
+  };
+
   if (!workout) {
     return (
       <Screen footerSafeArea={false}>
@@ -950,263 +1028,316 @@ function WorkoutStep({
   ).length;
   const templateName = workout.template?.name;
 
+  // Pinned under the main button, like the meal total, so progress stays in view.
+  const progress = (
+    <View className="flex-row items-baseline justify-between px-1">
+      <Text className="text-sm text-muted">完成進度</Text>
+      <Text className="text-lg font-bold text-ink">
+        {completedExercises} / {workout.items.length} 個動作
+      </Text>
+    </View>
+  );
+
   return (
     <Screen
       footerSafeArea={false}
       footer={
-        <>
-          <View className="flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">完成進度</Text>
-            <Text className="text-base font-semibold text-ink">
-              {completedExercises} / {workout.items.length} 個動作
-            </Text>
-          </View>
-          {workoutSkipped ? (
-            <PrimaryButton onPress={complete} busy={busy}>
-              仍要完成今日訓練
-            </PrimaryButton>
-          ) : allComplete && workout.items.length > 0 ? (
+        workoutSkipped ? (
+          <PrimaryButton onPress={complete} busy={busy}>
+            仍要完成今日訓練
+          </PrimaryButton>
+        ) : allComplete && workout.items.length > 0 ? (
+          <>
             <PrimaryButton onPress={complete} busy={busy}>
               {busy ? '處理中…' : `完成今日訓練，下一步：${after}`}
             </PrimaryButton>
-          ) : (
+            {progress}
+          </>
+        ) : (
+          <>
+            {progress}
             <TextAction
               label="今天略過訓練"
               disabled={busy}
               onPress={skipWorkout}
               className="justify-center"
             />
-          )}
-        </>
+          </>
+        )
       }
     >
       {header}
       <View className="gap-4">
-        <Title sub={templateName ? `今天的課表：${templateName}` : '今天沒有排定訓練'}>訓練</Title>
+        <View className="gap-1">
+          <Hint>今天的訓練</Hint>
+          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+            {templateName ?? '今天沒有排定訓練'}
+          </Text>
+          {workout.items.length > 0 && !workoutSkipped ? (
+            <Hint>點動作名稱可以換動作、編輯或移除。</Hint>
+          ) : null}
+        </View>
 
-      {workoutSkipped ? (
-        <Card className="gap-3 bg-fill">
-          <View className="gap-1">
-            <Text className="text-base font-semibold text-ink">今天已略過訓練</Text>
-            <Hint>略過已儲存。若後來完成了訓練，可直接標記完成。</Hint>
-          </View>
-        </Card>
-      ) : (
-        <>
-          {workout.items.map((item, itemIndex) => {
-        const prescribed = item.item;
-        const setCount = prescribed.sets ?? 1;
-        const completed = completedSetCount(item);
-        const ungrouped = prescribed.sets === null;
-        const suggestion = suggestions[prescribed.id];
-
-        return (
-          <Card key={prescribed.id} className="gap-3">
+        {workoutSkipped ? (
+          <Card className="gap-3 bg-fill">
             <View className="gap-1">
-              <View className="flex-row items-center gap-4">
-                <Text className="flex-1 text-base font-semibold text-ink">
-                  {itemIndex + 1}. {prescribed.exercise_name}
-                </Text>
-                <TextAction label="編輯" disabled={busy} onPress={() => startEdit(item)} />
-                <TextAction tone="danger" label="移除" disabled={busy} onPress={() => deleteItem(item)} />
-              </View>
-              <Hint>
-                {prescribed.duration_sec
-                  ? `${Math.round(prescribed.duration_sec / 60)} 分鐘`
-                  : ungrouped
-                    ? prescribed.reps
-                    : `${setCount} 組 × ${prescribed.reps}`}
-                {prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''}
-              </Hint>
-              {prescribed.replaced_exercise_name ? (
-                <Hint>今天已替換原本的 {prescribed.replaced_exercise_name}</Hint>
-              ) : null}
-              {prescribed.note ? <Hint>{prescribed.note}</Hint> : null}
+              <Text className="text-base font-semibold text-ink">今天已略過訓練</Text>
+              <Hint>略過已儲存。若後來完成了訓練，可直接標記完成。</Hint>
             </View>
+          </Card>
+        ) : (
+          <>
+            {workout.items.length > 0 ? (
+              <Card className="gap-3 p-2">
+                {workout.items.map((item, itemIndex) => {
+                  const prescribed = item.item;
+                  const setCount = prescribed.sets ?? 1;
+                  const completed = completedSetCount(item);
+                  const ungrouped = prescribed.sets === null;
+                  const suggestion = suggestions[prescribed.id];
 
-            {editingItem === prescribed.id && edit ? (
-              <View className="gap-3 rounded-field bg-fill p-3">
-                {prescribed.duration_sec ? (
-                  <Field
-                    label="時間"
-                    suffix="分鐘"
-                    value={edit.durationMin}
-                    onChangeText={(durationMin) => setEdit((current) => current && { ...current, durationMin })}
-                    keyboardType="numeric"
-                  />
-                ) : (
-                  <View className="flex-row gap-3">
-                    <Field
-                      label="組數"
-                      value={edit.sets}
-                      onChangeText={(sets) => setEdit((current) => current && { ...current, sets })}
-                      keyboardType="numeric"
-                    />
-                    <Field
-                      label="次數"
-                      value={edit.reps}
-                      onChangeText={(reps) => setEdit((current) => current && { ...current, reps })}
-                    />
-                  </View>
-                )}
-                <View className="flex-row gap-3">
-                  <Field
-                    label="重量"
-                    suffix="kg"
-                    value={edit.weight}
-                    onChangeText={(weight) => setEdit((current) => current && { ...current, weight })}
-                    keyboardType="decimal-pad"
-                  />
-                  <Field
-                    label="休息"
-                    suffix="秒"
-                    value={edit.rest}
-                    onChangeText={(rest) => setEdit((current) => current && { ...current, rest })}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <Field
-                  label="做法說明"
-                  value={edit.note}
-                  onChangeText={(note) => setEdit((current) => current && { ...current, note })}
-                />
-                <View className="flex-row gap-2">
-                  <View className="flex-1">
-                    <PrimaryButton tone="plain" onPress={() => { setEditingItem(null); setEdit(null); }} disabled={busy}>
-                      取消
-                    </PrimaryButton>
-                  </View>
-                  <View className="flex-1">
-                    <PrimaryButton onPress={() => saveEdit(item)} disabled={busy || (!prescribed.duration_sec && !edit.reps)}>
-                      儲存
-                    </PrimaryButton>
-                  </View>
-                </View>
-              </View>
-            ) : null}
-
-            {prescribed.duration_sec ? (
-              <Field
-                label="實際時間"
-                suffix="分鐘"
-                value={minutes[prescribed.id] ?? String(Math.round(prescribed.duration_sec / 60))}
-                onChangeText={(text) =>
-                  setMinutes((current) => ({ ...current, [prescribed.id]: text }))
-                }
-                keyboardType="numeric"
-              />
-            ) : null}
-
-            <TextAction
-              label="換動作"
-              disabled={busy}
-              onPress={() =>
-                router.navigate(
-                  `/workouts/replace-today?date=${date}&item_id=${prescribed.id}&exercise_id=${prescribed.exercise_id}&name=${encodeURIComponent(prescribed.exercise_name)}`,
-                )
-              }
-              className="min-h-[44px]"
-            />
-
-            {ungrouped ? (
-              <PrimaryButton onPress={() => logSet(item, 0)} disabled={busy || completed > 0} tone="plain">
-                {completed > 0 ? '已完成' : '完成這個動作'}
-              </PrimaryButton>
-            ) : (
-              <View className="flex-row flex-wrap gap-2">
-                {Array.from({ length: setCount }, (_, setIndex) => {
-                  const done = setIndex < completed;
-                  const final = setIndex === setCount - 1;
-                  const available = setIndex === completed;
                   return (
-                    <Pressable
-                      key={setIndex}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: done }}
-                      disabled={busy || done || !available}
-                      onPress={() => (final ? setPendingEffort(prescribed.id) : logSet(item, setIndex))}
-                      className={`min-h-[44px] min-w-[72px] flex-row items-center justify-center gap-1 rounded-field px-3 ${
-                        done ? 'bg-good-soft' : 'bg-fill'
-                      } ${busy || !available ? 'opacity-40' : ''}`}
-                    >
-                      <Text className={`text-base ${done ? 'text-good' : 'text-ink'}`}>第 {setIndex + 1} 組</Text>
-                      {done ? <CheckIcon size={16} tint={color.good} /> : null}
-                    </Pressable>
+                    <View key={prescribed.id} className="overflow-hidden rounded-card bg-fill">
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
+                        accessibilityState={{ disabled: busy }}
+                        disabled={busy}
+                        onPress={() => setActionItem(item)}
+                        className="min-h-[52px] flex-row items-center gap-3 px-3 py-2 active:opacity-70"
+                      >
+                        <Text className="flex-1 text-base font-semibold text-ink">
+                          {itemIndex + 1}. {prescribed.exercise_name}
+                        </Text>
+                        <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
+                        <ChevronIcon direction="right" size={16} tint={color.muted} />
+                      </Pressable>
+
+                      <View className="gap-3 bg-surface px-3 py-3">
+                        {prescribed.replaced_exercise_name ? (
+                          <Hint>今天已替換原本的 {prescribed.replaced_exercise_name}</Hint>
+                        ) : null}
+                        {prescribed.note ? <Hint>{prescribed.note}</Hint> : null}
+
+                        {editingItem === prescribed.id && edit ? (
+                          <View className="gap-3 rounded-field bg-fill p-3">
+                            {prescribed.duration_sec ? (
+                              <Field
+                                label="時間"
+                                suffix="分鐘"
+                                value={edit.durationMin}
+                                onChangeText={(durationMin) =>
+                                  setEdit((current) => current && { ...current, durationMin })
+                                }
+                                keyboardType="numeric"
+                              />
+                            ) : (
+                              <View className="flex-row gap-3">
+                                <Field
+                                  label="組數"
+                                  value={edit.sets}
+                                  onChangeText={(sets) => setEdit((current) => current && { ...current, sets })}
+                                  keyboardType="numeric"
+                                />
+                                <Field
+                                  label="次數"
+                                  value={edit.reps}
+                                  onChangeText={(reps) => setEdit((current) => current && { ...current, reps })}
+                                />
+                              </View>
+                            )}
+                            <View className="flex-row gap-3">
+                              <Field
+                                label="重量"
+                                suffix="kg"
+                                value={edit.weight}
+                                onChangeText={(weight) => setEdit((current) => current && { ...current, weight })}
+                                keyboardType="decimal-pad"
+                              />
+                              <Field
+                                label="休息"
+                                suffix="秒"
+                                value={edit.rest}
+                                onChangeText={(rest) => setEdit((current) => current && { ...current, rest })}
+                                keyboardType="numeric"
+                              />
+                            </View>
+                            <Field
+                              label="做法說明"
+                              value={edit.note}
+                              onChangeText={(note) => setEdit((current) => current && { ...current, note })}
+                            />
+                            <View className="flex-row gap-2">
+                              <View className="flex-1">
+                                <PrimaryButton
+                                  tone="plain"
+                                  onPress={() => {
+                                    setEditingItem(null);
+                                    setEdit(null);
+                                  }}
+                                  disabled={busy}
+                                >
+                                  取消
+                                </PrimaryButton>
+                              </View>
+                              <View className="flex-1">
+                                <PrimaryButton
+                                  onPress={() => saveEdit(item)}
+                                  disabled={busy || (!prescribed.duration_sec && !edit.reps)}
+                                >
+                                  儲存
+                                </PrimaryButton>
+                              </View>
+                            </View>
+                          </View>
+                        ) : null}
+
+                        {prescribed.duration_sec ? (
+                          <Field
+                            label="實際時間"
+                            suffix="分鐘"
+                            value={minutes[prescribed.id] ?? String(Math.round(prescribed.duration_sec / 60))}
+                            onChangeText={(text) =>
+                              setMinutes((current) => ({ ...current, [prescribed.id]: text }))
+                            }
+                            keyboardType="numeric"
+                          />
+                        ) : null}
+
+                        {ungrouped ? (
+                          <PrimaryButton onPress={() => logSet(item, 0)} disabled={busy || completed > 0} tone="plain">
+                            {completed > 0 ? '已完成' : '完成這個動作'}
+                          </PrimaryButton>
+                        ) : (
+                          <View className="flex-row flex-wrap gap-2">
+                            {Array.from({ length: setCount }, (_, setIndex) => {
+                              const done = setIndex < completed;
+                              const final = setIndex === setCount - 1;
+                              const available = setIndex === completed;
+                              return (
+                                <Pressable
+                                  key={setIndex}
+                                  accessibilityRole="button"
+                                  accessibilityState={{ selected: done }}
+                                  disabled={busy || done || !available}
+                                  onPress={() => (final ? setPendingEffort(prescribed.id) : logSet(item, setIndex))}
+                                  className={`min-h-[44px] min-w-[72px] flex-row items-center justify-center gap-1 rounded-field px-3 ${
+                                    done ? 'bg-good-soft' : 'bg-fill'
+                                  } ${busy || !available ? 'opacity-40' : ''}`}
+                                >
+                                  <Text className={`text-base ${done ? 'text-good' : 'text-ink'}`}>
+                                    第 {setIndex + 1} 組
+                                  </Text>
+                                  {done ? <CheckIcon size={16} tint={color.good} /> : null}
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        )}
+
+                        {pendingEffort === prescribed.id ? (
+                          <View className="gap-2">
+                            <Hint>最後一組感覺如何？</Hint>
+                            <View className="flex-row gap-2">
+                              {([
+                                ['easy', '輕鬆'],
+                                ['appropriate', '剛好'],
+                                ['hard', '吃力'],
+                              ] as const).map(([effort, label]) => (
+                                <Chip
+                                  key={effort}
+                                  label={label}
+                                  onPress={() => logSet(item, setCount - 1, effort)}
+                                  tone={effort === 'hard' ? 'warm' : effort === 'easy' ? 'good' : 'primary'}
+                                />
+                              ))}
+                            </View>
+                          </View>
+                        ) : null}
+
+                        {suggestion !== undefined ? (
+                          <View className="gap-2 rounded-field bg-primary-soft p-3">
+                            <Text className="text-base text-ink">下次建議 {suggestion} kg</Text>
+                            {workout.template?.is_builtin ? (
+                              <Hint>公用課表維持唯讀；複製成自己的課表後可保存建議重量。</Hint>
+                            ) : (
+                              <Pressable
+                                accessibilityRole="button"
+                                disabled={busy}
+                                onPress={() => applySuggestion(item)}
+                                className="min-h-[44px] justify-center"
+                              >
+                                <Text className="text-base font-semibold text-primary">套用到課表</Text>
+                              </Pressable>
+                            )}
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
                   );
                 })}
-              </View>
+              </Card>
+            ) : (
+              <Hint>今天沒有安排訓練。</Hint>
             )}
 
-            {pendingEffort === prescribed.id ? (
-              <View className="gap-2">
-                <Hint>最後一組感覺如何？</Hint>
-                <View className="flex-row gap-2">
-                  {([
-                    ['easy', '輕鬆'],
-                    ['appropriate', '剛好'],
-                    ['hard', '吃力'],
-                  ] as const).map(([effort, label]) => (
-                    <Chip
-                      key={effort}
-                      label={label}
-                      onPress={() => logSet(item, setCount - 1, effort)}
-                      tone={effort === 'hard' ? 'warm' : effort === 'easy' ? 'good' : 'primary'}
-                    />
-                  ))}
-                </View>
-              </View>
+            {workout.estimated_burn_kcal ? (
+              <Hint>
+                今天訓練約消耗 {workout.estimated_burn_kcal} 大卡。這是依動作強度和課表時間的粗估，
+                沒有算進你的熱量目標——目標裡的活動量已經含了訓練。
+              </Hint>
             ) : null}
 
-            {suggestion !== undefined ? (
-              <View className="gap-2 rounded-field bg-primary-soft p-3">
-                <Text className="text-base text-ink">下次建議 {suggestion} kg</Text>
-                {workout.template?.is_builtin ? (
-                  <Hint>公用課表維持唯讀；複製成自己的課表後可保存建議重量。</Hint>
-                ) : (
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={busy}
-                    onPress={() => applySuggestion(item)}
-                    className="min-h-[44px] justify-center"
-                  >
-                    <Text className="text-base font-semibold text-primary">套用到課表</Text>
-                  </Pressable>
-                )}
-              </View>
-            ) : null}
-          </Card>
-        );
-          })}
+            <View className="flex-row items-center justify-center gap-8">
+              <TextAction
+                icon={PlusIcon}
+                label="加入動作"
+                disabled={busy}
+                onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
+                className="min-h-[44px] justify-center"
+              />
+              {workout.items.length > 0 ? (
+                <TextAction
+                  label="另存為我的課表"
+                  disabled={busy}
+                  onPress={() => router.navigate({ pathname: '/workouts/save-today', params: { date } })}
+                  className="min-h-[44px] justify-center"
+                />
+              ) : null}
+            </View>
+          </>
+        )}
+      </View>
 
-      {workout.estimated_burn_kcal ? (
-        <Hint>
-          今天訓練約消耗 {workout.estimated_burn_kcal} 大卡。這是依動作強度和課表時間的粗估，
-          沒有算進你的熱量目標——目標裡的活動量已經含了訓練。
-        </Hint>
-      ) : null}
-
-          {workout.items.length === 0 ? <Hint>今天沒有安排訓練。</Hint> : null}
-
-          <PrimaryButton
-            tone="plain"
-            icon={PlusIcon}
-            onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
-            disabled={busy}
-          >
-            加入動作
-          </PrimaryButton>
-          {workout.items.length > 0 ? (
+      <Sheet
+        visible={actionItem !== null}
+        title={actionItem?.item.exercise_name ?? '動作'}
+        onClose={() => setActionItem(null)}
+      >
+        {actionItem ? (
+          <>
+            <ExerciseFigure
+              exerciseId={actionItem.item.exercise_id}
+              name={actionItem.item.exercise_name}
+              mode="pair"
+            />
+            <PrimaryButton tone="plain" onPress={() => replaceExercise(actionItem)} disabled={busy}>
+              換動作
+            </PrimaryButton>
+            <PrimaryButton tone="plain" onPress={() => editExercise(actionItem)} disabled={busy}>
+              編輯
+            </PrimaryButton>
             <PrimaryButton
-              tone="plain"
-              onPress={() => router.navigate({ pathname: '/workouts/save-today', params: { date } })}
+              tone="danger"
+              icon={TrashIcon}
+              onPress={() => removeExercise(actionItem)}
               disabled={busy}
             >
-              另存為我的課表
+              移除這個動作
             </PrimaryButton>
-          ) : null}
-        </>
-      )}
-      </View>
+          </>
+        ) : null}
+      </Sheet>
     </Screen>
   );
 }
