@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
+import { ShowMore, usePaged } from '@/components/paging';
 import { draft } from '@/meals/draft';
 import { byCategoryOrder } from '@/meals/order';
 import { amountToGrams, describeFood, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
@@ -15,6 +16,8 @@ import { color } from '@/theme/tokens';
 
 type Food = Schema<'FoodOut'>;
 type Category = Schema<'FoodCategoryOut'>;
+
+const NO_FOODS: Food[] = [];
 
 export default function AddFood() {
   const { category, meal_id, destination = 'meal', date, slot } = useLocalSearchParams<{
@@ -135,6 +138,7 @@ export default function AddFood() {
   const pickedGrams = picked ? amountToGrams(picked, Number(amount) || 0) : 0;
   const kcal = picked ? Math.round((picked.per_100g.kcal * pickedGrams) / 100) : 0;
   const ordered = useMemo(() => foods && byCategoryOrder(foods, categories), [foods, categories]);
+  const { visible, remaining, showMore } = usePaged(ordered ?? NO_FOODS, ordered);
 
   return (
     <Screen
@@ -199,7 +203,7 @@ export default function AddFood() {
       ) : (
         <Card className="px-0 py-0">
           <Rows>
-            {ordered.map((food) => (
+            {visible.map((food) => (
             <FoodOptionRow
               key={food.id}
               name={food.name}
@@ -212,6 +216,8 @@ export default function AddFood() {
           </Rows>
         </Card>
       )}
+
+      <ShowMore remaining={remaining} onPress={showMore} />
 
     </Screen>
   );

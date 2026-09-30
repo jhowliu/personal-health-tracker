@@ -1,10 +1,11 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { MealCard } from '@/components/MealCard';
+import { ShowMore, usePaged } from '@/components/paging';
 import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';
 import { Card, Chip, Empty, Hint, Rows, Screen, Segmented } from '@/components/ui';
 import { byCategoryOrder } from '@/meals/order';
@@ -242,6 +243,8 @@ function FoodLibrary() {
   );
 
   const selected = categories.find((c) => c.id === category);
+  const ordered = useMemo(() => (foods ? byCategoryOrder(foods, categories) : []), [foods, categories]);
+  const { visible, remaining, showMore } = usePaged(ordered, ordered);
 
   return (
     <>
@@ -266,7 +269,7 @@ function FoodLibrary() {
       ) : (
         <Card className="py-0">
           <Rows>
-            {byCategoryOrder(foods, categories).map((food) => (
+            {visible.map((food) => (
               <Pressable
                 key={food.id}
                 accessibilityRole="button"
@@ -288,6 +291,8 @@ function FoodLibrary() {
           </Rows>
         </Card>
       )}
+
+      <ShowMore remaining={remaining} onPress={showMore} />
     </>
   );
 }
