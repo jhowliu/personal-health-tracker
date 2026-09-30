@@ -1,10 +1,12 @@
 /** A cartoon of an exercise: how it starts and where it ends, drawn from joint angles. */
+import { Image as AnimatedImage } from 'expo-image';
 import { useMemo } from 'react';
 import { Image, View } from 'react-native';
 import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 
 import { ChevronIcon } from '@/components/icons';
 import { color } from '@/theme/tokens';
+import { EXERCISE_ANIMATIONS } from '@/workouts/figure/exercise-animations';
 import { EXERCISE_IMAGES } from '@/workouts/figure/exercise-images';
 import { moveFor } from '@/workouts/figure/moves';
 import {
@@ -194,17 +196,22 @@ function Figure({ built, scale, size }: { built: Built; scale: number; size: num
 /**
  * A picture of the exercise: an illustration from `assets/exercise/` when there is one for
  * this id, and the cartoon drawn below when there is not. `-start` and `-end` pictures show
- * both ends of the movement; a single picture is shown on its own.
+ * both ends of the movement; a single picture is shown on its own. In `pair` mode a looping
+ * animation from `assets/exercise-anim/` replaces all of that; `single` tiles stay still so a
+ * long list does not play dozens of animations at once.
  */
 export function ExerciseFigure({
   exerciseId,
   name,
   mode,
+  size = 48,
 }: {
   exerciseId: string;
   name: string;
   /** `pair` shows the start and the end; `single` is a small tile of the working position. */
   mode: 'pair' | 'single';
+  /** Side of the `single` tile in points. */
+  size?: number;
 }) {
   const startPicture = EXERCISE_IMAGES[`${exerciseId}-start`];
   const endPicture = EXERCISE_IMAGES[`${exerciseId}-end`];
@@ -218,11 +225,20 @@ export function ExerciseFigure({
     return { start: first, end: last, scale: fit(first, last) };
   }, [exerciseId, name, picture]);
 
+  const animation = EXERCISE_ANIMATIONS[exerciseId];
+  if (mode === 'pair' && animation !== undefined) {
+    return (
+      <View aria-hidden className="items-center rounded-field bg-surface py-2">
+        <AnimatedImage source={animation} contentFit="contain" style={{ width: 220, height: 220 }} />
+      </View>
+    );
+  }
+
   if (picture !== undefined) {
     if (mode === 'single') {
       return (
-        <View aria-hidden className="h-12 w-12 overflow-hidden rounded-field bg-surface">
-          <Image source={picture} resizeMode="contain" style={{ width: 48, height: 48 }} />
+        <View aria-hidden className="overflow-hidden rounded-field bg-surface" style={{ width: size, height: size }}>
+          <Image source={picture} resizeMode="contain" style={{ width: size, height: size }} />
         </View>
       );
     }
@@ -247,8 +263,8 @@ export function ExerciseFigure({
 
   if (mode === 'single') {
     return (
-      <View aria-hidden className="h-12 w-12 overflow-hidden rounded-field bg-surface">
-        <Figure built={end} scale={scale} size={48} />
+      <View aria-hidden className="overflow-hidden rounded-field bg-surface" style={{ width: size, height: size }}>
+        <Figure built={end} scale={scale} size={size} />
       </View>
     );
   }
