@@ -780,15 +780,19 @@ function PortionEditor({
                   <Text className="text-base text-muted">{itemName}</Text>
                 </View>
               )}
-              <Field
-                label="份量"
-                value={value}
-                onChangeText={onChange}
-                suffix={unit.label}
-                keyboardType="decimal-pad"
-                selectTextOnFocus
-                onSubmitEditing={Keyboard.dismiss}
-              />
+              {/* Field is flex-1: as a direct child of this column in a sheet its height basis is 0 and it
+                  collapses to a line. In a row the flex-1 is horizontal, and the height follows the input. */}
+              <View className="flex-row">
+                <Field
+                  label="份量"
+                  value={value}
+                  onChangeText={onChange}
+                  suffix={unit.label}
+                  keyboardType="decimal-pad"
+                  selectTextOnFocus
+                  onSubmitEditing={Keyboard.dismiss}
+                />
+              </View>
               {unit.gramsPerUnit === 1 || !valid ? null : (
                 <Hint>約 {readableAmount(amount * unit.gramsPerUnit)} g</Hint>
               )}
