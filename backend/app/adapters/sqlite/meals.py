@@ -1,7 +1,7 @@
 import aiosqlite
 
 from app.application.ports import FoodStore
-from app.domain.models import Meal, MealItem, MealTag, MealTime
+from app.domain.models import Meal, MealItem, MealTime
 
 
 class SqliteMealStore:
@@ -26,7 +26,7 @@ class SqliteMealStore:
             params.append(f"%{query}%")
 
         async with self._conn.execute(
-            f"SELECT m.id, m.name, m.tag FROM meals m WHERE {' AND '.join(clauses)}"
+            f"SELECT m.id, m.name FROM meals m WHERE {' AND '.join(clauses)}"
             " ORDER BY m.created_at",
             params,
         ) as cursor:
@@ -36,7 +36,7 @@ class SqliteMealStore:
 
     async def load(self, user_id: str, meal_id: str) -> Meal | None:
         async with self._conn.execute(
-            "SELECT id, name, tag FROM meals"
+            "SELECT id, name FROM meals"
             " WHERE id = ? AND user_id = ? AND archived_at IS NULL",
             (meal_id, user_id),
         ) as cursor:
@@ -46,14 +46,13 @@ class SqliteMealStore:
     async def save(self, user_id: str, meal: Meal) -> None:
         await self._conn.execute(
             """
-            INSERT INTO meals (id, user_id, name, tag) VALUES (?, ?, ?, ?)
+            INSERT INTO meals (id, user_id, name) VALUES (?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
                 name = excluded.name,
-                tag = excluded.tag,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             WHERE meals.user_id = excluded.user_id
             """,
-            (meal.id, user_id, meal.name, meal.tag.value),
+            (meal.id, user_id, meal.name),
         )
 
         # Slots and items are replaced wholesale — simpler than diffing, and the meal
@@ -112,7 +111,6 @@ class SqliteMealStore:
         return Meal(
             id=row["id"],
             name=row["name"],
-            tag=MealTag(row["tag"]),
             meal_times=slots,
             items=tuple(items),
         )

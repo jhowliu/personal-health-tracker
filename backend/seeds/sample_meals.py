@@ -18,25 +18,22 @@ from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.meals import SqliteMealStore
 from app.db import get_conn
 from app.domain.ids import new_id
-from app.domain.models import Meal, MealItem, MealTag, MealTime
+from app.domain.models import Meal, MealItem, MealTime
 
-# name, tag, slots, [(food_id, grams)]
-RECIPES: list[tuple[str, MealTag, tuple[MealTime, ...], list[tuple[str, float]]]] = [
+# name, slots, [(food_id, grams)]
+RECIPES: list[tuple[str, tuple[MealTime, ...], list[tuple[str, float]]]] = [
     (
         "燕麥豆漿早餐",
-        MealTag.REGULAR,
         (MealTime.BREAKFAST,),
         [("oats-raw", 30), ("soy-milk-unsweetened", 250), ("banana", 100)],
     ),
     (
         "雞蛋吐司早餐",
-        MealTag.REGULAR,
         (MealTime.BREAKFAST,),
         [("toast", 60), ("egg", 100), ("apple", 180)],
     ),
     (
         "雞胸胡麻花椰飯",
-        MealTag.REGULAR,
         (MealTime.LUNCH, MealTime.DINNER),
         [
             ("brown-rice-cooked", 120),
@@ -47,7 +44,6 @@ RECIPES: list[tuple[str, MealTag, tuple[MealTime, ...], list[tuple[str, float]]]
     ),
     (
         "乾煎雞腿蛋花湯",
-        MealTag.REGULAR,
         (MealTime.LUNCH, MealTime.DINNER),
         [
             ("brown-rice-cooked", 100),
@@ -59,19 +55,16 @@ RECIPES: list[tuple[str, MealTag, tuple[MealTime, ...], list[tuple[str, float]]]
     ),
     (
         "鮭魚地瓜菠菜",
-        MealTag.REGULAR,
         (MealTime.LUNCH, MealTime.DINNER),
         [("sweet-potato-cooked", 150), ("salmon-cooked", 120), ("spinach-cooked", 150)],
     ),
     (
         "豆腐蔬菜清淡餐",
-        MealTag.LIGHT,
         (MealTime.DINNER,),
         [("firm-tofu", 150), ("napa-cabbage-cooked", 200), ("carrot-cooked", 50)],
     ),
     (
         "壽喜燒",
-        MealTag.OCCASIONAL,
         (MealTime.DINNER,),
         [
             ("rice-cake", 40),
@@ -103,7 +96,7 @@ async def seed(email: str | None = None) -> dict[str, int]:
 
             foods = await _food_lookup(conn, user["id"])
 
-            for name, tag, slots, items in RECIPES:
+            for name, slots, items in RECIPES:
                 resolved = [
                     MealItem(id=new_id(), food=foods[fid], grams=grams, sort_order=i)
                     for i, (fid, grams) in enumerate(items)
@@ -119,7 +112,6 @@ async def seed(email: str | None = None) -> dict[str, int]:
                     Meal(
                         id=new_id(),
                         name=name,
-                        tag=tag,
                         meal_times=frozenset(slots),
                         items=tuple(resolved),
                     ),
@@ -131,7 +123,7 @@ async def seed(email: str | None = None) -> dict[str, int]:
 
 async def _food_lookup(conn, user_id: str) -> dict:
     store = SqliteFoodStore(conn)
-    ids = {fid for _, _, _, items in RECIPES for fid, _ in items}
+    ids = {fid for _, _, items in RECIPES for fid, _ in items}
     found = {}
     for food in await store.search(user_id, None, None):
         if food.template_id in ids:

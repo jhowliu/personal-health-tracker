@@ -2828,65 +2828,6 @@
         }
       }
     },
-    "/meals/suggest-settings": {
-      "post": {
-        "tags": [
-          "meals"
-        ],
-        "summary": "Suggest Settings",
-        "operationId": "suggest_settings_meals_suggest_settings_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SuggestionIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MealSettingsSuggestionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/meals/{meal_id}": {
       "get": {
         "tags": [
@@ -5372,16 +5313,6 @@
             "type": "string",
             "title": "Name"
           },
-          "tag": {
-            "type": "string",
-            "enum": [
-              "regular",
-              "light",
-              "occasional"
-            ],
-            "title": "Tag",
-            "default": "regular"
-          },
           "meal_times": {
             "items": {
               "type": "string",
@@ -5470,10 +5401,6 @@
             "type": "string",
             "title": "Name"
           },
-          "tag": {
-            "type": "string",
-            "title": "Tag"
-          },
           "meal_times": {
             "items": {
               "type": "string"
@@ -5496,7 +5423,6 @@
         "required": [
           "id",
           "name",
-          "tag",
           "meal_times",
           "items",
           "nutrients"
@@ -5515,22 +5441,6 @@
               }
             ],
             "title": "Name"
-          },
-          "tag": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "regular",
-                  "light",
-                  "occasional"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag"
           },
           "meal_times": {
             "anyOf": [
@@ -5639,56 +5549,6 @@
           "status"
         ],
         "title": "MealPhotoCreateOut"
-      },
-      "MealSettingsSuggestionOut": {
-        "properties": {
-          "tag": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag"
-          },
-          "meal_times": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Meal Times"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          },
-          "rationale": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rationale"
-          },
-          "fallback_used": {
-            "type": "boolean",
-            "title": "Fallback Used"
-          }
-        },
-        "type": "object",
-        "required": [
-          "tag",
-          "meal_times",
-          "confidence",
-          "rationale",
-          "fallback_used"
-        ],
-        "title": "MealSettingsSuggestionOut"
       },
       "MealStateIn": {
         "properties": {

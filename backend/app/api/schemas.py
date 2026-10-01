@@ -651,7 +651,6 @@ class MealItemIn(BaseModel):
 class MealOut(BaseModel):
     id: str
     name: str
-    tag: str
     meal_times: list[str]
     items: list[MealItemOut]
     nutrients: NutrientsOut
@@ -661,7 +660,6 @@ class MealOut(BaseModel):
         return cls(
             id=meal.id,
             name=meal.name,
-            tag=meal.tag.value,
             meal_times=sorted(slot.value for slot in meal.meal_times),
             items=[MealItemOut.of(i) for i in meal.items],
             nutrients=NutrientsOut.of(total(meal.items)),
@@ -670,14 +668,12 @@ class MealOut(BaseModel):
 
 class MealIn(BaseModel):
     name: str
-    tag: Literal["regular", "light", "occasional"] = "regular"
     meal_times: list[PlannedSlot]
     items: list[MealItemIn]
 
 
 class MealPatch(BaseModel):
     name: str | None = None
-    tag: Literal["regular", "light", "occasional"] | None = None
     meal_times: list[PlannedSlot] | None = None
     items: list[MealItemIn] | None = None
 
@@ -887,31 +883,4 @@ class CategorySuggestionOut(BaseModel):
             confidence=result.confidence,
             rationale=result.rationale,
             fallback_used=result.selection_id is None,
-        )
-
-
-class MealSettingsSuggestionOut(BaseModel):
-    tag: str | None
-    meal_times: list[str]
-    confidence: float
-    rationale: str | None
-    fallback_used: bool
-
-    @classmethod
-    def of(cls, result: DecisionResult) -> "MealSettingsSuggestionOut":
-        if result.selection_id is None:
-            return cls(
-                tag=None,
-                meal_times=[],
-                confidence=result.confidence,
-                rationale=result.rationale,
-                fallback_used=True,
-            )
-        tag, meal_time = result.selection_id.split(":", 1)
-        return cls(
-            tag=tag,
-            meal_times=[meal_time],
-            confidence=result.confidence,
-            rationale=result.rationale,
-            fallback_used=False,
         )

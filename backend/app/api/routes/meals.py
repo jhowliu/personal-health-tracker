@@ -1,16 +1,14 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUserId, Decisions, Meals
+from app.api.deps import CurrentUserId, Meals
 from app.api.schemas import (
     CalculateIn,
     MealIn,
     MealOut,
     MealPatch,
-    MealSettingsSuggestionOut,
     NutrientsOut,
-    SuggestionIn,
 )
-from app.domain.models import MealTag, MealTime
+from app.domain.models import MealTime
 
 router = APIRouter(prefix="/meals", tags=["meals"])
 
@@ -31,7 +29,6 @@ async def create_meal(payload: MealIn, user_id: CurrentUserId, service: Meals) -
     meal = await service.create(
         user_id,
         name=payload.name,
-        tag=MealTag(payload.tag),
         meal_times=frozenset(MealTime(t) for t in payload.meal_times),
         items=tuple((i.food_id, i.grams) for i in payload.items),
     )
@@ -43,13 +40,6 @@ async def calculate(payload: CalculateIn, user_id: CurrentUserId, service: Meals
     """Totals for a draft meal. Stores nothing — the edit screen calls this while typing."""
     items = tuple((i.food_id, i.grams) for i in payload.items)
     return NutrientsOut.of(await service.calculate(user_id, items))
-
-
-@router.post("/suggest-settings", response_model=MealSettingsSuggestionOut)
-async def suggest_settings(
-    payload: SuggestionIn, user_id: CurrentUserId, service: Decisions
-) -> MealSettingsSuggestionOut:
-    return MealSettingsSuggestionOut.of(await service.meal_settings(payload.subject))
 
 
 @router.get("/{meal_id}", response_model=MealOut)
@@ -65,7 +55,6 @@ async def update_meal(
         user_id,
         meal_id,
         name=payload.name,
-        tag=MealTag(payload.tag) if payload.tag else None,
         meal_times=(
             frozenset(MealTime(t) for t in payload.meal_times)
             if payload.meal_times is not None

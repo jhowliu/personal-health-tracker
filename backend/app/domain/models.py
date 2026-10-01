@@ -54,12 +54,6 @@ class SwapBasis(StrEnum):
     NONE = "none"
 
 
-class MealTag(StrEnum):
-    REGULAR = "regular"
-    LIGHT = "light"
-    OCCASIONAL = "occasional"
-
-
 class FoodState(StrEnum):
     RAW = "raw"
     COOKED = "cooked"
@@ -302,7 +296,6 @@ class MealItem:
 class Meal:
     id: str
     name: str
-    tag: MealTag
     meal_times: frozenset[MealTime]
     items: tuple[MealItem, ...]
 

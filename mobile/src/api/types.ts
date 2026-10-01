@@ -629,23 +629,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/meals/suggest-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Suggest Settings */
-        post: operations["suggest_settings_meals_suggest_settings_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/meals/{meal_id}": {
         parameters: {
             query?: never;
@@ -1212,12 +1195,6 @@ export interface components {
         MealIn: {
             /** Name */
             name: string;
-            /**
-             * Tag
-             * @default regular
-             * @enum {string}
-             */
-            tag: "regular" | "light" | "occasional";
             /** Meal Times */
             meal_times: ("breakfast" | "lunch" | "dinner")[];
             /** Items */
@@ -1247,8 +1224,6 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            /** Tag */
-            tag: string;
             /** Meal Times */
             meal_times: string[];
             /** Items */
@@ -1259,8 +1234,6 @@ export interface components {
         MealPatch: {
             /** Name */
             name?: string | null;
-            /** Tag */
-            tag?: ("regular" | "light" | "occasional") | null;
             /** Meal Times */
             meal_times?: ("breakfast" | "lunch" | "dinner")[] | null;
             /** Items */
@@ -1293,19 +1266,6 @@ export interface components {
             upload_url: string;
             /** Status */
             status: string;
-        };
-        /** MealSettingsSuggestionOut */
-        MealSettingsSuggestionOut: {
-            /** Tag */
-            tag: string | null;
-            /** Meal Times */
-            meal_times: string[];
-            /** Confidence */
-            confidence: number;
-            /** Rationale */
-            rationale: string | null;
-            /** Fallback Used */
-            fallback_used: boolean;
         };
         /** MealStateIn */
         MealStateIn: {
@@ -3392,41 +3352,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NutrientsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    suggest_settings_meals_suggest_settings_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SuggestionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MealSettingsSuggestionOut"];
                 };
             };
             /** @description Validation Error */

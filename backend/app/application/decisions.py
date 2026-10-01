@@ -2,7 +2,7 @@
 
 from app.application.ports import DecisionEngine, FoodStore, TrainingStore
 from app.domain.decisions import DecisionOption, DecisionRequest, DecisionResult
-from app.domain.models import PLANNED_SLOTS, Exercise, Food
+from app.domain.models import Exercise, Food
 
 # Below this a pick counts as no pick: the spec wants the user to confirm anything
 # under 0.5 rather than having it quietly pre-filled.
@@ -29,17 +29,6 @@ class DecisionService:
             subject,
             "Choose the closest exercise category.",
             tuple(DecisionOption(id, name) for id, name in categories),
-        )
-
-    async def meal_settings(self, subject: str) -> DecisionResult:
-        return await self._decide(
-            subject,
-            "Choose the most suitable meal setting.",
-            tuple(
-                DecisionOption(f"{tag}:{slot.value}", f"{tag}, {slot.value}")
-                for tag in ("regular", "light", "occasional")
-                for slot in PLANNED_SLOTS
-            ),
         )
 
     async def food_match(self, label: str, candidates: tuple[Food, ...]) -> DecisionResult:

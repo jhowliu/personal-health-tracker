@@ -38,12 +38,6 @@ const SLOTS = [
   { id: 'dinner', label: '晚餐' },
 ] as const;
 
-const TAGS = [
-  { id: 'regular', label: '日常' },
-  { id: 'light', label: '清淡' },
-  { id: 'occasional', label: '偶爾吃' },
-] as const;
-
 export default function EditMeal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
@@ -218,20 +212,6 @@ export default function EditMeal() {
               label={slot.label}
               selected={current.mealTimes.includes(slot.id)}
               onPress={() => draft.toggleMealTime(id, slot.id)}
-            />
-          ))}
-        </View>
-      </View>
-
-      <View className="gap-1">
-        <Text className="text-sm text-muted">分類</Text>
-        <View className="flex-row gap-2">
-          {TAGS.map((tag) => (
-            <Chip
-              key={tag.id}
-              label={tag.label}
-              selected={current.tag === tag.id}
-              onPress={() => draft.set(id, { tag: tag.id })}
             />
           ))}
         </View>
