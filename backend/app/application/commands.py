@@ -40,7 +40,6 @@ class ProfileChange:
     activity_level: Patch[ActivityLevel] = UNSET
     deficit_pct: Patch[int] = UNSET
     auto_scale_carbs: Patch[bool] = UNSET
-    auto_assign_meals: Patch[bool] = UNSET
     workout_time: Patch[WorkoutTime] = UNSET
     default_location: Patch[Location] = UNSET
     reminder_time: Patch[str | None] = UNSET

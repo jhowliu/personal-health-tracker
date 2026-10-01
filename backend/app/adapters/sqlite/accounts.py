@@ -93,10 +93,10 @@ class SqliteAccountStore:
             """
             INSERT INTO profiles (
                 user_id, sex, birth_date, height_cm, weight_kg, activity_level, deficit_pct,
-                carb_base_g, auto_scale_carbs, auto_assign_meals, workout_time,
+                carb_base_g, auto_scale_carbs, workout_time,
                 default_location, reminder_time, timezone,
                 updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
             ON CONFLICT (user_id) DO UPDATE SET
                 sex = excluded.sex,
@@ -107,7 +107,6 @@ class SqliteAccountStore:
                 deficit_pct = excluded.deficit_pct,
                 carb_base_g = excluded.carb_base_g,
                 auto_scale_carbs = excluded.auto_scale_carbs,
-                auto_assign_meals = excluded.auto_assign_meals,
                 workout_time = excluded.workout_time,
                 default_location = excluded.default_location,
                 reminder_time = excluded.reminder_time,
@@ -124,7 +123,6 @@ class SqliteAccountStore:
                 profile.deficit_pct,
                 profile.carb_base_g,
                 int(profile.auto_scale_carbs),
-                int(profile.auto_assign_meals),
                 profile.workout_time.value,
                 profile.default_location.value,
                 profile.reminder_time,

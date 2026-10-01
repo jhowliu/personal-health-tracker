@@ -10,10 +10,10 @@ from app.api.schemas import (
     ExtraItemOut,
     MealStateIn,
     PlanItemPatchIn,
+    PlanMealIn,
     SaveDayTemplateIn,
     SetLogIn,
     SetLogResultOut,
-    ShuffleIn,
     SwapItemIn,
     TemplateOut,
     TodayOut,
@@ -133,16 +133,18 @@ async def log_set(
 
 @router.get("/{day}/plan", response_model=DayPlanOut)
 async def read_plan(day: date, user_id: CurrentUserId, service: DailyPlan) -> DayPlanOut:
-    """Today's plate. Generates one on first look when auto-assign is on."""
+    """Today's plate: what has been logged for each meal so far."""
     return DayPlanOut.of(await service.view(user_id, day))
 
 
-@router.post("/{day}/plan/shuffle", response_model=DayPlanOut)
-async def shuffle_plan(
-    day: date, payload: ShuffleIn, user_id: CurrentUserId, service: DailyPlan
+@router.post("/{day}/plan/{meal_time}/meal", response_model=DayPlanOut, status_code=201)
+async def add_plan_meal(
+    day: date, meal_time: str, payload: PlanMealIn, user_id: CurrentUserId, service: DailyPlan
 ) -> DayPlanOut:
-    slot = MealTime(payload.meal_time) if payload.meal_time else None
-    return DayPlanOut.of(await service.shuffle(user_id, day, slot))
+    """Put one of the user's saved meals on the plate, portions scaled to today's target."""
+    return DayPlanOut.of(
+        await service.add_meal(user_id, day, _meal_time(meal_time), payload.meal_id)
+    )
 
 
 @router.patch("/{day}/plan/{meal_time}/items", response_model=DayPlanOut)

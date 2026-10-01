@@ -55,6 +55,16 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3be353db-7519-4202-8827-22bfee94b1ed"
+      }
+    },
+    "owner": "jhowliu",
+    "runtimeVersion": "exposdk:57.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/3be353db-7519-4202-8827-22bfee94b1ed"
     }
   }
 }

@@ -18,7 +18,6 @@ from app.domain.models import (
     Food,
     FoodCategory,
     Meal,
-    MealItem,
     MealTime,
     PlannedMeal,
     PlateItem,
@@ -215,18 +214,6 @@ class DayStore(Protocol):
     async def load_plan(self, user_id: str, day: date) -> tuple[PlannedMeal, ...]:
         """What is on the plate today, as stored — grams already scaled and swapped."""
 
-    async def save_plan(
-        self,
-        user_id: str,
-        day: date,
-        meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
-    ) -> None:
-        """Write the snapshot for the given slots as (meal_id, name, items).
-
-        Slots already marked eaten are left alone: what someone already ate is a fact,
-        not something a reshuffle gets to rewrite.
-        """
-
     async def replace_plan_item(
         self, user_id: str, day: date, meal_time: MealTime, item_id: str, food_id: str, grams: float
     ) -> None:
@@ -243,6 +230,9 @@ class DayStore(Protocol):
     async def delete_plan_item(
         self, user_id: str, day: date, meal_time: MealTime, item_id: str
     ) -> bool: ...
+
+    async def link_meal(self, user_id: str, day: date, meal_time: MealTime, meal_id: str) -> None:
+        """Name an existing slot after the saved meal now filling it."""
 
     async def load_extras(self, user_id: str, day: date) -> tuple[PlateItem, ...]: ...
 
@@ -267,6 +257,9 @@ class FoodStore(Protocol):
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         """Swap candidates: everything in the same category."""
+
+    async def recently_logged(self, user_id: str, since: date) -> tuple[str, ...]:
+        """Ids of foods on the user's days from `since` on, most recently logged first."""
 
     async def seed_defaults(self, user_id: str) -> None:
         """Give the user their own copy of every default food they do not have yet.
@@ -299,8 +292,10 @@ class MealPhotoStore(Protocol):
     async def load(self, user_id: str, photo_id: str) -> MealPhoto | None: ...
 
     async def begin_analysis(
-        self, user_id: str, photo_id: str, now: datetime
-    ) -> MealPhoto | None: ...
+        self, user_id: str, photo_id: str, now: datetime, stale_before: datetime
+    ) -> bool:
+        """Claim the photo for analysis. True for exactly one caller: the photo was uploaded,
+        or an earlier claim started before `stale_before` and was abandoned."""
 
     async def finish_analysis(
         self, user_id: str, photo_id: str, status: str, result_json: str
@@ -321,7 +316,11 @@ class ObjectStorage(Protocol):
 
 
 class ImageRecognizer(Protocol):
-    async def recognize(self, image_url: str) -> tuple[Recognition, ...]: ...
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
+        """`known_foods` are the user's library names; reusing one verbatim lets it match."""
+        ...
 
 
 class DecisionEngine(Protocol):

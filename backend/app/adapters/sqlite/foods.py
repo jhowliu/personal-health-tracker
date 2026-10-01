@@ -1,3 +1,5 @@
+from datetime import date
+
 import aiosqlite
 
 from app.domain.models import Food, FoodCategory, FoodState, Nutrients, SwapBasis
@@ -121,6 +123,15 @@ class SqliteFoodStore:
 
     async def in_category(self, user_id: str, category_id: str) -> tuple[Food, ...]:
         return await self.search(user_id, None, category_id)
+
+    async def recently_logged(self, user_id: str, since: date) -> tuple[str, ...]:
+        async with self._conn.execute(
+            "SELECT food_id FROM day_meal_items"
+            " WHERE user_id = ? AND date >= ? AND food_id IS NOT NULL"
+            " GROUP BY food_id ORDER BY MAX(date) DESC, MAX(created_at) DESC",
+            (user_id, since.isoformat()),
+        ) as cursor:
+            return tuple(row[0] for row in await cursor.fetchall())
 
     async def save(self, user_id: str, food: Food) -> None:
         await self._conn.execute(

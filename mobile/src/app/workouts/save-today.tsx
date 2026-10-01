@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { BackLink, Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -57,7 +58,7 @@ export default function SaveTodayWorkout() {
   return (
     <Screen footer={<PrimaryButton onPress={save} disabled={!name.trim() || !workout.items.length} busy={busy}>儲存為我的課表</PrimaryButton>}>
       <BackLink label="今天" disabled={busy} onPress={() => backOrReplace('/today')} />
-      <Title sub="從今天調整後的動作建立新課表；不會修改原課表或每週排程。">另存課表</Title>
+      <Title sub={`從${date ? dayWord(date) : '今天'}調整後的動作建立新課表；不會修改原課表或每週排程。`}>另存課表</Title>
       <Field label="課表名稱" value={name} onChangeText={setName} placeholder="我的全身訓練" />
       <Card className="gap-2">
         <Text className="text-base font-semibold text-ink">{workout.items.length} 個動作</Text>

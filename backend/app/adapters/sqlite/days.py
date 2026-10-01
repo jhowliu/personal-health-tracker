@@ -10,7 +10,6 @@ from app.domain.models import (
     DayFacts,
     Food,
     FrozenNutrition,
-    MealItem,
     MealSlot,
     MealTime,
     Nutrients,
@@ -192,58 +191,6 @@ class SqliteDayStore:
         )
         return cursor.rowcount == 1
 
-    async def save_plan(
-        self,
-        user_id: str,
-        day: date,
-        meals: dict[MealTime, tuple[str, str, tuple[MealItem, ...]]],
-    ) -> None:
-        # day_meals references days(user_id, date); planning may be the first thing
-        # that touches this date.
-        await open_day(self._conn, user_id, day)
-
-        for meal_time, (meal_id, _name, items) in meals.items():
-            async with self._conn.execute(
-                "SELECT eaten_at, skipped_at FROM day_meals "
-                "WHERE user_id = ? AND date = ? AND meal_time = ?",
-                (user_id, to_day(day), meal_time.value),
-            ) as cursor:
-                existing = await cursor.fetchone()
-
-            # Completed slots are facts; a reshuffle does not get to rewrite them.
-            if existing and (
-                existing["eaten_at"] is not None or existing["skipped_at"] is not None
-            ):
-                continue
-
-            await self._conn.execute(
-                "INSERT INTO day_meals (user_id, date, meal_time, meal_id)"
-                " VALUES (?, ?, ?, ?)"
-                " ON CONFLICT (user_id, date, meal_time) DO UPDATE SET meal_id = excluded.meal_id",
-                (user_id, to_day(day), meal_time.value, meal_id),
-            )
-            await self._conn.execute(
-                "DELETE FROM day_meal_items WHERE user_id = ? AND date = ? AND meal_time = ?",
-                (user_id, to_day(day), meal_time.value),
-            )
-            await self._conn.executemany(
-                "INSERT INTO day_meal_items"
-                " (id, user_id, date, meal_time, food_id, grams, sort_order)"
-                " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        item.id,
-                        user_id,
-                        to_day(day),
-                        meal_time.value,
-                        item.food.id,
-                        item.grams,
-                        index,
-                    )
-                    for index, item in enumerate(items)
-                ],
-            )
-
     async def replace_plan_item(
         self,
         user_id: str,
@@ -288,6 +235,12 @@ class SqliteDayStore:
             (item_id, user_id, to_day(day), meal_time.value),
         )
         return cursor.rowcount == 1
+
+    async def link_meal(self, user_id: str, day: date, meal_time: MealTime, meal_id: str) -> None:
+        await self._conn.execute(
+            "UPDATE day_meals SET meal_id = ? WHERE user_id = ? AND date = ? AND meal_time = ?",
+            (meal_id, user_id, to_day(day), meal_time.value),
+        )
 
     async def _insert_item(
         self, user_id: str, day: date, meal_time: MealTime, item: PlateItem

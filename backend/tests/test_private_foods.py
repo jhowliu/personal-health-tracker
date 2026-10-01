@@ -69,9 +69,10 @@ async def test_archived_food_remains_in_meals_and_does_not_return_on_reseed(
                         "items": [{"food_id": chicken["id"], "grams": 100}]},
     )
     assert rejected.status_code == 404
-    assert (await with_foods.get("/days/2026-09-23/plan")).json()["meals"][0]["items"][0][
-        "food"
-    ]["id"] == chicken["id"]
+    plated = await with_foods.post(
+        "/days/2026-09-23/plan/breakfast/meal", json={"meal_id": meal.json()["id"]}
+    )
+    assert plated.json()["meals"][0]["items"][0]["food"]["id"] == chicken["id"]
 
 
 async def test_eaten_nutrition_stays_fixed_when_food_changes_but_new_meals_use_new_values(
@@ -88,7 +89,11 @@ async def test_eaten_nutrition_stays_fixed_when_food_changes_but_new_meals_use_n
     )
     assert meal.status_code == 201
     old_day = "2026-09-22"
-    plan = (await with_foods.get(f"/days/{old_day}/plan")).json()
+    plan = (
+        await with_foods.post(
+            f"/days/{old_day}/plan/breakfast/meal", json={"meal_id": meal.json()["id"]}
+        )
+    ).json()
     item_id = plan["meals"][0]["items"][0]["id"]
     await with_foods.patch(f"/days/{old_day}/meals/breakfast", json={"state": "eaten"})
 
@@ -115,9 +120,10 @@ async def test_eaten_nutrition_stays_fixed_when_food_changes_but_new_meals_use_n
     assert (await with_foods.get(f"/days/{old_day}")).json()["flow"]["eaten"]["kcal"] == 330
     old_plan = (await with_foods.get(f"/days/{old_day}/plan")).json()
     assert old_plan["meals"][0]["nutrients"]["kcal"] == 330
-    assert (await with_foods.get("/days/2026-09-23/plan")).json()["meals"][0]["nutrients"][
-        "kcal"
-    ] == 220
+    new_day = await with_foods.post(
+        "/days/2026-09-23/plan/breakfast/meal", json={"meal_id": meal.json()["id"]}
+    )
+    assert new_day.json()["meals"][0]["nutrients"]["kcal"] == 220
 
 
 async def test_existing_templates_can_be_added_without_replacing_existing_copies(

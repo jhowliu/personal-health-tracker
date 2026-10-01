@@ -1,7 +1,17 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 
+import { ApiError } from '@/api/client';
 import { analyzeMealPhoto } from '@/meals/analyze-photo';
+
+/** What to tell the user when picking or recognizing a meal photo fails. */
+export function photoErrorMessage(error: unknown) {
+  return error instanceof ApiError && error.status >= 500
+    ? '辨識服務目前未設定或暫時無法使用，請改用手動加入食物。'
+    : error instanceof Error
+      ? error.message
+      : '照片辨識失敗，請稍後再試。';
+}
 
 type PhotoSource = 'camera' | 'library';
 

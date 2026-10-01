@@ -12,6 +12,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
+import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
 
 type Exchange = Schema<'ExchangeOut'>;
@@ -127,7 +128,7 @@ export default function SwapToday() {
     >
       <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
 
-      <Title sub="只換今天這一次，不會改到原本的餐點">換一樣食物</Title>
+      <Title sub={`只換${params.date ? dayWord(params.date) : '今天'}這一次，不會改到原本的餐點`}>換一樣食物</Title>
 
       {choices.length ? (
         <View className="gap-1">

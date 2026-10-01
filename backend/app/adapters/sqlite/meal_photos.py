@@ -30,19 +30,22 @@ class SqliteMealPhotoStore:
             row = await cursor.fetchone()
         return self._photo(row) if row else None
 
-    async def begin_analysis(self, user_id: str, photo_id: str, now) -> MealPhoto | None:
-        await self._conn.execute(
+    async def begin_analysis(self, user_id: str, photo_id: str, now, stale_before) -> bool:
+        # One conditional UPDATE is the whole claim: two requests cannot both change the row.
+        cursor = await self._conn.execute(
             "UPDATE meal_photos SET status = ?, analyzed_at = ?, result_json = NULL "
-            "WHERE id = ? AND user_id = ? AND status = ?",
+            "WHERE id = ? AND user_id = ? AND (status = ? OR (status = ? AND analyzed_at < ?))",
             (
                 MealPhotoStatus.ANALYZING.value,
                 to_iso(now),
                 photo_id,
                 user_id,
                 MealPhotoStatus.UPLOADED.value,
+                MealPhotoStatus.ANALYZING.value,
+                to_iso(stale_before),
             ),
         )
-        return await self.load(user_id, photo_id)
+        return cursor.rowcount == 1
 
     async def finish_analysis(
         self, user_id: str, photo_id: str, status: str, result_json: str

@@ -1,11 +1,16 @@
+from dataclasses import replace
+from datetime import UTC, date, datetime
+
 import aiosqlite
 from httpx import AsyncClient
 
 import app.api.deps as deps
+from app.adapters.sqlite.rows import to_iso
 from app.config import settings
 from app.domain.decisions import DecisionResult
-from app.domain.meal_photos import EstimatedFood, Recognition
+from app.domain.meal_photos import EstimatedFood, Recognition, foods_for_prompt
 from app.domain.models import Nutrients
+from tests import factories
 from tests.factories import seeded_food_id
 
 
@@ -30,7 +35,9 @@ class MissingObjectStorage(FakeStorage):
 
 
 class FakeRecognizer:
-    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
         assert image_url.startswith("https://storage.test/users/")
         return (Recognition("雞胸", 120, 0.91),)
 
@@ -171,9 +178,18 @@ async def test_photographed_food_can_be_added_to_a_specific_meal_slot(
     assert photographed["nutrients"]["kcal"] == 165
 
 
+async def plate_breakfast(client: AsyncClient, day: str) -> dict:
+    """Put the saved breakfast on the day's plate, as the user would from 我的餐點."""
+    meals = (await client.get("/meals")).json()
+    meal_id = next(m["id"] for m in meals if m["name"] == "燕麥豆漿早餐")
+    response = await client.post(f"/days/{day}/plan/breakfast/meal", json={"meal_id": meal_id})
+    assert response.status_code == 201
+    return response.json()
+
+
 async def test_plan_snapshot_items_support_known_and_custom_crud(with_meals: AsyncClient):
     day = "2026-09-23"
-    before = (await with_meals.get(f"/days/{day}/plan")).json()
+    before = await plate_breakfast(with_meals, day)
     breakfast = next(meal for meal in before["meals"] if meal["meal_time"] == "breakfast")
     before_kcal = before["nutrients"]["kcal"]
     chicken = await seeded_food_id(with_meals, "chicken-breast-cooked")
@@ -233,7 +249,7 @@ async def test_editing_an_eaten_item_updates_the_day_nutrition_summary(
     with_meals: AsyncClient,
 ):
     day = "2026-09-23"
-    plan = (await with_meals.get(f"/days/{day}/plan")).json()
+    plan = await plate_breakfast(with_meals, day)
     breakfast = next(meal for meal in plan["meals"] if meal["meal_time"] == "breakfast")
     item = breakfast["items"][0]
     await with_meals.patch(f"/days/{day}/meals/breakfast", json={"state": "eaten"})
@@ -354,7 +370,9 @@ async def test_exercise_alternatives_are_category_safe_and_deterministic(
 class BroadRecognizer:
     """A label that several library foods could answer, so there is a real choice to make."""
 
-    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
         return (Recognition("雞", 120, 0.91),)
 
 
@@ -374,12 +392,16 @@ class UnexpectedDecisionEngine:
 
 
 class ExactRecognizer:
-    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
         return (Recognition("香蕉", 120, 0.91),)
 
 
 class NewFoodRecognizer:
-    async def recognize(self, image_url: str) -> tuple[Recognition, ...]:
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
         return (
             Recognition(
                 "火龍果",
@@ -388,6 +410,94 @@ class NewFoodRecognizer:
                 EstimatedFood("fruit", Nutrients(50, 1.1, 0.2, 11)),
             ),
         )
+
+
+class PairingRecognizer:
+    """Says what it saw and, separately, which library food that is, like the real prompt."""
+
+    def __init__(self, *recognitions: Recognition) -> None:
+        self.recognitions = recognitions
+        self.known_foods: tuple[str, ...] = ()
+
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
+        self.known_foods = known_foods
+        return self.recognitions
+
+
+async def analyze_with(client: AsyncClient, monkeypatch, recognizer) -> dict:
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    monkeypatch.setattr(deps, "image_recognizer", lambda: recognizer)
+    monkeypatch.setattr(deps, "decision_engine", lambda: UnexpectedDecisionEngine())
+    photo = await client.post("/meal-photos", json={"content_type": "image/png"})
+    analyzed = await client.post(f"/meal-photos/{photo.json()['id']}/analyze")
+    assert analyzed.status_code == 200
+    return analyzed.json()
+
+
+async def test_photo_pairing_is_only_as_sure_as_the_recognizer_says(
+    with_foods: AsyncClient, monkeypatch
+):
+    seen = EstimatedFood("protein", Nutrients(190, 27, 9, 0))
+    recognizer = PairingRecognizer(
+        Recognition("豬肉片", 100, 0.85, seen, library_name="梅花豬(熟)", library_confidence=0.7)
+    )
+
+    item = (await analyze_with(with_foods, monkeypatch, recognizer))["items"][0]
+
+    library = {food["name"] for food in (await with_foods.get("/foods")).json()}
+    assert set(recognizer.known_foods) == library
+    assert item["label"] == "豬肉片"
+    assert item["food_id"] == await seeded_food_id(with_foods, "pork-collar-cooked")
+    # Not 1.0: a forced near miss has to keep asking the user to confirm.
+    assert item["match_confidence"] == 0.7
+    # What was actually seen stays available, for when the pairing is wrong.
+    assert item["estimate"]["kcal_per_100g"] == 190
+
+
+async def test_photo_pairing_with_a_name_outside_the_library_falls_back_to_search(
+    with_foods: AsyncClient, monkeypatch
+):
+    recognizer = PairingRecognizer(
+        Recognition("香蕉", 120, 0.9, library_name="不存在的香蕉", library_confidence=0.9)
+    )
+
+    item = (await analyze_with(with_foods, monkeypatch, recognizer))["items"][0]
+
+    assert item["food_id"] == await seeded_food_id(with_foods, "banana")
+    assert item["match_confidence"] == 1.0
+
+
+async def test_photo_recognizer_sees_recently_logged_foods_first(
+    with_foods: AsyncClient, monkeypatch
+):
+    salmon = await seeded_food_id(with_foods, "salmon-cooked")
+    logged = await with_foods.post(
+        f"/days/{date.today().isoformat()}/meals/extras/items",
+        json={"food_id": salmon, "grams": 100},
+    )
+    assert logged.status_code == 201
+    recognizer = PairingRecognizer(Recognition("香蕉", 120, 0.9))
+
+    await analyze_with(with_foods, monkeypatch, recognizer)
+
+    assert recognizer.known_foods[0] == "鮭魚(熟)"
+
+
+def test_prompt_foods_put_recent_then_defaults_first_and_stop_at_the_limit():
+    custom = factories.food("custom", kcal=100, name="自己的便當")
+    default = replace(factories.food("default", kcal=100, name="白飯(熟)"), template_id="rice")
+    recent = factories.food("recent", kcal=100, name="鮭魚(熟)")
+    twin = factories.food("twin", kcal=100, name="白飯(熟)")
+
+    names = foods_for_prompt((custom, default, recent, twin), ("recent", "gone"))
+
+    assert names == ("鮭魚(熟)", "白飯(熟)", "自己的便當")
+    assert foods_for_prompt((custom, default, recent), ("recent",), limit=2) == (
+        "鮭魚(熟)",
+        "白飯(熟)",
+    )
 
 
 async def test_photo_exact_local_match_skips_the_decision_layer(
@@ -518,3 +628,58 @@ async def test_photographed_extras_count_towards_what_was_eaten(
     # Extras are recorded after the fact, so there is no "mark eaten" step to wait for.
     assert after["kcal"] - before["kcal"] == 165
     assert after["protein_g"] - before["protein_g"] == 31
+
+
+class WritingRecognizer:
+    """Logs a weigh-in while the model is "thinking", the way another request would."""
+
+    def __init__(self, client: AsyncClient) -> None:
+        self.client = client
+        self.write_status: int | None = None
+
+    async def recognize(
+        self, image_url: str, known_foods: tuple[str, ...]
+    ) -> tuple[Recognition, ...]:
+        logged = await self.client.put(
+            f"/body-logs/{date.today().isoformat()}", json={"weight_kg": 56}
+        )
+        self.write_status = logged.status_code
+        return (Recognition("香蕉", 120, 0.9),)
+
+
+async def test_other_writes_go_through_while_a_photo_is_being_recognized(
+    with_foods: AsyncClient, monkeypatch
+):
+    recognizer = WritingRecognizer(with_foods)
+
+    await analyze_with(with_foods, monkeypatch, recognizer)
+
+    # The model call must not run inside the request's write transaction.
+    assert recognizer.write_status == 200
+
+
+async def mark_analyzing(photo_id: str, started: str) -> None:
+    async with aiosqlite.connect(settings.db_path) as conn:
+        await conn.execute(
+            "UPDATE meal_photos SET status = 'analyzing', analyzed_at = ? WHERE id = ?",
+            (started, photo_id),
+        )
+        await conn.commit()
+
+
+async def test_photo_analysis_cannot_start_twice_but_a_stale_one_can_be_retried(
+    with_foods: AsyncClient, monkeypatch
+):
+    monkeypatch.setattr(deps, "object_storage", lambda: FakeStorage())
+    monkeypatch.setattr(deps, "image_recognizer", lambda: ExactRecognizer())
+    photo = await with_foods.post("/meal-photos", json={"content_type": "image/png"})
+    photo_id = photo.json()["id"]
+
+    await mark_analyzing(photo_id, to_iso(datetime.now(UTC)))
+    running = await with_foods.post(f"/meal-photos/{photo_id}/analyze")
+    assert running.status_code == 422
+
+    # A server that died mid-analysis leaves the claim behind; it lapses after a while.
+    await mark_analyzing(photo_id, "2020-01-01T00:00:00.000Z")
+    retried = await with_foods.post(f"/meal-photos/{photo_id}/analyze")
+    assert retried.status_code == 200

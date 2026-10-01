@@ -138,7 +138,7 @@ export default function EditMeal() {
   };
 
   const remove = () =>
-    Alert.alert('刪除餐點', '之後的自動分配不會再排到這道。已經吃過的紀錄不受影響。', [
+    Alert.alert('刪除餐點', '之後就不能從我的餐點選這道。已經吃過的紀錄不受影響。', [
       { text: '取消', style: 'cancel' },
       {
         text: '刪除',
