@@ -2,11 +2,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
 
-import { ApiError } from '@/api/client';
 import { CameraIcon } from '@/components/icons';
 import { BackLink, Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
-import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
+import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { photoDraft } from '@/meals/photo-draft';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
@@ -50,13 +49,7 @@ export default function MealPhotoCapture() {
         params: { destination, meal_id, date, slot, analysis_id: analysis.id },
       });
     } catch (error) {
-      const message =
-        error instanceof ApiError && error.status >= 500
-          ? '辨識服務目前未設定或暫時無法使用，請改用手動加入食物。'
-          : error instanceof Error
-            ? error.message
-            : '照片辨識失敗，請稍後再試。';
-      Alert.alert('無法辨識餐點', message);
+      Alert.alert('無法辨識餐點', photoErrorMessage(error));
     } finally {
       setBusy(false);
     }

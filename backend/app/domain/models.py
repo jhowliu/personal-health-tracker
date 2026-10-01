@@ -85,7 +85,6 @@ class Profile:
     deficit_pct: int
     carb_base_g: float
     auto_scale_carbs: bool
-    auto_assign_meals: bool
     workout_time: WorkoutTime
     default_location: Location
     reminder_time: str | None

@@ -1,13 +1,12 @@
-"""Today's plate: which meal fills each slot, at what portions.
+"""Today's plate: what was eaten at each slot, at what portions.
 
-Two things separate this from `MealService`:
+Nothing is dealt in ahead of time; foods arrive from a photo, one at a time, or as a whole
+saved meal. Two things separate this from `MealService`:
 
-* portions here have carb_scale applied, so they follow the current calorie target
-* what gets written is a *snapshot* — editing a meal tomorrow never rewrites today
+* a saved meal's portions get carb_scale applied, so they follow the current calorie target
+* what gets written is a *snapshot*: editing a meal tomorrow never rewrites today
 """
 
-import hashlib
-from dataclasses import replace
 from datetime import date
 
 from app.application.plate_intake import PlateIntake
@@ -25,14 +24,12 @@ from app.domain.meals import apply_carb_scale
 from app.domain.models import (
     PLANNED_SLOTS,
     DayPlan,
-    Meal,
-    MealItem,
     MealTime,
     Nutrients,
+    PlateItem,
     SwapBasis,
 )
 from app.domain.nutrition import compute_targets
-from app.domain.planning import assign, reshuffle
 
 
 class DailyPlanService:
@@ -53,31 +50,36 @@ class DailyPlanService:
         self._intake = intake
 
     async def view(self, user_id: str, day: date) -> DayPlan:
-        """Today's plate, generating one on first look if the user has meals to draw on."""
-        if not await self._days.load_plan(user_id, day):
-            profile = await self._accounts.load_profile(user_id)
-            if profile is not None and profile.auto_assign_meals:
-                await self._generate(user_id, day, seed=_seed(user_id, day))
         return await self._plan(user_id, day)
 
-    async def shuffle(self, user_id: str, day: date, meal_time: MealTime | None = None) -> DayPlan:
-        """Deal a different meal — one slot, or the whole day."""
-        library = await self._meals.list(user_id, None, None)
-        if not library:
-            raise NotFound("還沒有可以分配的餐點")
+    async def add_meal(
+        self, user_id: str, day: date, meal_time: MealTime, meal_id: str
+    ) -> DayPlan:
+        """Put one of the user's saved meals on the plate, portions scaled to today's target.
 
-        by_id = {meal.id: meal for meal in library}
-        current = {
-            planned.meal_time: by_id[planned.meal_id]
-            for planned in await self._days.load_plan(user_id, day)
-            if planned.meal_id in by_id
-        }
+        On an empty slot the slot takes the meal's name; added next to other foods it does
+        not, because the plate is then no longer that meal.
+        """
+        self._check_meal_time(meal_time)
+        meal = await self._meals.load(user_id, meal_id)
+        if meal is None:
+            raise NotFound("找不到這道餐點")
+        profile = await self._accounts.load_profile(user_id)
+        if profile is None:
+            raise NotFound("還沒有建立個人資料")
 
-        # A fresh nonce each call, otherwise shuffling twice would deal the same hand.
-        nonce = int(self._clock.now().timestamp() * 1000)
-        chosen = reshuffle(library, current, seed=_seed(user_id, day) ^ nonce, only=meal_time)
-
-        await self._write(user_id, day, chosen)
+        slot = DayPlan(date=day, meals=await self._days.load_plan(user_id, day)).slot(meal_time)
+        was_empty = slot is None or not slot.items
+        scale = compute_targets(profile, day).carb_scale
+        for item in apply_carb_scale(meal.items, scale):
+            await self._days.add_plan_item(
+                user_id,
+                day,
+                meal_time,
+                PlateItem(new_id(), item.food, None, item.grams, None, None, 0),
+            )
+        if was_empty:
+            await self._days.link_meal(user_id, day, meal_time, meal.id)
         return await self._plan(user_id, day)
 
     async def swap_item(
@@ -166,40 +168,7 @@ class DailyPlanService:
             extras=await self._days.load_extras(user_id, day),
         )
 
-    async def _generate(self, user_id: str, day: date, seed: int) -> None:
-        library = await self._meals.list(user_id, None, None)
-        if library:
-            await self._write(user_id, day, assign(library, seed=seed))
-
-    async def _write(self, user_id: str, day: date, chosen: dict[MealTime, Meal]) -> None:
-        """Scale to today's target, then hand the snapshot to the store."""
-        profile = await self._accounts.load_profile(user_id)
-        if profile is None:
-            raise NotFound("還沒有建立個人資料")
-
-        scale = compute_targets(profile, day).carb_scale
-        snapshot = {
-            slot: (meal.id, meal.name, _fresh_ids(apply_carb_scale(meal.items, scale)))
-            for slot, meal in chosen.items()
-        }
-        await self._days.save_plan(user_id, day, snapshot)
-
     @staticmethod
     def _check_meal_time(meal_time: MealTime) -> None:
         if meal_time not in PLANNED_SLOTS:
             raise ValidationFailed("額外餐點不屬於計畫餐點")
-
-
-def _fresh_ids(items: tuple[MealItem, ...]) -> tuple[MealItem, ...]:
-    """Snapshot rows get their own ids — they outlive the meal items they came from."""
-    return tuple(replace(item, id=new_id()) for item in items)
-
-
-def _seed(user_id: str, day: date) -> int:
-    """Stable per user per day, so looking at today twice shows the same plan.
-
-    Not builtin hash(): string hashing is salted per process, so a server restart would
-    silently deal a different plan for the same day.
-    """
-    digest = hashlib.sha256(f"{user_id}:{day.isoformat()}".encode()).digest()
-    return int.from_bytes(digest[:4], "big")

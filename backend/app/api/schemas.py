@@ -102,7 +102,6 @@ class ProfileIn(BaseModel):
     activity_level: Literal["sedentary", "light", "moderate", "active"]
     deficit_pct: Literal[10, 12, 15, 20]
     auto_scale_carbs: bool = True
-    auto_assign_meals: bool = True
     workout_time: Literal["am", "pm"] = "pm"
     default_location: Literal["home", "gym"] = "home"
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
@@ -117,7 +116,6 @@ class ProfilePatch(BaseModel):
     activity_level: Literal["sedentary", "light", "moderate", "active"] | None = None
     deficit_pct: Literal[10, 12, 15, 20] | None = None
     auto_scale_carbs: bool | None = None
-    auto_assign_meals: bool | None = None
     workout_time: Literal["am", "pm"] | None = None
     default_location: Literal["home", "gym"] | None = None
     timezone: Timezone | None = None
@@ -149,7 +147,6 @@ class ProfileOut(BaseModel):
     activity_level: str
     deficit_pct: int
     auto_scale_carbs: bool
-    auto_assign_meals: bool
     workout_time: str
     default_location: str
     reminder_time: str | None
@@ -749,8 +746,8 @@ class DayPlanOut(BaseModel):
         )
 
 
-class ShuffleIn(BaseModel):
-    meal_time: PlannedSlot | None = None
+class PlanMealIn(BaseModel):
+    meal_id: str
 
 
 class SwapItemIn(BaseModel):

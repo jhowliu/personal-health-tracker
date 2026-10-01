@@ -44,7 +44,6 @@ def to_profile(row: aiosqlite.Row) -> Profile:
         deficit_pct=row["deficit_pct"],
         carb_base_g=row["carb_base_g"],
         auto_scale_carbs=bool(row["auto_scale_carbs"]),
-        auto_assign_meals=bool(row["auto_assign_meals"]),
         workout_time=WorkoutTime(row["workout_time"]),
         default_location=Location(row["default_location"]),
         reminder_time=row["reminder_time"],

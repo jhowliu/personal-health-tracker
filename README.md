@@ -38,7 +38,7 @@ cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.exercises
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.workout_templates
 ```
 
-Optional sample meals, so a new account has something to plan:
+Optional sample meals, so a new account has saved meals to pick from:
 
 ```bash
 cd backend && DB_PATH=./dev.sqlite .venv/bin/python -m seeds.sample_meals

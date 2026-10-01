@@ -17,7 +17,6 @@ def build_profile(**overrides) -> Profile:
         deficit_pct=12,
         carb_base_g=133.0,
         auto_scale_carbs=True,
-        auto_assign_meals=True,
         workout_time=WorkoutTime.PM,
         default_location=Location.HOME,
         reminder_time="07:00",

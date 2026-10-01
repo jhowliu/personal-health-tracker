@@ -6,6 +6,7 @@ import { ApiError, api } from '@/api/client';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { color } from '@/theme/tokens';
+import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
 
 type Reason = 'equipment_occupied' | 'knee_discomfort' | 'missing_equipment' | 'variety';
@@ -79,7 +80,7 @@ export default function ReplaceTodayWorkout() {
   return (
     <Screen>
       <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
-      <Title sub="只換今天這一次，不會改到原本課表。">替代 {name ?? '動作'}</Title>
+      <Title sub={`只換${date ? dayWord(date) : '今天'}這一次，不會改到原本課表。`}>替代 {name ?? '動作'}</Title>
       <View className="flex-row flex-wrap gap-2">
         {REASONS.map((option) => (
           <Chip key={option.id} label={option.label} selected={reason === option.id} onPress={() => setReason(option.id)} />

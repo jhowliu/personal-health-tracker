@@ -100,30 +100,58 @@ class TestCalculate:
         assert response.json()["kcal"] == 0
 
 
+async def saved_meal_id(client: AsyncClient, name: str) -> str:
+    return next(m["id"] for m in (await client.get("/meals")).json() if m["name"] == name)
+
+
+async def add_meal(client: AsyncClient, slot: str, name: str) -> dict:
+    response = await client.post(
+        f"/days/{TODAY}/plan/{slot}/meal", json={"meal_id": await saved_meal_id(client, name)}
+    )
+    assert response.status_code == 201
+    return next(m for m in response.json()["meals"] if m["meal_time"] == slot)
+
+
 class TestDailyPlan:
-    async def test_first_look_deals_a_plan(self, with_meals: AsyncClient):
+    async def test_a_day_starts_empty_even_with_saved_meals(self, with_meals: AsyncClient):
+        """Nothing is dealt in ahead of time: the plate holds only what was logged."""
         plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
+        assert plan["meals"] == []
 
-        slots = {m["meal_time"] for m in plan["meals"]}
-        assert slots == {"breakfast", "lunch", "dinner"}
-        assert plan["nutrients"]["kcal"] > 0
+    async def test_adding_a_saved_meal_puts_its_foods_on_the_plate(self, with_meals: AsyncClient):
+        lunch = await add_meal(with_meals, "lunch", "雞胸胡麻花椰飯")
 
-    async def test_the_plan_is_stable_across_reads(self, with_meals: AsyncClient):
-        first = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        second = (await with_meals.get(f"/days/{TODAY}/plan")).json()
+        assert lunch["meal_id"] == await saved_meal_id(with_meals, "雞胸胡麻花椰飯")
+        assert {i["food"]["template_id"] for i in lunch["items"]} == {
+            "brown-rice-cooked",
+            "chicken-breast-cooked",
+            "broccoli-cooked",
+        }
+        assert lunch["nutrients"]["kcal"] > 0
 
-        assert first == second
+    async def test_a_meal_added_next_to_other_food_does_not_name_the_slot(
+        self, with_meals: AsyncClient
+    ):
+        tofu = await seeded_food_id(with_meals, "firm-tofu")
+        await with_meals.post(
+            f"/days/{TODAY}/plan/lunch/items", json={"food_id": tofu, "grams": 100}
+        )
 
-    async def test_lunch_and_dinner_differ(self, with_meals: AsyncClient):
-        plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        by_slot = {m["meal_time"]: m["meal_id"] for m in plan["meals"]}
+        lunch = await add_meal(with_meals, "lunch", "雞胸胡麻花椰飯")
 
-        assert by_slot["lunch"] != by_slot["dinner"]
+        # Both stay, and the plate is no longer just that meal.
+        assert len(lunch["items"]) == 4
+        assert lunch["meal_id"] is None
+
+    async def test_adding_a_meal_that_is_not_yours_is_rejected(self, with_meals: AsyncClient):
+        response = await with_meals.post(
+            f"/days/{TODAY}/plan/lunch/meal", json={"meal_id": "nope"}
+        )
+        assert response.status_code == 404
 
     async def test_plan_items_are_a_snapshot_not_a_pointer(self, with_meals: AsyncClient):
-        """Editing the meal afterwards must not rewrite what was planned for today."""
-        plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        lunch = next(m for m in plan["meals"] if m["meal_time"] == "lunch")
+        """Editing the meal afterwards must not rewrite what is on today's plate."""
+        lunch = await add_meal(with_meals, "lunch", "雞胸胡麻花椰飯")
         before = lunch["nutrients"]["kcal"]
         oil = await seeded_food_id(with_meals, "olive-oil")
 
@@ -136,21 +164,8 @@ class TestDailyPlan:
         still = next(m for m in after["meals"] if m["meal_time"] == "lunch")
         assert still["nutrients"]["kcal"] == before
 
-    async def test_shuffling_one_slot_leaves_the_others(self, with_meals: AsyncClient):
-        before = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        by_slot = {m["meal_time"]: m["meal_id"] for m in before["meals"]}
-
-        after = (
-            await with_meals.post(f"/days/{TODAY}/plan/shuffle", json={"meal_time": "lunch"})
-        ).json()
-        after_by_slot = {m["meal_time"]: m["meal_id"] for m in after["meals"]}
-
-        assert after_by_slot["lunch"] != by_slot["lunch"]
-        assert after_by_slot["breakfast"] == by_slot["breakfast"]
-
     async def test_swapping_one_food_converts_the_portion(self, with_meals: AsyncClient):
-        plan = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        lunch = next(m for m in plan["meals"] if m["meal_time"] == "lunch")
+        lunch = await add_meal(with_meals, "lunch", "雞胸胡麻花椰飯")
         protein = next(i for i in lunch["items"] if i["category_id"] == "protein")
         tofu_id = await seeded_food_id(with_meals, "firm-tofu")
 
@@ -165,7 +180,7 @@ class TestDailyPlan:
         assert tofu["grams"] > protein["grams"], "tofu is far less protein-dense"
 
     async def test_swapping_an_unknown_item_is_rejected(self, with_meals: AsyncClient):
-        await with_meals.get(f"/days/{TODAY}/plan")
+        await add_meal(with_meals, "lunch", "雞胸胡麻花椰飯")
         tofu_id = await seeded_food_id(with_meals, "firm-tofu")
         response = await with_meals.patch(
             f"/days/{TODAY}/plan/lunch/items",
@@ -173,30 +188,10 @@ class TestDailyPlan:
         )
         assert response.status_code == 404
 
-    async def test_eaten_meals_survive_a_shuffle(self, with_meals: AsyncClient):
-        """What someone already ate is a fact, not something a reshuffle rewrites."""
-        before = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        eaten = next(m for m in before["meals"] if m["meal_time"] == "lunch")
-
-        await with_meals.patch(f"/days/{TODAY}/meals/lunch")
-        await with_meals.post(f"/days/{TODAY}/plan/shuffle", json={})
-
-        after = (await with_meals.get(f"/days/{TODAY}/plan")).json()
-        still = next(m for m in after["meals"] if m["meal_time"] == "lunch")
-        assert still["meal_id"] == eaten["meal_id"]
-
-    async def test_no_meals_means_no_plan_rather_than_an_error(self, with_foods: AsyncClient):
-        plan = (await with_foods.get(f"/days/{TODAY}/plan")).json()
-        assert plan["meals"] == []
-
-    async def test_shuffling_without_meals_explains_itself(self, with_foods: AsyncClient):
-        response = await with_foods.post(f"/days/{TODAY}/plan/shuffle", json={})
-        assert response.status_code == 404
-
 
 async def test_planned_meals_show_up_in_the_day_calorie_count(with_meals: AsyncClient):
-    """The today screen's "eaten X / target" comes from the plan, via P1's day query."""
-    await with_meals.get(f"/days/{TODAY}/plan")
+    """The today screen's "eaten X / target" comes from the plate, via P1's day query."""
+    await add_meal(with_meals, "breakfast", "燕麥豆漿早餐")
     await with_meals.patch(f"/days/{TODAY}/meals/breakfast")
 
     day = (await with_meals.get(f"/days/{TODAY}")).json()

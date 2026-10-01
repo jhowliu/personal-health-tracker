@@ -21,6 +21,9 @@ export async function analyzeMealPhoto(
     httpMethod: 'PUT',
     headers: { 'Content-Type': 'image/jpeg' },
     uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+    // iOS defaults to a background session, which never fails when storage is unreachable:
+    // it retries forever and the screen spins. The user is waiting here, so fail fast instead.
+    sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
   });
   if (upload.status < 200 || upload.status >= 300) {
     throw new Error(`照片上傳失敗 (${upload.status})，請確認網路後再試。`);

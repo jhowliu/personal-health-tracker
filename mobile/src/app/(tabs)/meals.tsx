@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
@@ -85,12 +85,11 @@ export default function MealsScreen() {
 }
 
 function MyMeals() {
-  const { profile, reload } = useSession();
+  const { profile } = useSession();
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [slot, setSlot] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [settingsBusy, setSettingsBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -107,20 +106,8 @@ function MyMeals() {
     }, [load]),
   );
 
-  const toggleAutoAssign = async (next: boolean) => {
-    setSettingsBusy(true);
-    try {
-      await api.patch('/users/me/profile', { auto_assign_meals: next });
-      await reload();
-    } catch (error) {
-      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setSettingsBusy(false);
-    }
-  };
-
   const removeMeal = (meal: Meal) =>
-    Alert.alert('刪除餐點', '之後的自動分配不會再排到這道。已經吃過的紀錄不受影響。', [
+    Alert.alert('刪除餐點', '之後就不能從我的餐點選這道。已經吃過的紀錄不受影響。', [
       { text: '取消', style: 'cancel' },
       {
         text: '刪除',
@@ -159,19 +146,6 @@ function MyMeals() {
       </View>
 
       {profile?.profile.auto_scale_carbs ? <CarbScaleNotice /> : null}
-
-      <Card className="flex-row items-center justify-between">
-        <View className="flex-1 gap-0.5 pr-4">
-          <Text className="text-base font-semibold text-ink">每日自動分配</Text>
-          <Hint>每天從你的餐點裡隨機排早午晚餐。</Hint>
-        </View>
-        <Switch
-          value={profile?.profile.auto_assign_meals ?? true}
-          onValueChange={toggleAutoAssign}
-          disabled={settingsBusy}
-          trackColor={{ true: color.good, false: color.line }}
-        />
-      </Card>
 
       {meals === null ? (
         <ActivityIndicator color={color.primary} />

@@ -1559,7 +1559,7 @@
           "days"
         ],
         "summary": "Read Plan",
-        "description": "Today's plate. Generates one on first look when auto-assign is on.",
+        "description": "Today's plate: what has been logged for each meal so far.",
         "operationId": "read_plan_days__day__plan_get",
         "parameters": [
           {
@@ -1613,13 +1613,14 @@
         }
       }
     },
-    "/days/{day}/plan/shuffle": {
+    "/days/{day}/plan/{meal_time}/meal": {
       "post": {
         "tags": [
           "days"
         ],
-        "summary": "Shuffle Plan",
-        "operationId": "shuffle_plan_days__day__plan_shuffle_post",
+        "summary": "Add Plan Meal",
+        "description": "Put one of the user's saved meals on the plate, portions scaled to today's target.",
+        "operationId": "add_plan_meal_days__day__plan__meal_time__meal_post",
         "parameters": [
           {
             "name": "day",
@@ -1629,6 +1630,15 @@
               "type": "string",
               "format": "date",
               "title": "Day"
+            }
+          },
+          {
+            "name": "meal_time",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Meal Time"
             }
           },
           {
@@ -1653,13 +1663,13 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ShuffleIn"
+                "$ref": "#/components/schemas/PlanMealIn"
               }
             }
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -5770,6 +5780,19 @@
         ],
         "title": "PlanItemPatchIn"
       },
+      "PlanMealIn": {
+        "properties": {
+          "meal_id": {
+            "type": "string",
+            "title": "Meal Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meal_id"
+        ],
+        "title": "PlanMealIn"
+      },
       "PlannedMealItemOut": {
         "properties": {
           "id": {
@@ -5950,11 +5973,6 @@
             "title": "Auto Scale Carbs",
             "default": true
           },
-          "auto_assign_meals": {
-            "type": "boolean",
-            "title": "Auto Assign Meals",
-            "default": true
-          },
           "workout_time": {
             "type": "string",
             "enum": [
@@ -6033,10 +6051,6 @@
             "type": "boolean",
             "title": "Auto Scale Carbs"
           },
-          "auto_assign_meals": {
-            "type": "boolean",
-            "title": "Auto Assign Meals"
-          },
           "workout_time": {
             "type": "string",
             "title": "Workout Time"
@@ -6070,7 +6084,6 @@
           "activity_level",
           "deficit_pct",
           "auto_scale_carbs",
-          "auto_assign_meals",
           "workout_time",
           "default_location",
           "reminder_time",
@@ -6177,17 +6190,6 @@
               }
             ],
             "title": "Auto Scale Carbs"
-          },
-          "auto_assign_meals": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Auto Assign Meals"
           },
           "workout_time": {
             "anyOf": [
@@ -6640,28 +6642,6 @@
           "next_weight_kg"
         ],
         "title": "SetLogResultOut"
-      },
-      "ShuffleIn": {
-        "properties": {
-          "meal_time": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "breakfast",
-                  "lunch",
-                  "dinner"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Meal Time"
-          }
-        },
-        "type": "object",
-        "title": "ShuffleIn"
       },
       "SuggestionIn": {
         "properties": {

@@ -6,6 +6,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { ChevronIcon } from '@/components/icons';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
 import { BackLink, Screen, Title } from '@/components/ui';
+import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -15,6 +16,7 @@ export default function AddTodayWorkout() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [busy, setBusy] = useState(false);
+  const word = date ? dayWord(date) : '今天';
 
   useEffect(() => {
     if (!date) {
@@ -30,7 +32,7 @@ export default function AddTodayWorkout() {
         if (live) setWorkout(result);
       })
       .catch((error) =>
-        Alert.alert('讀不到今天的訓練', error instanceof ApiError ? error.message : '請稍後再試。', [
+        Alert.alert(`讀不到${dayWord(date)}的訓練`, error instanceof ApiError ? error.message : '請稍後再試。', [
           { text: '返回今天', onPress: () => backOrReplace('/today') },
         ]),
       );
@@ -66,7 +68,7 @@ export default function AddTodayWorkout() {
       footer={
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-base text-ink">
-            今天共 <Text className="text-2xl font-bold text-primary">{workout?.items.length ?? 0}</Text> 個動作
+            {word}共 <Text className="text-2xl font-bold text-primary">{workout?.items.length ?? 0}</Text> 個動作
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -76,15 +78,15 @@ export default function AddTodayWorkout() {
               busy ? 'opacity-40' : 'active:opacity-80'
             }`}
           >
-            <Text className="text-sm font-semibold text-white">查看今日訓練</Text>
+            <Text className="text-sm font-semibold text-white">查看{word}的訓練</Text>
             <ChevronIcon direction="right" size={16} tint={color.surface} />
           </Pressable>
         </View>
       }
     >
       <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
-      <Title sub="只會加入今天的訓練，不會修改原本課表。">加入動作</Title>
-      <ExerciseLibrary onSelect={add} selectLabel={busy ? '加入中…' : '加入今天'} addedIds={addedIds} />
+      <Title sub={`只會加入${word}的訓練，不會修改原本課表。`}>加入動作</Title>
+      <ExerciseLibrary onSelect={add} selectLabel={busy ? '加入中…' : `加入${word}`} addedIds={addedIds} />
     </Screen>
   );
 }

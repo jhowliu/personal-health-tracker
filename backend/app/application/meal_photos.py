@@ -1,7 +1,7 @@
 """Meal-photo upload, recognition, and confirmation of extra food items."""
 
 import json
-from datetime import date
+from datetime import date, timedelta
 
 from app.application.decisions import DecisionService
 from app.application.plate_intake import PlateIntake
@@ -22,12 +22,26 @@ from app.domain.meal_photos import (
     Recognition,
     RecognizedFood,
     RecognizedItem,
+    foods_for_prompt,
 )
 from app.domain.models import Food, Nutrients, PlateItem
 
 _IMAGE_TYPES = {"image/jpeg", "image/png"}
 _CANDIDATE_LIMIT = 10
 _ALTERNATIVE_LIMIT = 3
+# Foods logged this recently go to the front of the names the recognizer is shown.
+_RECENT_WINDOW = timedelta(days=60)
+# An ANALYZING claim older than this was abandoned (the server died mid-call) and can be
+# retried. Well past the recognizer's 30 s timeout, so a live analysis is never taken over.
+_ANALYSIS_LEASE = timedelta(minutes=2)
+
+
+def _named(library: tuple[Food, ...], name: str | None) -> Food | None:
+    """The library food the recognizer named, if the name really is one of them."""
+    if not name:
+        return None
+    wanted = name.strip().casefold()
+    return next((food for food in library if food.name.strip().casefold() == wanted), None)
 
 
 class MealPhotoService:
@@ -73,28 +87,39 @@ class MealPhotoService:
     async def analyze(
         self, user_id: str, photo_id: str
     ) -> tuple[MealPhoto, tuple[RecognizedItem, ...]]:
-        today = self._clock.now().date()
+        now = self._clock.now()
+        today = now.date()
         if await self._photos.analyses_on(user_id, today) >= self._daily_quota:
             raise QuotaExceeded("今天的照片辨識額度已用完")
 
-        photo = await self._photos.begin_analysis(user_id, photo_id, self._clock.now())
+        photo = await self._photos.load(user_id, photo_id)
         if photo is None:
             raise NotFound("找不到這張照片")
-        if photo.status is not MealPhotoStatus.ANALYZING:
+        if not await self._photos.begin_analysis(user_id, photo_id, now, now - _ANALYSIS_LEASE):
             raise ValidationFailed("這張照片目前不能辨識")
+        # Commit the claim before the model call. From here the ANALYZING status keeps a
+        # second request off this photo; an open transaction would instead hold SQLite's one
+        # write lock, everyone's, for the 10-20 s the model takes.
+        await self._uow.commit()
 
         try:
             if not await self._objects.exists(photo.object_key):
                 raise ValidationFailed("照片尚未完成上傳，請重新選擇照片")
+            # Library search is substring-based, so "豬肉" never finds "梅花豬(熟)". Showing the
+            # recognizer the user's own names lets it pair what it sees with a library food.
+            library = await self._foods.search(user_id, None, None)
+            recent = await self._foods.recently_logged(user_id, today - _RECENT_WINDOW)
             recognized = await self._recognizer.recognize(
-                await self._objects.create_download_url(photo.object_key)
+                await self._objects.create_download_url(photo.object_key),
+                foods_for_prompt(library, recent),
             )
-            items = await self._match_foods(user_id, recognized)
+            items = await self._match_foods(user_id, recognized, library)
             raw = json.dumps(
                 {
                     "items": [
                         {
                             "label": item.label,
+                            "library_name": source.library_name,
                             "grams": item.grams,
                             "recognition_confidence": item.recognition_confidence,
                             "match_confidence": item.match_confidence,
@@ -135,12 +160,18 @@ class MealPhotoService:
             raise
 
     async def _match_foods(
-        self, user_id: str, recognized: tuple[Recognition, ...]
+        self, user_id: str, recognized: tuple[Recognition, ...], library: tuple[Food, ...]
     ) -> tuple[RecognizedItem, ...]:
         items: list[RecognizedItem] = []
         for item in recognized:
             candidates = await self._candidates(user_id, item.label)
-            selected, confidence = await self._pick(item.label, candidates)
+            paired = _named(library, item.library_name)
+            if paired is not None:
+                # Only as sure as the recognizer says: a near miss it was pushed into (pork
+                # belly for pork collar) must still ask the user to confirm.
+                selected, confidence = paired, item.library_confidence
+            else:
+                selected, confidence = await self._pick(item.label, candidates)
             # The screen looks the selected food up inside `alternatives`, so the chosen one
             # leads the list rather than being filtered out of it.
             ordered = (
@@ -160,7 +191,9 @@ class MealPhotoService:
                         RecognizedFood(food.id, food.category_id, food.name)
                         for food in ordered[:_ALTERNATIVE_LIMIT]
                     ),
-                    estimate=item.estimate if selected is None else None,
+                    # A pairing keeps the estimate of what was actually seen, so the screen can
+                    # fall back to it when the pairing turns out wrong.
+                    estimate=item.estimate if selected is None or paired is not None else None,
                 )
             )
         return tuple(items)

@@ -1,0 +1,26 @@
+# VPS (health.jayliu.dev). The host is shared: its system Caddy owns 80/443 and
+# meeting-mgnt's MinIO is on 127.0.0.1:9000, so the API joins the host network and
+# listens on loopback only. Images are built locally and loaded by ops/deploy.sh.
+# Written for docker-compose 1.29, which is what the VPS has.
+services:
+  api:
+    image: pht-api:${PHT_TAG:-latest}
+    container_name: pht-api
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    environment:
+      HOST: 127.0.0.1
+      PORT: "8010"
+    volumes:
+      - api_data:/data
+    # 1 GB box shared with other apps; keep a leak here from taking them down.
+    mem_limit: 300m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8010/healthz').status == 200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  api_data:

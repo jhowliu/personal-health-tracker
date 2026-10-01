@@ -395,7 +395,7 @@ export interface paths {
         };
         /**
          * Read Plan
-         * @description Today's plate. Generates one on first look when auto-assign is on.
+         * @description Today's plate: what has been logged for each meal so far.
          */
         get: operations["read_plan_days__day__plan_get"];
         put?: never;
@@ -406,7 +406,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/days/{day}/plan/shuffle": {
+    "/days/{day}/plan/{meal_time}/meal": {
         parameters: {
             query?: never;
             header?: never;
@@ -415,8 +415,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Shuffle Plan */
-        post: operations["shuffle_plan_days__day__plan_shuffle_post"];
+        /**
+         * Add Plan Meal
+         * @description Put one of the user's saved meals on the plate, portions scaled to today's target.
+         */
+        post: operations["add_plan_meal_days__day__plan__meal_time__meal_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1340,6 +1343,11 @@ export interface components {
             /** Grams */
             grams: number;
         };
+        /** PlanMealIn */
+        PlanMealIn: {
+            /** Meal Id */
+            meal_id: string;
+        };
         /** PlannedMealItemOut */
         PlannedMealItemOut: {
             /** Id */
@@ -1403,11 +1411,6 @@ export interface components {
              */
             auto_scale_carbs: boolean;
             /**
-             * Auto Assign Meals
-             * @default true
-             */
-            auto_assign_meals: boolean;
-            /**
              * Workout Time
              * @default pm
              * @enum {string}
@@ -1446,8 +1449,6 @@ export interface components {
             deficit_pct: number;
             /** Auto Scale Carbs */
             auto_scale_carbs: boolean;
-            /** Auto Assign Meals */
-            auto_assign_meals: boolean;
             /** Workout Time */
             workout_time: string;
             /** Default Location */
@@ -1473,8 +1474,6 @@ export interface components {
             deficit_pct?: (10 | 12 | 15 | 20) | null;
             /** Auto Scale Carbs */
             auto_scale_carbs?: boolean | null;
-            /** Auto Assign Meals */
-            auto_assign_meals?: boolean | null;
             /** Workout Time */
             workout_time?: ("am" | "pm") | null;
             /** Default Location */
@@ -1604,11 +1603,6 @@ export interface components {
             today: components["schemas"]["TodayOut"];
             /** Next Weight Kg */
             next_weight_kg: number | null;
-        };
-        /** ShuffleIn */
-        ShuffleIn: {
-            /** Meal Time */
-            meal_time?: ("breakfast" | "lunch" | "dinner") | null;
         };
         /** SuggestionIn */
         SuggestionIn: {
@@ -2791,7 +2785,7 @@ export interface operations {
             };
         };
     };
-    shuffle_plan_days__day__plan_shuffle_post: {
+    add_plan_meal_days__day__plan__meal_time__meal_post: {
         parameters: {
             query?: never;
             header?: {
@@ -2799,17 +2793,18 @@ export interface operations {
             };
             path: {
                 day: string;
+                meal_time: string;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ShuffleIn"];
+                "application/json": components["schemas"]["PlanMealIn"];
             };
         };
         responses: {
             /** @description Successful Response */
-            200: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };

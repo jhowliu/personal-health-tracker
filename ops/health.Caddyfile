@@ -1,0 +1,17 @@
+# Imported from the VPS's /etc/caddy/Caddyfile.
+health.jayliu.dev {
+	encode zstd gzip
+
+	# Presigned photo URLs point here. Caddy keeps the Host header, which the
+	# S3 signature covers, so MinIO accepts them.
+	handle /pht-photos/* {
+		request_body {
+			max_size 20MB
+		}
+		reverse_proxy 127.0.0.1:9000
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8010
+	}
+}
