@@ -14,12 +14,12 @@ async def test_builtin_templates_are_global_read_only_and_schedulable(
 
     listed = (await with_profile.get("/workout-templates")).json()
     assert [template["id"] for template in listed] == [
-        "beginner-full-body-a",
-        "beginner-full-body-b",
-        "beginner-full-body-c",
+        template.id for template in sorted(TEMPLATES, key=lambda template: template.name)
     ]
     assert all(template["is_builtin"] for template in listed)
-    assert all(len(template["items"]) == 6 for template in listed)
+    assert {template["id"]: len(template["items"]) for template in listed} == {
+        template.id: len(template.items) for template in TEMPLATES
+    }
 
     scheduled = await with_profile.put(
         "/workout-schedule",
@@ -89,9 +89,9 @@ async def test_builtin_template_can_be_copied_without_becoming_account_data(
         "/workout-schedule", json=[{"weekday": 1, "template_id": copied["id"]}]
     )
     assert hidden.status_code == 404
-    assert len((await with_profile.get("/workout-templates")).json()) == 3
+    assert len((await with_profile.get("/workout-templates")).json()) == len(TEMPLATES)
 
     with_profile.headers["Authorization"] = first_user_token
     assert (await with_profile.delete("/users/me")).status_code == 204
     with_profile.headers["Authorization"] = f"Bearer {registered.json()['access_token']}"
-    assert len((await with_profile.get("/workout-templates")).json()) == 3
+    assert len((await with_profile.get("/workout-templates")).json()) == len(TEMPLATES)

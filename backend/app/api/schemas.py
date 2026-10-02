@@ -295,6 +295,7 @@ class ExerciseIn(BaseModel):
             "machine",
             "barbell",
             "dumbbell",
+            "kettlebell",
             "cable",
             "resistance_band",
             "treadmill",
