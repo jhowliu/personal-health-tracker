@@ -22,6 +22,7 @@ import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Card, Chip, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { photoDraft } from '@/meals/photo-draft';
+import { loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color, foodCategoryTone } from '@/theme/tokens';
@@ -954,6 +955,9 @@ function WorkoutStep({
   const [suggestions, setSuggestions] = useState<Record<string, number>>({});
   const [minutes, setMinutes] = useState<Record<string, string>>({});
   const [actionItem, setActionItem] = useState<WorkoutItem | null>(null);
+  // Focus mode is for today; 直接記錄 (and any other day) keeps the list below.
+  const [listMode, setListMode] = useState(false);
+  const [sessionStarted, setSessionStarted] = useState(false);
   const word = dayWord(date);
 
   const load = useCallback(async () => {
@@ -968,7 +972,8 @@ function WorkoutStep({
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+      void loadSession(date).then((stored) => setSessionStarted(stored !== null));
+    }, [load, date]),
   );
 
   const logSet = async (item: WorkoutItem, setIndex: number, effort?: SetEffort) => {
@@ -995,28 +1000,6 @@ function WorkoutStep({
       await load();
     } catch (error) {
       Alert.alert('記錄不了這一組', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const applySuggestion = async (item: WorkoutItem) => {
-    const templateId = workout?.template?.id;
-    const nextWeight = suggestions[item.item.id];
-    // Writing back needs the template row this was copied from; a day-only item has none.
-    const sourceItemId = item.item.source_item_id;
-    if (!templateId || !sourceItemId || nextWeight === undefined) return;
-    setBusy(true);
-    try {
-      await api.put(`/workout-templates/${templateId}/items/${sourceItemId}/weight`, {
-        weight_kg: nextWeight,
-      });
-      setSuggestions((current) => {
-        const { [item.item.id]: _, ...rest } = current;
-        return rest;
-      });
-    } catch (error) {
-      Alert.alert('套用不了重量', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
       setBusy(false);
     }
@@ -1138,6 +1121,79 @@ function WorkoutStep({
     (entry) => completedSetCount(entry) >= (entry.item.sets ?? 1),
   ).length;
   const templateName = workout.template?.name;
+
+  if (date === todayISO() && workout.items.length > 0 && !workoutSkipped && !listMode) {
+    const done = (entry: WorkoutItem) =>
+      entry.item.duration_sec ? entry.logs.length > 0 : completedSetCount(entry) >= (entry.item.sets ?? 1);
+    const doneCount = workout.items.filter(done).length;
+    const underway = sessionStarted || workout.items.some((entry) => entry.logs.length > 0);
+    return (
+      <Screen
+        footerSafeArea={false}
+        footer={
+          <>
+            <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
+              {underway ? `繼續訓練 · ${doneCount} / ${workout.items.length}` : '開始訓練'}
+            </PrimaryButton>
+            <View className="flex-row items-center justify-center gap-8">
+              <TextAction
+                label="直接記錄，不用計時"
+                disabled={busy}
+                onPress={() => setListMode(true)}
+                className="min-h-[44px] justify-center"
+              />
+              <TextAction
+                label="略過訓練"
+                disabled={busy}
+                onPress={skipWorkout}
+                className="min-h-[44px] justify-center"
+              />
+            </View>
+          </>
+        }
+      >
+        {header}
+        <View className="gap-1">
+          <Hint>今天的訓練</Hint>
+          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+            {templateName ?? '今天的訓練'}
+          </Text>
+          <Hint>
+            {workout.items.length} 個動作
+            {workout.template?.duration_min ? ` · 約 ${workout.template.duration_min} 分鐘` : ''}
+          </Hint>
+        </View>
+        <View className="gap-2.5">
+          {workout.items.map((entry, index) => {
+            const prescribed = entry.item;
+            const finished = done(entry);
+            const status = finished
+              ? '✓ 完成'
+              : prescribed.duration_sec
+                ? `${Math.round(prescribed.duration_sec / 60)} 分鐘`
+                : entry.logs.length
+                  ? `${entry.logs.length} / ${prescribed.sets ?? 1} 組`
+                  : `${prescribed.sets ?? 1} 組${prescribed.reps ? ` × ${prescribed.reps}` : ''}${
+                      prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
+                    }`;
+            return (
+              <View
+                key={prescribed.id}
+                className={`min-h-[58px] flex-row items-center justify-between gap-2.5 rounded-card px-4 ${
+                  finished ? 'bg-good-soft' : 'bg-fill'
+                }`}
+              >
+                <Text className="flex-1 text-base font-semibold text-ink">
+                  {index + 1}. {prescribed.exercise_name}
+                </Text>
+                <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </Screen>
+    );
+  }
 
   // Pinned under the main button, like the meal total, so progress stays in view.
   const progress = (
@@ -1368,19 +1424,8 @@ function WorkoutStep({
 
                         {suggestion !== undefined ? (
                           <View className="gap-2 rounded-field bg-primary-soft p-3">
-                            <Text className="text-base text-ink">下次建議 {suggestion} kg</Text>
-                            {workout.template?.is_builtin ? (
-                              <Hint>公用課表維持唯讀；複製成自己的課表後可保存建議重量。</Hint>
-                            ) : (
-                              <Pressable
-                                accessibilityRole="button"
-                                disabled={busy}
-                                onPress={() => applySuggestion(item)}
-                                className="min-h-[44px] justify-center"
-                              >
-                                <Text className="text-base font-semibold text-primary">套用到課表</Text>
-                              </Pressable>
-                            )}
+                            {/* The next session reads this back from the logged effort; nothing to save. */}
+                            <Text className="text-base text-ink">下次會從 {suggestion} kg 開始</Text>
                           </View>
                         ) : null}
                       </View>

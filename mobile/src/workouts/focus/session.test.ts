@@ -1,0 +1,247 @@
+import type { Schema } from '@/api/client';
+import {
+  REST_SEC,
+  adjustRest,
+  awaitingFeedback,
+  completeCurrent,
+  elapsedMs,
+  fromWorkout,
+  jumpTo,
+  pause,
+  restLeftSec,
+  restore,
+  resume,
+  setFeedback,
+  settleRest,
+  skipRest,
+  step,
+  summary,
+  type Session,
+} from '@/workouts/focus/session';
+
+type Workout = Schema<'WorkoutExecutionOut'>;
+
+const T0 = Date.UTC(2026, 9, 2, 10, 0, 0);
+const sec = (n: number) => n * 1000;
+
+type ItemSpec = {
+  id: string;
+  sets?: number;
+  reps?: string | null;
+  durationSec?: number | null;
+  weightKg?: number | null;
+  equipment?: string | null;
+  logs?: { weight_kg: number | null; reps_done: number | null; duration_sec?: number | null }[];
+  lastSet?: { weight_kg: number | null; reps_done: number | null } | null;
+  best?: number | null;
+  suggested?: number | null;
+};
+
+/** Just the fields focus mode reads; the rest of the API shape does not matter here. */
+function workout(items: ItemSpec[]): Workout {
+  return {
+    date: '2026-10-02',
+    template: null,
+    estimated_burn_kcal: null,
+    items: items.map((spec) => ({
+      item: {
+        id: spec.id,
+        exercise_id: `ex-${spec.id}`,
+        exercise_name: spec.id,
+        sets: spec.sets ?? 3,
+        reps: spec.reps === undefined ? '10–12' : spec.reps,
+        duration_sec: spec.durationSec ?? null,
+        weight_kg: spec.weightKg === undefined ? 40 : spec.weightKg,
+        equipment: spec.equipment ?? 'barbell',
+      },
+      completed_set_count: spec.logs?.length ?? 0,
+      logs: (spec.logs ?? []).map((log, index) => ({ set_index: index, duration_sec: null, ...log })),
+      last_set: spec.lastSet ?? null,
+      best_weight_kg: spec.best ?? null,
+      suggested_weight_kg: spec.suggested ?? null,
+    })),
+  } as unknown as Workout;
+}
+
+/** Complete the current set `times` times, skipping each rest, and return the session. */
+function doSets(session: Session, times: number, now = T0): Session {
+  let current = session;
+  for (let i = 0; i < times; i += 1) current = skipRest(completeCurrent(current, now).session);
+  return current;
+}
+
+describe('starting values', () => {
+  it('start from the suggested weight and the last reps, or the prescription the first time', () => {
+    const session = fromWorkout(
+      workout([
+        { id: 'pulldown', lastSet: { weight_kg: 45, reps_done: 12 }, suggested: 47.5 },
+        { id: 'row', weightKg: 50, reps: '10–12' },
+      ]),
+      T0,
+    );
+
+    expect(session.exercises[0]).toMatchObject({ weightKg: 47.5, reps: 12 });
+    expect(session.exercises[1]).toMatchObject({ weightKg: 50, reps: 10 });
+  });
+
+  it('carry on from a set already logged today', () => {
+    const session = fromWorkout(
+      workout([{ id: 'pulldown', suggested: 47.5, logs: [{ weight_kg: 50, reps_done: 8 }] }]),
+      T0,
+    );
+
+    expect(session.exercises[0]).toMatchObject({ weightKg: 50, reps: 8 });
+  });
+
+  it('treat bodyweight work as having no weight, and timed work in minutes', () => {
+    const session = fromWorkout(
+      workout([
+        { id: 'push-up', weightKg: null, equipment: 'bodyweight' },
+        { id: 'treadmill', durationSec: 20 * 60, reps: null, weightKg: null, equipment: 'treadmill' },
+      ]),
+      T0,
+    );
+
+    expect(session.exercises[0].weightKg).toBeNull();
+    expect(session.exercises[1]).toMatchObject({ kind: 'time', minutes: 20, plannedSets: 1 });
+  });
+
+  it('start a lift from 0 when the plan sets no weight, rather than hiding the weight', () => {
+    const session = fromWorkout(workout([{ id: 'squat', weightKg: null, equipment: 'barbell' }]), T0);
+
+    expect(session.exercises[0].weightKg).toBe(0);
+  });
+});
+
+describe('completing a set', () => {
+  it('logs it and rests before the next set of the same exercise', () => {
+    const { session, log, finished } = completeCurrent(fromWorkout(workout([{ id: 'a' }, { id: 'b' }]), T0), T0);
+
+    expect(log).toMatchObject({ itemId: 'a', setIndex: 0, weightKg: 40, reps: 10, durationSec: null });
+    expect(finished).toBe(false);
+    expect(session.currentIndex).toBe(0);
+    expect(session.rest).toMatchObject({ totalSec: REST_SEC, nextIsNewExercise: false, finishedItemId: null });
+  });
+
+  it('moves to the next exercise after the last set, resting and asking how it felt', () => {
+    const start = fromWorkout(workout([{ id: 'a', sets: 2 }, { id: 'b' }]), T0);
+    const { session } = completeCurrent(doSets(start, 1), T0);
+
+    expect(session.currentIndex).toBe(1);
+    expect(session.rest).toMatchObject({ nextIsNewExercise: true, finishedItemId: 'a' });
+  });
+
+  it('does not rest into cardio, or after it', () => {
+    const start = fromWorkout(
+      workout([{ id: 'a', sets: 1 }, { id: 'run', durationSec: 600, reps: null }, { id: 'b' }]),
+      T0,
+    );
+    const intoCardio = completeCurrent(start, T0).session;
+    expect(intoCardio.currentIndex).toBe(1);
+    expect(intoCardio.rest).toBeNull();
+
+    const { session, log } = completeCurrent(step(intoCardio, 'minutes', 1), T0);
+    expect(log).toMatchObject({ itemId: 'run', setIndex: 0, durationSec: 11 * 60, weightKg: null });
+    expect(session.currentIndex).toBe(2);
+    expect(session.rest).toBeNull();
+  });
+
+  // Acceptance 10: the last set goes straight to the summary, with the right totals.
+  it('finishes after the last set of the day without resting', () => {
+    const start = fromWorkout(workout([{ id: 'a', sets: 2 }]), T0);
+    const { session, finished } = completeCurrent(doSets(start, 1), T0);
+
+    expect(finished).toBe(true);
+    expect(session.rest).toBeNull();
+    expect(summary(session)).toMatchObject({ sets: 2, volumeKg: 2 * 40 * 10 });
+  });
+});
+
+describe('resting', () => {
+  const resting = () => completeCurrent(fromWorkout(workout([{ id: 'a' }]), T0), T0).session;
+
+  // Acceptance 3: the time left comes from the end time, however long the app was away.
+  it('counts down from the end time, not from ticks', () => {
+    const session = resting();
+
+    expect(restLeftSec(session, T0 + sec(37.2))).toBe(53);
+    expect(settleRest(session, T0 + sec(89)).rest).not.toBeNull();
+    expect(settleRest(session, T0 + sec(90)).rest).toBeNull();
+  });
+
+  it('adds or takes off 30 seconds, and ends when there is nothing left', () => {
+    const session = resting();
+
+    expect(restLeftSec(adjustRest(session, 30, T0), T0)).toBe(120);
+    expect(restLeftSec(adjustRest(session, -30, T0), T0)).toBe(60);
+    expect(adjustRest(session, -30, T0 + sec(70)).rest).toBeNull();
+    expect(skipRest(session).rest).toBeNull();
+  });
+
+  // Acceptance 6: values set during the rest are the ones the next set uses.
+  it('lets the next set be tuned during the rest', () => {
+    const tuned = step(step(resting(), 'weight', 1), 'reps', -1);
+    const { log } = completeCurrent(skipRest(tuned), T0);
+
+    expect(log).toMatchObject({ setIndex: 1, weightKg: 42.5, reps: 9 });
+  });
+});
+
+// Acceptance 7: switching exercises keeps what was done and comes back to it.
+it('jumps to another exercise without losing sets, and wraps back to unfinished ones', () => {
+  const start = fromWorkout(workout([{ id: 'a' }, { id: 'b', sets: 1 }, { id: 'c', sets: 1 }]), T0);
+  const afterOne = completeCurrent(start, T0).session;
+
+  const jumped = jumpTo(afterOne, 2);
+  expect(jumped.currentIndex).toBe(2);
+  expect(jumped.rest).toBeNull();
+  expect(jumped.exercises[0].logs).toHaveLength(1);
+
+  const { session } = completeCurrent(jumped, T0);
+  expect(session.currentIndex).toBe(0);
+  expect(jumpTo(session, 2)).toBe(session);
+});
+
+// Acceptance 8: paused time is not training time.
+it('leaves paused time out of the training time', () => {
+  const start = fromWorkout(workout([{ id: 'a' }]), T0);
+  const paused = pause(completeCurrent(start, T0 + sec(60)).session, T0 + sec(100));
+  expect(paused.rest).toBeNull();
+
+  const resumed = resume(paused, T0 + sec(400));
+  expect(elapsedMs(paused, T0 + sec(300))).toBe(sec(100));
+  expect(elapsedMs(resumed, T0 + sec(460))).toBe(sec(160));
+});
+
+it('asks in the summary about strength exercises finished without feedback', () => {
+  const start = fromWorkout(workout([{ id: 'a', sets: 1 }, { id: 'b', sets: 1 }, { id: 'run', durationSec: 600, reps: null }]), T0);
+  const done = doSets(start, 3);
+
+  expect(awaitingFeedback(done).map((exercise) => exercise.itemId)).toEqual(['a', 'b']);
+  expect(awaitingFeedback(setFeedback(done, 'a', 'easy')).map((exercise) => exercise.itemId)).toEqual(['b']);
+});
+
+it('marks a new record only against an earlier best', () => {
+  const start = fromWorkout(
+    workout([
+      { id: 'beaten', sets: 1, best: 45, suggested: 47.5 },
+      { id: 'first-time', sets: 1 },
+    ]),
+    T0,
+  );
+  const records = summary(doSets(start, 2)).exercises.map((entry) => entry.newRecord);
+
+  expect(records).toEqual([true, false]);
+});
+
+it('restores a stored session but trusts the server for what was logged', () => {
+  const stored = step(completeCurrent(fromWorkout(workout([{ id: 'a', sets: 1 }, { id: 'b' }]), T0), T0).session, 'weight', 1);
+  // The server says set 1 of "a" never arrived.
+  const fresh = fromWorkout(workout([{ id: 'a', sets: 1 }, { id: 'b' }]), T0 + sec(500));
+  const restored = restore({ ...stored, currentIndex: 0 }, fresh);
+
+  expect(restored.startedAt).toBe(T0);
+  expect(restored.exercises[0].logs).toHaveLength(0);
+  expect(restored.currentIndex).toBe(0);
+  expect(restored.exercises[1].weightKg).toBe(42.5);
+});

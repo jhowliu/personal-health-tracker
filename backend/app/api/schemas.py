@@ -37,6 +37,7 @@ from app.domain.models import (
 )
 from app.domain.workout_execution import (
     DayWorkoutItem,
+    PastSet,
     SetLog,
     WorkoutExecution,
     WorkoutExecutionItem,
@@ -389,10 +390,6 @@ class TemplateOut(BaseModel):
         )
 
 
-class TemplateWeightIn(BaseModel):
-    weight_kg: float = Field(ge=0)
-
-
 class SaveDayTemplateIn(BaseModel):
     name: str = Field(min_length=1)
 
@@ -441,6 +438,7 @@ class DayWorkoutItemOut(BaseModel):
     replaced_exercise_name: str | None
     replacement_reason: str | None
     source_item_id: str | None
+    equipment: str | None
 
     @classmethod
     def of(cls, item: DayWorkoutItem) -> "DayWorkoutItemOut":
@@ -449,17 +447,43 @@ class DayWorkoutItemOut(BaseModel):
         return cls(**{**values, "replacement_reason": reason.value if reason else None})
 
 
+class PastSetOut(BaseModel):
+    date: date
+    weight_kg: float | None
+    reps_done: int | None
+    duration_sec: int | None
+    effort: str | None
+
+    @classmethod
+    def of(cls, past: PastSet) -> "PastSetOut":
+        return cls(
+            date=past.date,
+            weight_kg=past.weight_kg,
+            reps_done=past.reps_done,
+            duration_sec=past.duration_sec,
+            effort=past.effort.value if past.effort else None,
+        )
+
+
 class WorkoutExecutionItemOut(BaseModel):
     item: DayWorkoutItemOut
     completed_set_count: int
     logs: list[SetLogOut]
+    # From earlier days: where focus mode starts this exercise, and the weight to beat.
+    last_set: PastSetOut | None
+    best_weight_kg: float | None
+    suggested_weight_kg: float | None
 
     @classmethod
     def of(cls, entry: WorkoutExecutionItem) -> "WorkoutExecutionItemOut":
+        last = entry.history.last_set
         return cls(
             item=DayWorkoutItemOut.of(entry.item),
             completed_set_count=entry.completed_set_count,
             logs=[SetLogOut.of(log) for log in entry.logs],
+            last_set=PastSetOut.of(last) if last else None,
+            best_weight_kg=entry.history.best_weight_kg,
+            suggested_weight_kg=entry.history.suggested_weight_kg,
         )
 
 

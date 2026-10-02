@@ -9,6 +9,7 @@ from app.domain.ids import new_id
 from app.domain.models import Location, TemplateItem, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
+    ExerciseHistory,
     SetEffort,
     SetLog,
     SetLogResult,
@@ -68,8 +69,16 @@ class WorkoutExecutionService:
     async def view(self, user_id: str, day: date) -> WorkoutExecution:
         profile = await self._profile(user_id)
         workout = await self._store.load(user_id, day)
+        exercise_ids = tuple(dict.fromkeys(entry.item.exercise_id for entry in workout.items))
+        history = await self._store.exercise_history(user_id, exercise_ids, day)
+        items = tuple(
+            replace(entry, history=history.get(entry.item.exercise_id, ExerciseHistory()))
+            for entry in workout.items
+        )
         return replace(
-            workout, estimated_burn_kcal=estimate_burn_kcal(workout, profile.weight_kg)
+            workout,
+            items=items,
+            estimated_burn_kcal=estimate_burn_kcal(workout, profile.weight_kg),
         )
 
     async def add_item(
@@ -180,12 +189,6 @@ class WorkoutExecutionService:
             ),
         )
         return SetLogResult(recommend_next_weight(weight_kg, effort))
-
-    async def apply_template_weight(
-        self, user_id: str, template_id: str, item_id: str, weight_kg: float
-    ) -> None:
-        if not await self._store.apply_template_weight(user_id, template_id, item_id, weight_kg):
-            raise NotFound("找不到這個課表動作")
 
     async def _profile(self, user_id: str):
         profile = await self._accounts.load_profile(user_id)

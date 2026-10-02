@@ -3964,76 +3964,6 @@
         }
       }
     },
-    "/workout-templates/{template_id}/items/{item_id}/weight": {
-      "put": {
-        "tags": [
-          "training"
-        ],
-        "summary": "Apply Template Item Weight",
-        "operationId": "apply_template_item_weight_workout_templates__template_id__items__item_id__weight_put",
-        "parameters": [
-          {
-            "name": "template_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Template Id"
-            }
-          },
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Item Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TemplateWeightIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/workout-schedule": {
       "get": {
         "tags": [
@@ -4613,6 +4543,17 @@
               }
             ],
             "title": "Source Item Id"
+          },
+          "equipment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equipment"
           }
         },
         "type": "object",
@@ -4630,7 +4571,8 @@
           "met",
           "replaced_exercise_name",
           "replacement_reason",
-          "source_item_id"
+          "source_item_id",
+          "equipment"
         ],
         "title": "DayWorkoutItemOut"
       },
@@ -5625,6 +5567,68 @@
           "carb_g"
         ],
         "title": "NutrientsOut"
+      },
+      "PastSetOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          },
+          "reps_done": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps Done"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "weight_kg",
+          "reps_done",
+          "duration_sec",
+          "effort"
+        ],
+        "title": "PastSetOut"
       },
       "PlanItemPatchIn": {
         "properties": {
@@ -6867,20 +6871,6 @@
         ],
         "title": "TemplateOut"
       },
-      "TemplateWeightIn": {
-        "properties": {
-          "weight_kg": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Weight Kg"
-          }
-        },
-        "type": "object",
-        "required": [
-          "weight_kg"
-        ],
-        "title": "TemplateWeightIn"
-      },
       "TodayOut": {
         "properties": {
           "date": {
@@ -7018,13 +7008,48 @@
             },
             "type": "array",
             "title": "Logs"
+          },
+          "last_set": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PastSetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "best_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Weight Kg"
+          },
+          "suggested_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Weight Kg"
           }
         },
         "type": "object",
         "required": [
           "item",
           "completed_set_count",
-          "logs"
+          "logs",
+          "last_set",
+          "best_weight_kg",
+          "suggested_weight_kg"
         ],
         "title": "WorkoutExecutionItemOut"
       },
