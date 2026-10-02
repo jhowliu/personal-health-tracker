@@ -120,6 +120,21 @@ export default function FocusWorkout() {
     }, [date]),
   );
 
+  // Leaving the screen by any way out — the back gesture, Android's back button, the browser's
+  // back — counts as 暫停並離開, so a forgotten session does not keep its clock running. This
+  // runs on unmount rather than on beforeRemove, which a web history pop skips. Opening 加入動作
+  // or 換動作 keeps this screen mounted underneath and does not pause. Once saved, nothing is left.
+  const saved = useRef(false);
+  useEffect(
+    () => () => {
+      const current = live.current;
+      if (!current || saved.current) return;
+      void cancelRestAlarm(current.date);
+      void saveSession(pause(current, Date.now()));
+    },
+    [],
+  );
+
   // Saved after every change: a killed app reopens to 繼續訓練 with everything in place.
   useEffect(() => {
     if (session) void saveSession(session);
@@ -257,9 +272,12 @@ export default function FocusWorkout() {
     }
   };
 
+  // Store the pause before going, so today's screen reads 繼續訓練 straight away; the unmount
+  // cleanup then finds the session already paused and changes nothing.
   const leave = async () => {
-    void cancelRestAlarm(date);
     const paused = pause(session, Date.now());
+    live.current = paused;
+    void cancelRestAlarm(date);
     await saveSession(paused);
     setSheet(null);
     router.back();
@@ -276,6 +294,7 @@ export default function FocusWorkout() {
     setBusy(true);
     try {
       await api.patch(`/days/${date}`, { workout_done: true });
+      saved.current = true;
       await clearSession(date);
       router.back();
     } catch (error) {
