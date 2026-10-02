@@ -1,6 +1,6 @@
 # Personal Health Tracker
 
-A single-user-per-account tracker for body metrics, planned and eaten meals, and workouts, organised around one calendar Day at a time.
+A single-user-per-account tracker for body metrics, eaten meals and workouts, organised around one calendar Day at a time. Meals are logged after cooking, mostly from a photo; nothing is dealt into a Day ahead of time.
 
 ## Language
 
@@ -13,8 +13,12 @@ Materialising a Day the first time it is viewed or written: its meal slots, its 
 _Avoid_: Creating a day, initialising a day
 
 **Meal slot**:
-One of breakfast, lunch or dinner within a Day, holding a plan and an eaten or skipped state.
+One of breakfast, lunch or dinner within a Day, holding the Plate items logged for it and an eaten or skipped state. Starts empty.
 _Avoid_: Meal time, meal period
+
+**Saved meal**:
+A named set of Foods at portions that the user keeps (我的餐點), to put on a Meal slot whole instead of logging it food by food. Putting one on a slot copies its items; later edits to the Saved meal do not reach that slot.
+_Avoid_: Template, recipe, planned meal
 
 **Extras**:
 Food recorded after the fact outside the three Meal slots, such as a photographed snack. Counts as eaten the moment it is saved.

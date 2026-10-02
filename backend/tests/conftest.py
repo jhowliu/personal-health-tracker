@@ -99,7 +99,6 @@ async def with_meals(with_foods: AsyncClient) -> AsyncClient:
             "/meals",
             json={
                 "name": name,
-                "tag": "regular",
                 "meal_times": slots,
                 "items": [{"food_id": template_ids[fid], "grams": g} for fid, g in items],
             },

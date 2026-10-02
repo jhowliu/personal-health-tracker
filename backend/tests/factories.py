@@ -7,7 +7,6 @@ from app.domain.models import (
     FoodState,
     Meal,
     MealItem,
-    MealTag,
     MealTime,
     Nutrients,
 )
@@ -55,14 +54,12 @@ def item(f: Food, grams: float, sort_order: int = 0) -> MealItem:
 def meal(
     id: str,
     *items: MealItem,
-    tag: MealTag = MealTag.REGULAR,
     times: tuple[MealTime, ...] = (MealTime.LUNCH, MealTime.DINNER),
     name: str | None = None,
 ) -> Meal:
     return Meal(
         id=id,
         name=name or id,
-        tag=tag,
         meal_times=frozenset(times),
         items=items,
     )

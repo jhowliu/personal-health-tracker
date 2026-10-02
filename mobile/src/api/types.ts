@@ -629,23 +629,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/meals/suggest-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Suggest Settings */
-        post: operations["suggest_settings_meals_suggest_settings_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/meals/{meal_id}": {
         parameters: {
             query?: never;
@@ -840,23 +823,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/workout-templates/{template_id}/items/{item_id}/weight": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Apply Template Item Weight */
-        put: operations["apply_template_item_weight_workout_templates__template_id__items__item_id__weight_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/workout-schedule": {
         parameters: {
             query?: never;
@@ -1012,6 +978,8 @@ export interface components {
             replacement_reason: string | null;
             /** Source Item Id */
             source_item_id: string | null;
+            /** Equipment */
+            equipment: string | null;
         };
         /** DeviceIn */
         DeviceIn: {
@@ -1212,12 +1180,6 @@ export interface components {
         MealIn: {
             /** Name */
             name: string;
-            /**
-             * Tag
-             * @default regular
-             * @enum {string}
-             */
-            tag: "regular" | "light" | "occasional";
             /** Meal Times */
             meal_times: ("breakfast" | "lunch" | "dinner")[];
             /** Items */
@@ -1247,8 +1209,6 @@ export interface components {
             id: string;
             /** Name */
             name: string;
-            /** Tag */
-            tag: string;
             /** Meal Times */
             meal_times: string[];
             /** Items */
@@ -1259,8 +1219,6 @@ export interface components {
         MealPatch: {
             /** Name */
             name?: string | null;
-            /** Tag */
-            tag?: ("regular" | "light" | "occasional") | null;
             /** Meal Times */
             meal_times?: ("breakfast" | "lunch" | "dinner")[] | null;
             /** Items */
@@ -1294,19 +1252,6 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** MealSettingsSuggestionOut */
-        MealSettingsSuggestionOut: {
-            /** Tag */
-            tag: string | null;
-            /** Meal Times */
-            meal_times: string[];
-            /** Confidence */
-            confidence: number;
-            /** Rationale */
-            rationale: string | null;
-            /** Fallback Used */
-            fallback_used: boolean;
-        };
         /** MealStateIn */
         MealStateIn: {
             /**
@@ -1337,6 +1282,22 @@ export interface components {
             fat_g: number;
             /** Carb G */
             carb_g: number;
+        };
+        /** PastSetOut */
+        PastSetOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Weight Kg */
+            weight_kg: number | null;
+            /** Reps Done */
+            reps_done: number | null;
+            /** Duration Sec */
+            duration_sec: number | null;
+            /** Effort */
+            effort: string | null;
         };
         /** PlanItemPatchIn */
         PlanItemPatchIn: {
@@ -1708,11 +1669,6 @@ export interface components {
             /** Items */
             items: components["schemas"]["TemplateItemOut"][];
         };
-        /** TemplateWeightIn */
-        TemplateWeightIn: {
-            /** Weight Kg */
-            weight_kg: number;
-        };
         /** TodayOut */
         TodayOut: {
             /**
@@ -1770,6 +1726,11 @@ export interface components {
             completed_set_count: number;
             /** Logs */
             logs: components["schemas"]["SetLogOut"][];
+            last_set: components["schemas"]["PastSetOut"] | null;
+            /** Best Weight Kg */
+            best_weight_kg: number | null;
+            /** Suggested Weight Kg */
+            suggested_weight_kg: number | null;
         };
         /** WorkoutExecutionOut */
         WorkoutExecutionOut: {
@@ -3405,41 +3366,6 @@ export interface operations {
             };
         };
     };
-    suggest_settings_meals_suggest_settings_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SuggestionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MealSettingsSuggestionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_meal_meals__meal_id__get: {
         parameters: {
             query?: never;
@@ -4043,42 +3969,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TemplateOut"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    apply_template_item_weight_workout_templates__template_id__items__item_id__weight_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                template_id: string;
-                item_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TemplateWeightIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

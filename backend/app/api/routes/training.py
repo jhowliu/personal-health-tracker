@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUserId, Decisions, Training, WorkoutExecution
+from app.api.deps import CurrentUserId, Decisions, Training
 from app.api.schemas import (
     CategorySuggestionOut,
     ExerciseAlternativeOut,
@@ -12,7 +12,6 @@ from app.api.schemas import (
     SuggestionIn,
     TemplateIn,
     TemplateOut,
-    TemplateWeightIn,
 )
 from app.domain.ids import new_id
 from app.domain.models import Location, ScheduleEntry, TemplateItem, WorkoutTemplate
@@ -149,20 +148,6 @@ async def reorder_items(
     return TemplateOut.of(
         await service.reorder_items(user_id, template_id, tuple(payload.item_ids))
     )
-
-
-@router.put(
-    "/workout-templates/{template_id}/items/{item_id}/weight",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def apply_template_item_weight(
-    template_id: str,
-    item_id: str,
-    payload: TemplateWeightIn,
-    user_id: CurrentUserId,
-    service: WorkoutExecution,
-) -> None:
-    await service.apply_template_weight(user_id, template_id, item_id, payload.weight_kg)
 
 
 @router.get("/workout-schedule", response_model=list[ScheduleEntryOut])

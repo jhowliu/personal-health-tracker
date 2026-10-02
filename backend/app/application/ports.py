@@ -27,7 +27,12 @@ from app.domain.models import (
     WorkoutTemplate,
 )
 from app.domain.streak import DayRecord
-from app.domain.workout_execution import DayWorkoutItem, SetLog, WorkoutExecution
+from app.domain.workout_execution import (
+    DayWorkoutItem,
+    ExerciseHistory,
+    SetLog,
+    WorkoutExecution,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,9 +181,11 @@ class WorkoutExecutionStore(Protocol):
 
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None: ...
 
-    async def apply_template_weight(
-        self, user_id: str, template_id: str, item_id: str, weight_kg: float
-    ) -> bool: ...
+    async def exercise_history(
+        self, user_id: str, exercise_ids: tuple[str, ...], before: date
+    ) -> dict[str, ExerciseHistory]:
+        """Per exercise, from days before `before`: the final set of the latest one, and the
+        heaviest weight ever logged. Exercises never done before are left out."""
 
 
 class DayStore(Protocol):

@@ -4,11 +4,13 @@ from datetime import date
 import aiosqlite
 
 from app.adapters.sqlite.day_row import open_day
-from app.adapters.sqlite.rows import from_iso, to_day, to_iso
+from app.adapters.sqlite.rows import from_day, from_iso, to_day, to_iso
 from app.domain.ids import new_id
 from app.domain.models import Exercise, WorkoutTemplate
 from app.domain.workout_execution import (
     DayWorkoutItem,
+    ExerciseHistory,
+    PastSet,
     ReplacementReason,
     SetEffort,
     SetLog,
@@ -58,7 +60,7 @@ class SqliteWorkoutExecutionStore:
                    w.duration_sec, w.weight_kg, w.rest_sec, w.note, w.source_item_id,
                    w.replacement_reason,
                    COALESCE(e.name, names.text, e.name_key) AS exercise_name,
-                   e.met,
+                   e.met, e.equipment,
                    COALESCE(re.name, replaced_names.text, re.name_key) AS replaced_name,
                    t.id AS template_id, t.category_id AS template_category_id,
                    t.name AS template_name, t.location AS template_location, t.duration_min,
@@ -236,22 +238,53 @@ class SqliteWorkoutExecutionStore:
             ),
         )
 
-    async def apply_template_weight(
-        self, user_id: str, template_id: str, item_id: str, weight_kg: float
-    ) -> bool:
-        cursor = await self._conn.execute(
-            """
-            UPDATE workout_template_items
-            SET weight_kg = ?
-            WHERE id = ? AND template_id = ?
-              AND EXISTS (
-                  SELECT 1 FROM workout_templates
-                  WHERE id = ? AND user_id = ? AND archived_at IS NULL
-              )
+    async def exercise_history(
+        self, user_id: str, exercise_ids: tuple[str, ...], before: date
+    ) -> dict[str, ExerciseHistory]:
+        if not exercise_ids:
+            return {}
+        marks = ", ".join("?" * len(exercise_ids))
+        params = (user_id, to_day(before), *exercise_ids)
+        async with self._conn.execute(
+            f"""
+            SELECT exercise_id, date, weight_kg, reps_done, duration_sec, effort
+            FROM (
+                SELECT *, ROW_NUMBER() OVER (
+                    PARTITION BY exercise_id ORDER BY date DESC, set_index DESC
+                ) AS recency
+                FROM set_logs
+                WHERE user_id = ? AND date < ? AND exercise_id IN ({marks})
+            )
+            WHERE recency = 1
             """,
-            (weight_kg, item_id, template_id, template_id, user_id),
-        )
-        return cursor.rowcount == 1
+            params,
+        ) as cursor:
+            last = {
+                row["exercise_id"]: PastSet(
+                    date=from_day(row["date"]),
+                    weight_kg=row["weight_kg"],
+                    reps_done=row["reps_done"],
+                    duration_sec=row["duration_sec"],
+                    effort=SetEffort(row["effort"]) if row["effort"] else None,
+                )
+                for row in await cursor.fetchall()
+            }
+        async with self._conn.execute(
+            f"""
+            SELECT exercise_id, MAX(weight_kg) AS best
+            FROM set_logs
+            WHERE user_id = ? AND date < ? AND exercise_id IN ({marks})
+            GROUP BY exercise_id
+            """,
+            params,
+        ) as cursor:
+            best = {row["exercise_id"]: row["best"] for row in await cursor.fetchall()}
+        return {
+            exercise_id: ExerciseHistory(last_set=past, best_weight_kg=best.get(exercise_id))
+            for exercise_id, past in last.items()
+        }
+
+
 
     def _entry(self, row: aiosqlite.Row) -> WorkoutExecutionItem:
         item = DayWorkoutItem(
@@ -273,6 +306,7 @@ class SqliteWorkoutExecutionStore:
                 else None
             ),
             source_item_id=row["source_item_id"],
+            equipment=row["equipment"],
         )
         logs = tuple(
             SetLog(

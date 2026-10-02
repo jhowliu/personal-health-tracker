@@ -25,12 +25,11 @@ export type DraftItem = {
 export type Draft = {
   id: string | null;
   name: string;
-  tag: 'regular' | 'light' | 'occasional';
   mealTimes: ('breakfast' | 'lunch' | 'dinner')[];
   items: DraftItem[];
 };
 
-const EMPTY: Draft = { id: null, name: '', tag: 'regular', mealTimes: ['lunch'], items: [] };
+const EMPTY: Draft = { id: null, name: '', mealTimes: ['lunch'], items: [] };
 
 const drafts = new Map<string, Draft>();
 const baselines = new Map<string, string>();
@@ -75,7 +74,6 @@ export const draft = {
         ? {
             id: meal.id,
             name: meal.name,
-            tag: meal.tag as Draft['tag'],
             mealTimes: meal.meal_times as Draft['mealTimes'],
             items: meal.items.map((item) => ({
               key: item.id,
@@ -134,7 +132,6 @@ export const draft = {
     const current = requireDraft(key);
     return {
       name: current.name,
-      tag: current.tag,
       meal_times: current.mealTimes,
       items: current.items.map((item) => ({ food_id: item.food.id, grams: item.grams })),
     };

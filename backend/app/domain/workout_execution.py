@@ -45,6 +45,9 @@ class DayWorkoutItem:
     replacement_reason: ReplacementReason | None
     # The template item this was copied from, so "apply to template" knows where to write.
     source_item_id: str | None
+    # From the exercise, so focus mode can tell bodyweight work from a lift whose weight the
+    # plan simply left blank (the built-in templates set none).
+    equipment: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +63,38 @@ class SetLog:
 
 
 @dataclass(frozen=True, slots=True)
+class PastSet:
+    """A set from an earlier day: where the next session of that exercise starts from."""
+
+    date: date
+    weight_kg: float | None
+    reps_done: int | None
+    duration_sec: int | None
+    effort: SetEffort | None
+
+
+@dataclass(frozen=True, slots=True)
+class ExerciseHistory:
+    """What earlier days say about one exercise: the last set done and the mark to beat."""
+
+    last_set: PastSet | None = None
+    best_weight_kg: float | None = None
+
+    @property
+    def suggested_weight_kg(self) -> float | None:
+        """Where the next session starts: the last weight, nudged by how that set felt."""
+        if self.last_set is None or self.last_set.weight_kg is None:
+            return None
+        if self.last_set.effort is None:
+            return self.last_set.weight_kg
+        return recommend_next_weight(self.last_set.weight_kg, self.last_set.effort)
+
+
+@dataclass(frozen=True, slots=True)
 class WorkoutExecutionItem:
     item: DayWorkoutItem
     logs: tuple[SetLog, ...]
+    history: ExerciseHistory = ExerciseHistory()
 
     @property
     def completed_set_count(self) -> int:

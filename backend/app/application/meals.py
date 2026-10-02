@@ -11,7 +11,7 @@ from app.application.ports import FoodStore, MealStore
 from app.domain.errors import NotFound, ValidationFailed
 from app.domain.ids import new_id
 from app.domain.meals import total
-from app.domain.models import Meal, MealItem, MealTag, MealTime, Nutrients
+from app.domain.models import Meal, MealItem, MealTime, Nutrients
 
 
 class MealService:
@@ -35,14 +35,12 @@ class MealService:
         user_id: str,
         *,
         name: str,
-        tag: MealTag,
         meal_times: frozenset[MealTime],
         items: tuple[tuple[str, float], ...],
     ) -> Meal:
         meal = Meal(
             id=new_id(),
             name=name,
-            tag=tag,
             meal_times=meal_times,
             items=await self._resolve(user_id, items),
         )
@@ -55,7 +53,6 @@ class MealService:
         meal_id: str,
         *,
         name: str | None = None,
-        tag: MealTag | None = None,
         meal_times: frozenset[MealTime] | None = None,
         items: tuple[tuple[str, float], ...] | None = None,
     ) -> Meal:
@@ -63,7 +60,6 @@ class MealService:
         meal = replace(
             current,
             name=name if name is not None else current.name,
-            tag=tag if tag is not None else current.tag,
             meal_times=meal_times if meal_times is not None else current.meal_times,
             items=(
                 await self._resolve(

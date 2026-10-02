@@ -28,12 +28,6 @@ const SLOT_LABEL: Record<string, string> = {
 // The API returns a meal's slots in no particular order; show them the way the day runs.
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner'];
 
-const TAG_LABEL: Record<string, string> = {
-  regular: '',
-  light: '清淡',
-  occasional: '偶爾吃',
-};
-
 const SLOT_TONE: Record<string, { backgroundColor: string; color: string }> = {
   breakfast: {
     backgroundColor: foodCategoryColor.staple.soft,
@@ -114,11 +108,6 @@ export function MealCard({
                 </View>
               );
             })}
-            {TAG_LABEL[meal.tag] ? (
-              <View className="rounded-full bg-warm-soft px-2 py-0.5">
-                <Text className="text-xs text-warm">{TAG_LABEL[meal.tag]}</Text>
-              </View>
-            ) : null}
           </View>
 
           <Text className="text-sm text-muted" numberOfLines={1}>

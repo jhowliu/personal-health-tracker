@@ -13,7 +13,6 @@ async def test_meal_round_trip(with_foods: AsyncClient):
         "/meals",
         json={
             "name": "雞胸胡麻花椰飯",
-            "tag": "regular",
             "meal_times": ["lunch", "dinner"],
             "items": [
                 {"food_id": rice, "grams": 120},

@@ -259,24 +259,6 @@ async def test_set_feedback_returns_a_recommendation_and_workout_logs(with_profi
     assert workout["items"][0]["logs"][0]["effort"] == "easy"
 
 
-async def test_template_weight_changes_only_after_explicit_apply(with_profile: AsyncClient):
-    _, _, template = await _workout(with_profile, weight_kg=20)
-    item_id = template["items"][0]["id"]
-
-    applied = await with_profile.put(
-        f"/workout-templates/{template['id']}/items/{item_id}/weight", json={"weight_kg": 22.5}
-    )
-    assert applied.status_code == 204
-    assert (await with_profile.get(f"/workout-templates/{template['id']}")).json()["items"][0][
-        "weight_kg"
-    ] == 22.5
-
-    wrong_item = await with_profile.put(
-        f"/workout-templates/{template['id']}/items/not-a-member/weight", json={"weight_kg": 25}
-    )
-    assert wrong_item.status_code == 404
-
-
 async def test_session_burn_is_estimated_only_once_sets_are_logged(with_exercises: AsyncClient):
     await _profile(with_exercises)
     template = (
@@ -551,3 +533,96 @@ async def test_an_item_can_switch_from_reps_to_a_duration_by_clearing_reps(
     assert edited["reps"] is None
     assert edited["duration_sec"] == 60
     assert edited["sets"] == 3, "fields that were not sent stay as they were"
+
+
+async def _log_set(
+    client: AsyncClient, day: str, exercise_id: str, set_index: int, weight_kg: float,
+    reps: int, effort: str | None = None,
+) -> None:
+    workout = (await client.get(f"/days/{day}/workout")).json()
+    logged = await client.put(
+        f"/days/{day}/workout/sets",
+        json={
+            "day_workout_item_id": workout["items"][0]["item"]["id"],
+            "exercise_id": exercise_id,
+            "set_index": set_index,
+            "reps_done": reps,
+            "weight_kg": weight_kg,
+            "effort": effort,
+        },
+    )
+    assert logged.status_code == 200
+
+
+async def test_each_exercise_carries_its_last_set_and_best_weight_from_earlier_days(
+    with_profile: AsyncClient,
+):
+    """Focus mode starts each exercise from the last set done and marks a new best."""
+    original, _, _ = await _workout(with_profile)
+    await _log_set(with_profile, "2026-09-08", original["id"], 0, 50, 8)
+    await _log_set(with_profile, "2026-09-08", original["id"], 1, 52.5, 6)
+    await _log_set(with_profile, "2026-09-15", original["id"], 0, 45, 12)
+    await _log_set(with_profile, "2026-09-15", original["id"], 1, 47.5, 10, "easy")
+    # A later day is not "earlier", even when it is already logged.
+    await _log_set(with_profile, "2026-09-29", original["id"], 0, 100, 5)
+
+    entry = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]
+
+    assert entry["last_set"] == {
+        "date": "2026-09-15",
+        "weight_kg": 47.5,
+        "reps_done": 10,
+        "duration_sec": None,
+        "effort": "easy",
+    }
+    assert entry["best_weight_kg"] == 52.5
+    # It felt easy last time, so the next session starts one step heavier.
+    assert entry["suggested_weight_kg"] == 50
+
+
+async def test_without_feedback_the_next_session_starts_from_the_last_weight(
+    with_profile: AsyncClient,
+):
+    original, _, _ = await _workout(with_profile)
+    await _log_set(with_profile, "2026-09-15", original["id"], 0, 45, 12)
+
+    entry = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]
+
+    assert entry["suggested_weight_kg"] == 45
+
+
+async def test_a_first_time_exercise_has_no_history(with_profile: AsyncClient):
+    await _workout(with_profile)
+
+    entry = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]
+
+    assert entry["last_set"] is None
+    assert entry["best_weight_kg"] is None
+    assert entry["suggested_weight_kg"] is None
+
+
+async def test_day_items_say_which_equipment_the_exercise_uses(with_profile: AsyncClient):
+    """A blank weight means 'not set' for a barbell lift, but 'none' for a push-up."""
+    push_up = (
+        await with_profile.post(
+            "/exercises",
+            json={"category_id": "strength", "name": "伏地挺身", "equipment": "bodyweight"},
+        )
+    ).json()
+    template = (
+        await with_profile.post(
+            "/workout-templates",
+            json={
+                "category_id": "strength",
+                "name": "徒手日",
+                "location": "home",
+                "items": [{"exercise_id": push_up["id"], "sets": 3, "reps": "12"}],
+            },
+        )
+    ).json()
+    schedule = [{"weekday": 1, "template_id": template["id"]}]
+    await with_profile.put("/workout-schedule", json=schedule)
+
+    items = await _day_items(with_profile)
+
+    assert items[0]["equipment"] == "bodyweight"
