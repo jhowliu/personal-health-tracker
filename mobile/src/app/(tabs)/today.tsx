@@ -175,6 +175,7 @@ export default function TodayScreen() {
         header={header}
         date={day.date}
         after={stepAfter(day, 'workout')}
+        resolved={day.flow.completed.includes('workout')}
         onDone={() => load(true)}
         onStateChanged={() => refreshAt('workout')}
       />
@@ -937,12 +938,15 @@ function WorkoutStep({
   header,
   date,
   after,
+  resolved,
   onDone,
   onStateChanged,
 }: {
   header: ReactNode;
   date: string;
   after: string;
+  /** The workout step is already done (or skipped) for this date. */
+  resolved: boolean;
   onDone: () => void;
   onStateChanged: () => void;
 }) {
@@ -1126,30 +1130,43 @@ function WorkoutStep({
     const done = (entry: WorkoutItem) =>
       entry.item.duration_sec ? entry.logs.length > 0 : completedSetCount(entry) >= (entry.item.sets ?? 1);
     const doneCount = workout.items.filter(done).length;
-    const underway = sessionStarted || workout.items.some((entry) => entry.logs.length > 0);
+    const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
+    const underway = sessionStarted || anyLogged;
     return (
       <Screen
         footerSafeArea={false}
         footer={
-          <>
-            <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
-              {underway ? `繼續訓練 · ${doneCount} / ${workout.items.length}` : '開始訓練'}
-            </PrimaryButton>
-            <View className="flex-row items-center justify-center gap-8">
-              <TextAction
-                label="直接記錄，不用計時"
-                disabled={busy}
-                onPress={() => setListMode(true)}
-                className="min-h-[44px] justify-center"
-              />
-              <TextAction
-                label="略過訓練"
-                disabled={busy}
-                onPress={skipWorkout}
-                className="min-h-[44px] justify-center"
-              />
+          resolved ? (
+            // Finished workouts are not reopened: what was done stays as it was saved.
+            <View className="items-center gap-1 py-2">
+              <Text className={`text-base font-semibold ${anyLogged ? 'text-good' : 'text-muted'}`}>
+                {anyLogged ? '✓ 今天的訓練已完成' : '今天已略過訓練'}
+              </Text>
+              {anyLogged && workout.estimated_burn_kcal ? (
+                <Hint>約消耗 {workout.estimated_burn_kcal} 大卡</Hint>
+              ) : null}
             </View>
-          </>
+          ) : (
+            <>
+              <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
+                {underway ? `繼續訓練 · ${doneCount} / ${workout.items.length}` : '開始訓練'}
+              </PrimaryButton>
+              <View className="flex-row items-center justify-center gap-8">
+                <TextAction
+                  label="直接記錄，不用計時"
+                  disabled={busy}
+                  onPress={() => setListMode(true)}
+                  className="min-h-[44px] justify-center"
+                />
+                <TextAction
+                  label="略過訓練"
+                  disabled={busy}
+                  onPress={skipWorkout}
+                  className="min-h-[44px] justify-center"
+                />
+              </View>
+            </>
+          )
         }
       >
         {header}
