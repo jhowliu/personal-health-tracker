@@ -24,11 +24,13 @@ const REASONS: { id: Reason; label: string }[] = [
 ];
 
 export default function ReplaceTodayWorkout() {
-  const { date, item_id: itemId, exercise_id: exerciseId, name } = useLocalSearchParams<{
+  const { date, item_id: itemId, exercise_id: exerciseId, name, from } = useLocalSearchParams<{
     date: string;
     item_id: string;
     exercise_id: string;
     name?: string;
+    /** 'focus' when opened mid-workout from focus mode, which is where Back returns to. */
+    from?: string;
   }>();
   const [reason, setReason] = useState<Reason>('equipment_occupied');
   const [alternatives, setAlternatives] = useState<Alternative[] | null>(null);
@@ -79,7 +81,7 @@ export default function ReplaceTodayWorkout() {
 
   return (
     <Screen>
-      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
+      <BackLink label={from === 'focus' ? '回到訓練' : '今天'} onPress={() => backOrReplace('/today')} disabled={busy} />
       <Title sub={`只換${date ? dayWord(date) : '今天'}這一次，不會改到原本課表。`}>替代 {name ?? '動作'}</Title>
       <View className="flex-row flex-wrap gap-2">
         {REASONS.map((option) => (

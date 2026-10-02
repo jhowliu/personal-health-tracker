@@ -140,13 +140,15 @@ export function fromWorkout(workout: Workout, now: number): Session {
 
 /**
  * A stored session brought up to date with the server's logs, which win: sets logged from
- * another screen count, and a set the phone never managed to send does not.
+ * another screen count, and a set the phone never managed to send does not. Exercises added
+ * meanwhile join in; one swapped for another (same item, new exercise) starts afresh rather
+ * than keeping the old exercise's weight.
  */
 export function restore(stored: Session, fresh: Session): Session {
   const kept = new Map(stored.exercises.map((exercise) => [exercise.itemId, exercise]));
   const exercises = fresh.exercises.map((exercise) => {
     const before = kept.get(exercise.itemId);
-    return before
+    return before && before.exerciseId === exercise.exerciseId
       ? { ...exercise, weightKg: before.weightKg, reps: before.reps, minutes: before.minutes, feedback: before.feedback }
       : exercise;
   });

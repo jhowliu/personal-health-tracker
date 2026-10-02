@@ -245,3 +245,16 @@ it('restores a stored session but trusts the server for what was logged', () => 
   expect(restored.currentIndex).toBe(0);
   expect(restored.exercises[1].weightKg).toBe(42.5);
 });
+
+it('picks up exercises added or swapped while focus mode was away', () => {
+  const stored = step(fromWorkout(workout([{ id: 'a' }, { id: 'b' }]), T0), 'weight', 1);
+  const swapped = workout([{ id: 'a' }, { id: 'b' }, { id: 'c', weightKg: 20 }]);
+  // "a" now holds a different exercise: replace-today keeps the item and changes what it is.
+  swapped.items[0].item.exercise_id = 'ex-other';
+  const restored = restore({ ...stored, exercises: stored.exercises.map((e, i) => (i === 1 ? { ...e, weightKg: 60 } : e)) }, fromWorkout(swapped, T0));
+
+  expect(restored.exercises.map((exercise) => exercise.itemId)).toEqual(['a', 'b', 'c']);
+  expect(restored.exercises[0].weightKg).toBe(40);
+  expect(restored.exercises[1].weightKg).toBe(60);
+  expect(restored.exercises[2].weightKg).toBe(20);
+});

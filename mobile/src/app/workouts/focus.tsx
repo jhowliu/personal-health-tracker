@@ -6,13 +6,13 @@
  * session's own state — clock, rest, steppers — is saved on the phone after every change,
  * so leaving, being killed or losing the screen never loses work. Today only.
  */
-import { router, useLocalSearchParams } from 'expo-router';
+import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { CloseIcon } from '@/components/icons';
+import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';
 import { todayISO } from '@/dates';
@@ -84,33 +84,41 @@ export default function FocusWorkout() {
     toastTimer.current = setTimeout(() => setToast(null), 1800);
   }, []);
 
-  useEffect(() => {
-    if (!date || date !== todayISO()) {
-      router.back();
-      return;
-    }
-    let active = true;
-    (async () => {
-      try {
-        const workout = (await api.get(`/days/${date}/workout`)) as Workout;
-        if (!active) return;
-        setTitle(workout.template?.name ?? '今天的訓練');
-        const at = Date.now();
-        const fresh = fromWorkout(workout, at);
-        const stored = await loadSession(date);
-        const started = settleRest(stored ? resume(restore(stored, fresh), at) : fresh, at);
-        setSession(started);
-        if (isFinished(started)) setPhase('summary');
-        if (!(await ensureRestAlarmPermission())) setNotifyHint(true);
-      } catch (error) {
-        Alert.alert('讀不到今天的訓練', error instanceof ApiError ? error.message : '請稍後再試。');
+  // Read on every visit, not just the first: coming back from 加入動作 or 換動作, the
+  // workout has changed underneath, and the session in hand is merged onto it.
+  const asked = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!date || date !== todayISO()) {
         router.back();
+        return;
       }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [date]);
+      let active = true;
+      (async () => {
+        try {
+          const workout = (await api.get(`/days/${date}/workout`)) as Workout;
+          if (!active) return;
+          setTitle(workout.template?.name ?? '今天的訓練');
+          const at = Date.now();
+          const fresh = fromWorkout(workout, at);
+          const base = live.current ?? (await loadSession(date));
+          const started = settleRest(base ? resume(restore(base, fresh), at) : fresh, at);
+          setSession(started);
+          if (isFinished(started)) setPhase('summary');
+          if (!asked.current) {
+            asked.current = true;
+            if (!(await ensureRestAlarmPermission())) setNotifyHint(true);
+          }
+        } catch (error) {
+          Alert.alert('讀不到今天的訓練', error instanceof ApiError ? error.message : '請稍後再試。');
+          router.back();
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [date]),
+  );
 
   // Saved after every change: a killed app reopens to 繼續訓練 with everything in place.
   useEffect(() => {
@@ -213,6 +221,14 @@ export default function FocusWorkout() {
     void cancelRestAlarm(date);
     setSession(skipRest(session));
   };
+
+  // The sheet closes before navigating, so it is not still open on the way back.
+  const openElsewhere = (path: Href) => {
+    setSheet(null);
+    requestAnimationFrame(() => router.navigate(path));
+  };
+  const replacePath = (target: FocusExercise): Href =>
+    `/workouts/replace-today?date=${date}&item_id=${target.itemId}&exercise_id=${target.exerciseId}&name=${encodeURIComponent(target.name)}&from=focus`;
 
   const switchTo = (index: number) => {
     void cancelRestAlarm(date);
@@ -486,25 +502,47 @@ export default function FocusWorkout() {
               : candidate.logs.length
                 ? `${candidate.logs.length} / ${candidate.plannedSets} 組`
                 : '未開始';
+          // Only an exercise not yet started can be swapped, so its sets never mix two exercises.
+          const swappable = !done && candidate.logs.length === 0;
           return (
-            <Pressable
+            <View
               key={candidate.itemId}
-              accessibilityRole="button"
-              disabled={done || current}
-              onPress={() => switchTo(index)}
-              className={`min-h-14 flex-row items-center justify-between rounded-[14px] px-3.5 ${
+              className={`min-h-14 flex-row items-center gap-2 rounded-[14px] pl-3.5 pr-2 ${
                 done ? 'bg-good-soft' : current ? 'border-2 border-primary bg-primary-soft' : 'bg-fill'
               }`}
             >
-              <Text className="flex-1 text-base font-semibold text-ink">
-                {index + 1}. {candidate.name}
-              </Text>
-              <Text className={`text-sm ${done ? 'font-semibold text-good' : current ? 'font-semibold text-primary' : 'text-muted'}`}>
-                {status}
-              </Text>
-            </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`改做${candidate.name}`}
+                disabled={done || current}
+                onPress={() => switchTo(index)}
+                className="min-h-14 flex-1 flex-row items-center justify-between gap-2"
+              >
+                <Text className="flex-1 text-base font-semibold text-ink">
+                  {index + 1}. {candidate.name}
+                </Text>
+                <Text
+                  className={`text-sm ${done ? 'font-semibold text-good' : current ? 'font-semibold text-primary' : 'text-muted'}`}
+                >
+                  {status}
+                </Text>
+              </Pressable>
+              {swappable ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`把${candidate.name}換成其他動作`}
+                  onPress={() => openElsewhere(replacePath(candidate))}
+                  className="min-h-[36px] justify-center rounded-full border border-primary bg-surface px-3"
+                >
+                  <Text className="text-sm font-semibold text-primary">換動作</Text>
+                </Pressable>
+              ) : null}
+            </View>
           );
         })}
+        <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => openElsewhere(`/workouts/add-today?date=${date}&from=focus`)}>
+          加入動作
+        </PrimaryButton>
       </Sheet>
 
       <Sheet visible={sheet === 'exit'} title="要離開訓練嗎？" onClose={() => setSheet(null)}>
