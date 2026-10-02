@@ -13,7 +13,9 @@ import { color } from '@/theme/tokens';
 type Workout = Schema<'WorkoutExecutionOut'>;
 
 export default function AddTodayWorkout() {
-  const { date } = useLocalSearchParams<{ date: string }>();
+  // from=focus: opened mid-workout from focus mode, which is where Back returns to.
+  const { date, from } = useLocalSearchParams<{ date: string; from?: string }>();
+  const backLabel = from === 'focus' ? '回到訓練' : '今天';
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [busy, setBusy] = useState(false);
   const word = date ? dayWord(date) : '今天';
@@ -78,13 +80,13 @@ export default function AddTodayWorkout() {
               busy ? 'opacity-40' : 'active:opacity-80'
             }`}
           >
-            <Text className="text-sm font-semibold text-white">查看{word}的訓練</Text>
+            <Text className="text-sm font-semibold text-white">{from === 'focus' ? '回到訓練' : `查看${word}的訓練`}</Text>
             <ChevronIcon direction="right" size={16} tint={color.surface} />
           </Pressable>
         </View>
       }
     >
-      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
+      <BackLink label={backLabel} onPress={() => backOrReplace('/today')} disabled={busy} />
       <Title sub={`只會加入${word}的訓練，不會修改原本課表。`}>加入動作</Title>
       <ExerciseLibrary onSelect={add} selectLabel={busy ? '加入中…' : `加入${word}`} addedIds={addedIds} />
     </Screen>
