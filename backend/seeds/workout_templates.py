@@ -1,4 +1,4 @@
-"""Seed the global, read-only beginner workout templates."""
+"""Seed the global, read-only workout templates: beginner full-body and push/pull/legs."""
 
 import asyncio
 import sys
@@ -58,6 +58,65 @@ TEMPLATES = (
             SeedItem("beginner-full-body-c-4", "dumbbell-reverse-lunge", 3, "10", 90),
             SeedItem("beginner-full-body-c-5", "lat-pulldown-machine", 3, "10", 90),
             SeedItem("beginner-full-body-c-6", "dumbbell-shoulder-press", 3, "10", 90),
+        ),
+    ),
+    # Push / pull / legs. The heavy hinge leads its day rather than following the arm work.
+    SeedTemplate(
+        "push-day",
+        "推日",
+        (
+            SeedItem("push-day-1", "dumbbell-bench-press", 3, "8", 120),
+            SeedItem("push-day-2", "dumbbell-incline-press", 3, "10", 90),
+            SeedItem("push-day-3", "dumbbell-shoulder-press", 3, "10", 90),
+            SeedItem("push-day-4", "dumbbell-lateral-raise", 3, "12", 60),
+            SeedItem("push-day-5", "cable-triceps-pushdown", 3, "12", 60),
+        ),
+    ),
+    SeedTemplate(
+        "pull-day",
+        "拉日",
+        (
+            SeedItem("pull-day-1", "barbell-deadlift", 3, "5", 180),
+            SeedItem("pull-day-2", "wide-grip-seated-cable-row", 3, "10", 90),
+            SeedItem("pull-day-3", "close-grip-seated-cable-row", 3, "10", 90),
+            SeedItem("pull-day-4", "lat-pulldown-machine", 3, "10", 90),
+            SeedItem("pull-day-5", "dumbbell-biceps-curl", 3, "12", 60),
+            SeedItem("pull-day-6", "dumbbell-hammer-curl", 3, "12", 60),
+        ),
+    ),
+    SeedTemplate(
+        "leg-day",
+        "腿日",
+        (
+            SeedItem("leg-day-1", "barbell-romanian-deadlift", 3, "8", 120),
+            SeedItem("leg-day-2", "barbell-back-squat", 3, "8", 120),
+            SeedItem("leg-day-3", "hip-adduction-machine", 3, "12", 60),
+            SeedItem("leg-day-4", "leg-extension-machine", 3, "12", 60),
+            SeedItem("leg-day-5", "seated-leg-curl-machine", 3, "12", 60),
+        ),
+    ),
+    # The same days without a barbell: kettlebells and machines stand in for the barbell lifts.
+    SeedTemplate(
+        "pull-day-no-barbell",
+        "拉日（無槓鈴）",
+        (
+            SeedItem("pull-day-no-barbell-1", "kettlebell-deadlift", 3, "10", 90),
+            SeedItem("pull-day-no-barbell-2", "wide-grip-seated-cable-row", 3, "10", 90),
+            SeedItem("pull-day-no-barbell-3", "close-grip-seated-cable-row", 3, "10", 90),
+            SeedItem("pull-day-no-barbell-4", "lat-pulldown-machine", 3, "10", 90),
+            SeedItem("pull-day-no-barbell-5", "dumbbell-biceps-curl", 3, "12", 60),
+            SeedItem("pull-day-no-barbell-6", "dumbbell-hammer-curl", 3, "12", 60),
+        ),
+    ),
+    SeedTemplate(
+        "leg-day-no-barbell",
+        "腿日（無槓鈴）",
+        (
+            SeedItem("leg-day-no-barbell-1", "kettlebell-romanian-deadlift", 3, "10", 90),
+            SeedItem("leg-day-no-barbell-2", "leg-press-machine", 3, "10", 120),
+            SeedItem("leg-day-no-barbell-3", "hip-adduction-machine", 3, "12", 60),
+            SeedItem("leg-day-no-barbell-4", "leg-extension-machine", 3, "12", 60),
+            SeedItem("leg-day-no-barbell-5", "seated-leg-curl-machine", 3, "12", 60),
         ),
     ),
 )

@@ -73,7 +73,7 @@ export function ExerciseLibrary({
           ))}
         </ScrollView>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4">
-          {['all', 'bodyweight', 'dumbbell', 'barbell', 'machine', 'cable', 'resistance_band', 'treadmill'].map((value) => (
+          {['all', 'bodyweight', 'dumbbell', 'barbell', 'kettlebell', 'machine', 'cable', 'resistance_band', 'treadmill'].map((value) => (
             <Chip key={value} label={equipmentLabel(value)} selected={equipment === value} onPress={() => setEquipment(value)} />
           ))}
         </ScrollView>
@@ -207,6 +207,7 @@ function equipmentLabel(value: string | null) {
     bodyweight: '徒手',
     dumbbell: '啞鈴',
     barbell: '槓鈴',
+    kettlebell: '壺鈴',
     machine: '器械',
     cable: '滑輪',
     resistance_band: '彈力帶',

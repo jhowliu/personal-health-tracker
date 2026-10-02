@@ -1033,7 +1033,7 @@ export interface components {
             /** Body Region */
             body_region?: ("lower_body" | "upper_body" | "core" | "full_body" | "mobility") | null;
             /** Equipment */
-            equipment?: ("bodyweight" | "machine" | "barbell" | "dumbbell" | "cable" | "resistance_band" | "treadmill") | null;
+            equipment?: ("bodyweight" | "machine" | "barbell" | "dumbbell" | "kettlebell" | "cable" | "resistance_band" | "treadmill") | null;
             /** Location */
             location?: ("home" | "gym" | "both") | null;
         };
