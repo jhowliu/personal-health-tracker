@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>專注練模式 · 畫面草圖</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#FAF8F5; --tan:#EFEBE5; --line:#E3DDD4;
+  --ink:#241F1B; --muted:#8A8178;
+  --plum:#A3215B; --plum-soft:#F7E9F0;
+  --green:#3B7658; --green-soft:#E9F3ED;
+}
+body{
+  background:#E8E3DA;color:var(--ink);
+  font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;border:0;background:none}
+button:focus-visible{outline:3px solid var(--plum);outline-offset:2px}
+.stage{max-width:430px;margin:0 auto;padding:12px 0 32px}
+
+.jump{margin:0 12px 12px}
+.jump p{font-size:13px;color:#6b635a;margin-bottom:8px}
+.jump div{display:flex;flex-wrap:wrap;gap:6px}
+.jump button{height:36px;padding:0 14px;border-radius:18px;background:#D9D2C7;font-size:14px;color:#4a423b}
+.jump button.on{background:var(--ink);color:#fff}
+
+.phone{
+  position:relative;margin:0 8px;height:min(800px,calc(100dvh - 150px));min-height:600px;
+  border-radius:28px;overflow:hidden;border:1px solid #cdc5b9;background:var(--bg);
+}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);transition:background .3s}
+.screen.rest{background:var(--plum-soft)}
+
+/* shared */
+.segs{display:flex;gap:4px}
+.segs i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.rest .segs i{background:#EBCFDD}
+.segs i.d{background:var(--green)}
+.segs i.c{background:var(--plum)}
+.cta{width:100%;height:64px;border-radius:18px;background:var(--plum);color:#fff;font-size:19px;font-weight:700;letter-spacing:.02em}
+.cta:active{filter:brightness(.92)}
+.ghost{height:64px;padding:0 18px;border-radius:18px;background:rgba(36,31,27,.07);font-size:16px;font-weight:600}
+.outline{height:64px;border-radius:18px;border:2px solid var(--plum);color:var(--plum);font-size:17px;font-weight:700;background:rgba(255,255,255,.6)}
+.two{display:flex;gap:10px}
+.two .outline{flex:1}
+
+/* preview */
+.ph{padding:16px 18px 6px}
+.ph small{display:block;font-size:13px;color:var(--muted)}
+.ph h1{font-size:28px;font-weight:700;line-height:1.15;letter-spacing:.02em}
+.ph p{font-size:14px;color:var(--muted);margin-top:4px}
+.plist{flex:1;min-height:0;overflow-y:auto;padding:10px 14px}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--tan);border-radius:16px;padding:0 16px;min-height:58px;margin-bottom:10px}
+.prow b{font-size:16px;font-weight:600}
+.prow span{font-size:14px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.prow.done{background:var(--green-soft)}
+.prow.done span{color:var(--green);font-weight:600}
+.pdock{padding:10px 14px 4px;border-top:1px solid var(--line)}
+.link{display:block;width:100%;height:46px;font-size:14px;color:var(--muted)}
+.tabs{display:flex;border-top:1px solid var(--line);padding:8px 0 10px}
+.tabs div{flex:1;text-align:center;font-size:12px;color:var(--muted)}
+.tabs div i{display:block;width:20px;height:20px;border-radius:50%;border:2px solid var(--ink);margin:0 auto 4px}
+.tabs .on{color:var(--plum)}
+.tabs .on i{border-color:var(--plum);background:radial-gradient(circle,var(--plum) 0 35%,transparent 38%)}
+
+/* focus */
+.fh{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 0}
+.rd{width:46px;height:46px;border-radius:50%;background:rgba(36,31,27,.07);display:grid;place-items:center}
+.et{text-align:center;line-height:1.2}
+.et small{display:block;font-size:12px;color:var(--muted)}
+.et b{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.pill{height:46px;padding:0 14px;border-radius:23px;background:rgba(36,31,27,.07);display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.fsegs{padding:12px 18px 0}
+.fmain{flex:1;min-height:0;overflow-y:auto;padding:12px 18px 8px}
+.kick{font-size:14px;font-weight:700;color:var(--plum);margin-bottom:2px}
+.fmain h2{font-size:30px;line-height:1.2;font-weight:700;letter-spacing:.01em}
+.tgt{font-size:15px;color:var(--muted);margin-top:4px}
+.setrow{display:flex;align-items:center;justify-content:space-between;margin:16px 0 6px}
+.setbig{display:flex;align-items:baseline;gap:6px}
+.setbig b{font-size:52px;line-height:1;font-weight:800;color:var(--plum);font-variant-numeric:tabular-nums}
+.setbig span{font-size:17px;color:var(--muted)}
+.dots{display:flex;gap:8px}
+.dots i{width:18px;height:18px;border-radius:50%;border:2px solid #cfc7bb}
+.dots i.d{background:var(--green);border-color:var(--green)}
+.dots i.c{border-color:var(--plum);background:#fff;box-shadow:0 0 0 3px var(--plum-soft)}
+.ringbox{position:relative;width:200px;height:200px;margin:12px auto 4px}
+.ringbox svg{width:100%;height:100%}
+.ringbox .bgc{fill:none;stroke:#EBCFDD;stroke-width:12}
+.ringbox .fgc{fill:none;stroke:var(--plum);stroke-width:12;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.rtxt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.rtxt small{font-size:14px;color:var(--plum);font-weight:600}
+.rtxt b{font-size:52px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.cwrap{text-align:center;margin:14px 0 6px}
+.cbig{font-size:76px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.cwrap .ghost{margin-top:8px;height:50px}
+.last{font-size:13px;color:var(--muted);margin:10px 0 2px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0}
+.row>span{font-size:16px;color:var(--muted)}
+.stepper{display:flex;align-items:center;gap:4px}
+.stepper button{width:60px;height:56px;border-radius:14px;background:rgba(36,31,27,.07);font-size:28px;line-height:1}
+.stepper button:active{background:rgba(36,31,27,.14)}
+.stepper output{min-width:110px;text-align:center}
+.stepper output b{font-size:38px;font-weight:700;font-variant-numeric:tabular-nums}
+.stepper output small{font-size:14px;color:var(--muted);margin-left:3px}
+.done-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.done-row span{font-size:13px;padding:6px 10px;border-radius:999px;background:var(--green-soft);color:var(--green);font-weight:600;font-variant-numeric:tabular-nums}
+.fdock{padding:8px 18px 18px}
+.up{font-size:13px;color:var(--muted);text-align:center;margin-bottom:8px}
+
+/* sheets */
+.scrim{position:absolute;inset:0;z-index:6;background:rgba(36,31,27,.42);display:flex;align-items:flex-end}
+.sheet{width:100%;background:#fff;border-radius:22px 22px 0 0;padding:22px 18px 22px;max-height:80%;overflow-y:auto}
+.sheet h3{font-size:18px;margin-bottom:6px}
+.sheet p{font-size:14px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.sheet .stack{display:flex;flex-direction:column;gap:8px}
+.sheet .stack button{height:52px;border-radius:14px;background:var(--tan);font-size:16px;font-weight:600}
+.sheet .stack .pri{background:var(--plum);color:#fff}
+.sheet .stack .txt{background:none;color:var(--plum)}
+.lrow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:56px;padding:0 14px;border-radius:14px;background:var(--tan);margin-bottom:8px;text-align:left}
+.lrow b{font-size:16px;font-weight:600}
+.lrow span{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lrow.cur{background:var(--plum-soft);box-shadow:inset 0 0 0 2px var(--plum)}
+.lrow.cur span{color:var(--plum);font-weight:600}
+.lrow.ok{background:var(--green-soft)}
+.lrow.ok span{color:var(--green);font-weight:600}
+
+/* summary */
+.sumh{padding:26px 18px 6px}
+.sumh h1{font-size:32px;font-weight:800;line-height:1.15}
+.sumh p{font-size:14px;color:var(--muted);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 18px}
+.stats div{background:var(--tan);border-radius:14px;padding:12px 10px}
+.stats b{display:block;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums}
+.stats small{font-size:12px;color:var(--muted)}
+.slist{flex:1;min-height:0;overflow-y:auto;padding:0 18px}
+.srow{padding:12px 0;border-bottom:1px solid var(--line)}
+.srow div{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.srow b{font-size:16px;font-weight:600}
+.srow span{display:block;font-size:13px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+.pr{font-size:12px;font-weight:700;color:var(--plum);background:var(--plum-soft);padding:3px 9px;border-radius:999px;white-space:nowrap}
+
+.toast{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:14px;padding:10px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s;white-space:nowrap;z-index:9}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.ringbox .fgc,.screen,.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="jump">
+    <p>直接跳到各個畫面看看：</p>
+    <div id="chips">
+      <button data-demo="preview" class="on">開始前</button>
+      <button data-demo="work">練習中</button>
+      <button data-demo="rest">休息中</button>
+      <button data-demo="newex">換動作</button>
+      <button data-demo="cardio">有氧</button>
+      <button data-demo="summary">完成</button>
+    </div>
+  </div>
+  <div class="phone">
+    <div class="screen" id="screen"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const scr = $('#screen');
+const fmt = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
+const clock = s => {
+  s = Math.max(0, Math.round(s));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${r}` : `${m}:${r}`;
+};
+const R = 92, C = 2 * Math.PI * R;
+
+const mk = () => [
+  {name:'上坡跑步機快走', kind:'time', target:20, min:20, done:false},
+  {name:'下拉機', kind:'sets', sets:3, reps:'10–12', w:45, r:12, best:45, last:'上次 45 kg × 12', logs:[]},
+  {name:'坐姿滑輪划船', kind:'sets', sets:3, reps:'10–12', w:50, r:11, best:50, last:'上次 50 kg × 11', logs:[]},
+  {name:'槓鈴俯身划船', kind:'sets', sets:3, reps:'10–12', w:40, r:10, best:40, last:'上次 40 kg × 10', logs:[]},
+  {name:'繩索面拉', kind:'sets', sets:3, reps:'12–15', w:20, r:14, best:20, last:'上次 20 kg × 14', logs:[]}
+];
+const fresh = () => ({phase:'preview', ex:0, rest:null, elapsed:0, started:false, sheet:null, cardio:{running:false, left:20 * 60}});
+let EX = mk(), S = fresh();
+
+const isDone = e => e.kind === 'time' ? e.done : e.logs.length >= e.sets;
+const nextOther = from => {
+  const n = EX.length;
+  for (let k = 1; k < n; k++) { const i = (from + k) % n; if (!isDone(EX[i])) return i; }
+  return -1;
+};
+
+/* ---------- demo states ---------- */
+function demo(name){
+  EX = mk(); S = fresh();
+  const finish = i => { const e = EX[i]; if (e.kind === 'time') e.done = true; else for (let k = 0; k < e.sets; k++) e.logs.push({w:e.w, r:e.r}); };
+  if (name !== 'preview') { S.phase = 'focus'; S.started = true; }
+  if (name === 'cardio') { S.ex = 0; S.elapsed = 95; }
+  if (name === 'work' || name === 'rest') {
+    finish(0); EX[1].logs.push({w:45, r:12}); S.ex = 1; S.elapsed = 1120;
+    if (name === 'rest') S.rest = {left:64, total:90, newEx:false};
+  }
+  if (name === 'newex') { finish(0); finish(1); S.ex = 2; S.elapsed = 1480; S.rest = {left:71, total:90, newEx:true}; }
+  if (name === 'summary') {
+    EX.forEach((_, i) => finish(i));
+    EX[1].logs = [{w:45, r:12}, {w:47.5, r:12}, {w:47.5, r:11}];
+    S.phase = 'summary'; S.ex = 4; S.elapsed = 3128;
+  }
+  render();
+}
+
+/* ---------- templates ---------- */
+const icoX = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 4l12 12M16 4L4 16"/></svg>`;
+const icoList = `<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 5h10M7 10h10M7 15h10M3 5h.01M3 10h.01M3 15h.01"/></svg>`;
+
+const stepper = (label, val, unit, dn, up) => `
+  <div class="row"><span>${label}</span>
+    <div class="stepper">
+      <button data-act="${dn}" aria-label="減少${label}">−</button>
+      <output><b>${val}</b>${unit ? `<small>${unit}</small>` : ''}</output>
+      <button data-act="${up}" aria-label="增加${label}">+</button>
+    </div>
+  </div>`;
+
+function previewHTML(){
+  const n = EX.length, dc = EX.filter(isDone).length;
+  const rows = EX.map((e, i) => {
+    const d = isDone(e);
+    const r = d ? '✓ 完成' : e.kind === 'time' ? `${e.target} 分鐘` : e.logs.length ? `${e.logs.length} / ${e.sets} 組` : `${e.sets} 組 × ${e.reps} · ${fmt(e.w)} kg`;
+    return `<div class="prow ${d ? 'done' : ''}"><b>${i + 1}. ${e.name}</b><span>${r}</span></div>`;
+  }).join('');
+  return `
+    <div class="ph"><small>今天的訓練</small><h1>背部</h1><p>${n} 個動作 · 約 50 分鐘</p></div>
+    <div class="plist">${rows}</div>
+    <div class="pdock">
+      <button class="cta" data-act="start">${S.started ? `繼續訓練 · ${dc} / ${n}` : '開始訓練'}</button>
+      <button class="link" data-act="quick">直接記錄，不用計時</button>
+    </div>
+    <nav class="tabs"><div class="on"><i></i>今天</div><div><i></i>身形</div><div><i></i>餐點</div><div><i></i>訓練</div><div><i></i>設定</div></nav>`;
+}
+
+function focusHTML(){
+  const e = EX[S.ex], n = EX.length, resting = !!S.rest;
+  const segs = EX.map((x, i) => `<i class="${isDone(x) ? 'd' : i === S.ex ? 'c' : ''}"></i>`).join('');
+  const k = e.kind === 'sets' ? e.logs.length + 1 : 1;
+  const nx = nextOther(S.ex);
+  const finalSet = e.kind === 'time' || e.logs.length === e.sets - 1;
+
+  let kick = '';
+  if (resting) kick = S.rest.newEx ? '下一個動作' : `下一組 · 第 ${k} / ${e.sets} 組`;
+
+  const tgt = e.kind === 'time' ? `目標 ${e.target} 分鐘` : `目標 ${e.sets} 組 × ${e.reps} 下`;
+
+  let hero;
+  if (resting) {
+    hero = `<div class="ringbox">
+      <svg viewBox="0 0 220 220" aria-hidden="true"><circle class="bgc" cx="110" cy="110" r="${R}"/>
+        <circle class="fgc" id="ringfg" cx="110" cy="110" r="${R}" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - S.rest.left / S.rest.total)}" transform="rotate(-90 110 110)"/></svg>
+      <div class="rtxt"><small>休息中</small><b id="rtime">${clock(S.rest.left)}</b></div>
+    </div>`;
+  } else if (e.kind === 'time') {
+    const c = S.cardio;
+    hero = `<div class="cwrap"><div class="cbig" id="ctime">${clock(c.left)}</div>
+      <button class="ghost" data-act="ctoggle">${c.running ? '暫停' : c.left < e.min * 60 ? '繼續計時' : '開始計時'}</button></div>`;
+  } else {
+    const dots = Array.from({length:e.sets}, (_, j) => `<i class="${j < e.logs.length ? 'd' : j === e.logs.length ? 'c' : ''}"></i>`).join('');
+    hero = `<div class="setrow"><div class="setbig"><b>第 ${k}</b><span>/ ${e.sets} 組</span></div><div class="dots">${dots}</div></div>`;
+  }
+
+  const card = e.kind === 'time'
+    ? `<p class="last">課表 ${e.target} 分鐘，已帶入</p>${stepper('實際時間', e.min, '分鐘', 'm-', 'm+')}`
+    : `<p class="last">${e.last}，已帶入</p>${stepper('重量', fmt(e.w), 'kg', 'w-', 'w+')}${stepper('次數', e.r, '下', 'r-', 'r+')}`;
+
+  const logged = e.kind === 'sets' && e.logs.length
+    ? `<div class="done-row">${e.logs.map((l, j) => `<span>✓ 第 ${j + 1} 組 ${fmt(l.w)} × ${l.r}</span>`).join('')}</div>` : '';
+
+  let dock;
+  if (resting) {
+    dock = `<div class="fdock"><div class="two"><button class="ghost" data-act="add">+30 秒</button><button class="outline" data-act="skiprest">略過休息</button></div></div>`;
+  } else {
+    const up = finalSet ? (nx !== -1 ? `<p class="up">做完這組，下一個：${EX[nx].name}</p>` : `<p class="up">這是今天最後一組</p>`) : '';
+    const label = e.kind === 'time' ? '完成這個動作' : finalSet && nx === -1 ? '完成最後一組' : `完成第 ${k} 組`;
+    dock = `<div class="fdock">${up}<button class="cta" data-act="go">${label}</button></div>`;
+  }
+
+  return `
+    <div class="fh">
+      <button class="rd" data-act="exit" aria-label="離開訓練">${icoX}</button>
+      <div class="et"><small>訓練時間</small><b id="elapsed">${clock(S.elapsed)}</b></div>
+      <button class="pill" data-act="list" aria-label="動作清單">${icoList}${S.ex + 1} / ${n}</button>
+    </div>
+    <div class="segs fsegs">${segs}</div>
+    <div class="fmain">
+      ${kick ? `<div class="kick">${kick}</div>` : ''}
+      <h2>${e.name}</h2><p class="tgt">${tgt}</p>
+      ${hero}${card}${logged}
+    </div>
+    ${dock}`;
+}
+
+function summaryHTML(){
+  const sets = EX.reduce((a, e) => a + (e.kind === 'sets' ? e.logs.length : 0), 0);
+  const vol = EX.reduce((a, e) => a + (e.kind === 'sets' ? e.logs.reduce((s, l) => s + l.w * l.r, 0) : 0), 0);
+  const rows = EX.map(e => {
+    if (e.kind === 'time') return `<div class="srow"><div><b>${e.name}</b></div><span>${e.min} 分鐘</span></div>`;
+    const pr = e.logs.some(l => l.w > e.best);
+    return `<div class="srow"><div><b>${e.name}</b>${pr ? '<em class="pr" style="font-style:normal">新紀錄</em>' : ''}</div>
+      <span>${e.logs.map(l => `${fmt(l.w)} × ${l.r}`).join(' · ') || '未完成'}</span></div>`;
+  }).join('');
+  return `
+    <div class="sumh"><h1>今天練完了</h1><p>背部 · ${EX.length} 個動作</p></div>
+    <div class="stats">
+      <div><b>${clock(S.elapsed)}</b><small>訓練時間</small></div>
+      <div><b>${sets}</b><small>完成組數</small></div>
+      <div><b>${Math.round(vol).toLocaleString('en-US')}</b><small>總量 kg</small></div>
+    </div>
+    <div class="slist">${rows}</div>
+    <div class="fdock"><button class="cta" data-act="save">完成並儲存</button><button class="link" data-act="back">回去修改</button></div>`;
+}
+
+function sheetHTML(){
+  if (S.sheet === 'exit') {
+    const any = EX.some(e => e.kind === 'time' ? e.done : e.logs.length);
+    return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true">
+      <h3>要離開訓練嗎？</h3><p>已完成的組數都已經記下來了。</p>
+      <div class="stack">
+        <button class="pri" data-act="closesheet">繼續訓練</button>
+        <button data-act="pause">暫停並離開，稍後再繼續</button>
+        ${any ? '<button class="txt" data-act="finish">結束並儲存</button>' : ''}
+      </div></div></div>`;
+  }
+  if (S.sheet === 'list') {
+    const rows = EX.map((e, i) => {
+      const d = isDone(e), cur = i === S.ex;
+      const st = d ? '✓ 完成' : cur ? '目前' : e.kind === 'sets' && e.logs.length ? `${e.logs.length} / ${e.sets} 組` : '未開始';
+      const inner = `<b>${i + 1}. ${e.name}</b><span>${st}</span>`;
+      return d ? `<div class="lrow ok">${inner}</div>`
+               : `<button class="lrow ${cur ? 'cur' : ''}" data-act="jump" data-i="${i}">${inner}</button>`;
+    }).join('');
+    return `<div class="scrim" data-act="closesheet"><div class="sheet" role="dialog" aria-modal="true">
+      <h3>今天的動作</h3><p>器材被占用時，可以先換別的動作做。</p>${rows}</div></div>`;
+  }
+  return '';
+}
+
+/* ---------- render ---------- */
+function render(){
+  scr.className = 'screen' + (S.phase === 'focus' && S.rest ? ' rest' : '');
+  scr.innerHTML = (S.phase === 'preview' ? previewHTML() : S.phase === 'focus' ? focusHTML() : summaryHTML()) + sheetHTML();
+  tickUI();
+}
+function tickUI(){
+  const el = $('#elapsed'); if (el) el.textContent = clock(S.elapsed);
+  if (S.rest) {
+    const t = $('#rtime'); if (t) t.textContent = clock(S.rest.left);
+    const f = $('#ringfg'); if (f) f.style.strokeDashoffset = C * (1 - S.rest.left / S.rest.total);
+  }
+  const c = $('#ctime'); if (c) c.textContent = clock(S.cardio.left);
+}
+
+let toastT;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ---------- actions ---------- */
+function go(){
+  const e = EX[S.ex];
+  if (e.kind === 'time') e.done = true; else e.logs.push({w:e.w, r:e.r});
+  if (isDone(e)) {
+    const nx = nextOther(S.ex);
+    if (nx === -1) { S.phase = 'summary'; S.rest = null; }
+    else { S.ex = nx; S.rest = e.kind === 'sets' ? {left:90, total:90, newEx:true} : null; }
+  } else {
+    S.rest = {left:90, total:90, newEx:false};
+  }
+  S.cardio.running = false;
+  render();
+}
+
+scr.addEventListener('click', ev => {
+  const t = ev.target.closest('[data-act]');
+  if (!t) return;
+  const a = t.dataset.act, e = EX[S.ex];
+  if (a === 'closesheet' && ev.target !== t) return;
+  switch (a) {
+    case 'start': {
+      S.phase = 'focus'; S.started = true;
+      if (isDone(EX[S.ex])) { const nx = nextOther(S.ex); if (nx !== -1) S.ex = nx; }
+      break;
+    }
+    case 'quick': toast('會切到原本的清單記錄畫面'); return;
+    case 'go': go(); return;
+    case 'w-': e.w = Math.max(0, e.w - 2.5); break;
+    case 'w+': e.w += 2.5; break;
+    case 'r-': e.r = Math.max(1, e.r - 1); break;
+    case 'r+': e.r += 1; break;
+    case 'm-': e.min = Math.max(1, e.min - 1); if (!S.cardio.running) S.cardio.left = e.min * 60; break;
+    case 'm+': e.min += 1; if (!S.cardio.running) S.cardio.left = e.min * 60; break;
+    case 'ctoggle': S.cardio.running = !S.cardio.running; break;
+    case 'add': S.rest.left += 30; S.rest.total += 30; break;
+    case 'skiprest': S.rest = null; break;
+    case 'exit': S.sheet = 'exit'; break;
+    case 'list': S.sheet = 'list'; break;
+    case 'closesheet': S.sheet = null; break;
+    case 'jump': S.ex = +t.dataset.i; S.rest = null; S.sheet = null; S.cardio.running = false; break;
+    case 'pause': S.sheet = null; S.phase = 'preview'; S.rest = null; S.cardio.running = false; break;
+    case 'finish': S.sheet = null; S.phase = 'summary'; S.rest = null; break;
+    case 'back': {
+      S.phase = 'focus';
+      if (isDone(e)) { if (e.kind === 'time') e.done = false; else e.logs.pop(); }
+      break;
+    }
+    case 'save': toast('訓練已儲存'); return;
+  }
+  render();
+});
+
+$('#chips').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-demo]'); if (!b) return;
+  document.querySelectorAll('#chips button').forEach(x => x.classList.toggle('on', x === b));
+  demo(b.dataset.demo);
+});
+
+/* 每秒：訓練時間、休息倒數、有氧倒數 */
+setInterval(() => {
+  if (S.phase !== 'focus') return;
+  S.elapsed++;
+  if (S.rest) {
+    S.rest.left--;
+    if (S.rest.left <= 0) { S.rest = null; toast('休息結束，開始下一組'); render(); return; }
+  } else if (S.cardio.running && EX[S.ex].kind === 'time') {
+    S.cardio.left--;
+    if (S.cardio.left <= 0) { S.cardio.running = false; S.cardio.left = 0; toast('時間到'); render(); return; }
+  }
+  tickUI();
+}, 1000);
+
+render();
+</script>
+</body>
+</html>
