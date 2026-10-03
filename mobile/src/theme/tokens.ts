@@ -30,6 +30,3 @@ export const foodCategoryColor = {
 export function foodCategoryTone(category: string | null | undefined) {
   return foodCategoryColor[category as keyof typeof foodCategoryColor] ?? foodCategoryColor.other;
 }
-
-/** Tap targets are at least 44 px, per the spec's component rules. */
-export const MIN_TAP_SIZE = 44;

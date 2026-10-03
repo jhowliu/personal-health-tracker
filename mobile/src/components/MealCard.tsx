@@ -43,10 +43,6 @@ const SLOT_TONE: Record<string, { backgroundColor: string; color: string }> = {
   },
 };
 
-export function formatGrams(item: Schema<'MealItemOut'>): string {
-  return `${item.food.name} ${formatPortion(item.food, item.grams)}`;
-}
-
 export function groupByCategory(items: Schema<'MealItemOut'>[]) {
   const groups = new Map<string, Schema<'MealItemOut'>[]>();
   for (const item of items) {

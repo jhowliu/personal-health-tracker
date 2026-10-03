@@ -12,7 +12,6 @@ from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
-from app.domain.decisions import DecisionResult
 from app.domain.meal_photos import MealPhoto, RecognizedItem
 from app.domain.meals import planned_total, total
 from app.domain.models import (
@@ -523,9 +522,6 @@ class WorkoutExecutionOut(BaseModel):
         )
 
 
-class ItemOrderIn(BaseModel):
-    item_ids: list[str]
-
 
 class ScheduleEntryIn(BaseModel):
     weekday: int = Field(ge=0, le=6)
@@ -889,21 +885,4 @@ class ExtraItemOut(BaseModel):
         )
 
 
-class SuggestionIn(BaseModel):
-    subject: str = Field(min_length=1, max_length=500)
 
-
-class CategorySuggestionOut(BaseModel):
-    category_id: str | None
-    confidence: float
-    rationale: str | None
-    fallback_used: bool
-
-    @classmethod
-    def of(cls, result: DecisionResult) -> "CategorySuggestionOut":
-        return cls(
-            category_id=result.selection_id,
-            confidence=result.confidence,
-            rationale=result.rationale,
-            fallback_used=result.selection_id is None,
-        )

@@ -76,10 +76,10 @@ class TestCap:
         swap = convert(CHICKEN_BREAST, 100, TOFU, SwapBasis.PROTEIN)
 
         assert swap.delta.protein_g < 0, "200 g tofu carries less protein than 100 g breast"
-        assert not swap.basis_matched
+        assert swap.capped
 
-    def test_uncapped_swap_is_marked_as_matched(self):
-        assert convert(CHICKEN_BREAST, 100, CHICKEN_THIGH, SwapBasis.PROTEIN).basis_matched
+    def test_uncapped_swap_is_not_marked_capped(self):
+        assert not convert(CHICKEN_BREAST, 100, CHICKEN_THIGH, SwapBasis.PROTEIN).capped
 
 
 class TestEdges:

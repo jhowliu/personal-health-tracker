@@ -1,15 +1,12 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUserId, Decisions, Training
+from app.api.deps import CurrentUserId, Training
 from app.api.schemas import (
-    CategorySuggestionOut,
     ExerciseAlternativeOut,
     ExerciseIn,
     ExerciseOut,
-    ItemOrderIn,
     ScheduleEntryIn,
     ScheduleEntryOut,
-    SuggestionIn,
     TemplateIn,
     TemplateOut,
 )
@@ -50,13 +47,6 @@ async def exercise_alternatives(
         )
         for exercise, recommended, hint in await service.alternatives(user_id, exercise_id, reason)
     ]
-
-
-@router.post("/exercises/suggest-category", response_model=CategorySuggestionOut)
-async def suggest_category(
-    payload: SuggestionIn, user_id: CurrentUserId, service: Decisions
-) -> CategorySuggestionOut:
-    return CategorySuggestionOut.of(await service.exercise_category(payload.subject))
 
 
 @router.post("/exercises", response_model=ExerciseOut, status_code=status.HTTP_201_CREATED)
@@ -139,15 +129,6 @@ async def replace_template(
 @router.delete("/workout-templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_template(template_id: str, user_id: CurrentUserId, service: Training) -> None:
     await service.remove_template(user_id, template_id)
-
-
-@router.put("/workout-templates/{template_id}/items/order", response_model=TemplateOut)
-async def reorder_items(
-    template_id: str, payload: ItemOrderIn, user_id: CurrentUserId, service: Training
-) -> TemplateOut:
-    return TemplateOut.of(
-        await service.reorder_items(user_id, template_id, tuple(payload.item_ids))
-    )
 
 
 @router.get("/workout-schedule", response_model=list[ScheduleEntryOut])

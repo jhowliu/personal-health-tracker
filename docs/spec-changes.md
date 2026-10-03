@@ -11,6 +11,9 @@
 | 「整道換掉」`POST /days/{date}/plan/shuffle` | 移除 | 同上 |
 | 餐點類型（日常／清淡／偶爾吃）、`POST /meals/suggest-settings`（Jev 建議時段與類型） | 移除；`meals.tag` 已刪除（migration 0017） | 只用來決定自動分配要排哪些餐 |
 | 主食份量自動調整（`carb_scale`、`profiles.auto_scale_carbs`、`carb_base_g`） | 移除（migration 0019）；加入我的餐點時照存的份量 | 記錄以拍照為主，預先縮放份量已沒有作用 |
+| `POST /foods/suggest-category`、`POST /exercises/suggest-category`（AI 建議分類） | 移除 | App 早就沒有用到 |
+| `GET /users/me/targets` | 移除 | `GET /users/me/profile` 已經會一起回傳目標 |
+| `PUT /workout-templates/{id}/items/order` | 移除 | 課表編輯是整份用 `PUT` 存檔 |
 
 ## 每日熱量目標（取代「營養與計算規則」的 TDEE 算法）
 

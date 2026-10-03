@@ -413,8 +413,3 @@ class Exchange:
     nutrients: Nutrients
     delta: Nutrients
     capped: bool
-
-    @property
-    def basis_matched(self) -> bool:
-        """False when max_grams stopped us short of an equal swap."""
-        return not self.capped

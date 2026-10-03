@@ -91,11 +91,6 @@ def _profile_change(payload: ProfilePatch | RemindersPatch) -> ProfileChange:
     return ProfileChange(**given)
 
 
-@router.get("/targets", response_model=TargetsOut)
-async def read_targets(user_id: CurrentUserId, service: Profiles) -> TargetsOut:
-    return TargetsOut.of(await service.targets(user_id))
-
-
 @router.patch("/reminders", response_model=ProfileOut)
 async def update_reminders(
     payload: RemindersPatch, user_id: CurrentUserId, service: Profiles

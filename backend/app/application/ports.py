@@ -139,7 +139,6 @@ class TrainingStore(Protocol):
 
     async def archive_exercise(self, user_id: str, exercise_id: str) -> None: ...
 
-    async def exercise_categories(self) -> tuple[tuple[str, str], ...]: ...
 
     async def list_templates(
         self, user_id: str, location: str | None

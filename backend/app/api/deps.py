@@ -132,7 +132,7 @@ def body_tracking(conn: DbConn) -> BodyTrackingService:
 
 
 def training(conn: DbConn) -> TrainingService:
-    return TrainingService(SqliteTrainingStore(conn), decisions(conn))
+    return TrainingService(SqliteTrainingStore(conn), decisions())
 
 
 def day_store(conn: DbConn) -> SqliteDayStore:
@@ -182,7 +182,7 @@ def meal_photos(conn: DbConn) -> MealPhotoService:
         object_storage(),
         image_recognizer(),
         SqliteFoodStore(conn),
-        decisions(conn),
+        decisions(),
         clock(),
         SqliteUnitOfWork(conn),
         settings.daily_ai_image_quota,
@@ -197,8 +197,8 @@ def extras(conn: DbConn) -> ExtrasService:
     return ExtrasService(day_store(conn), plate_intake(conn))
 
 
-def decisions(conn: DbConn) -> DecisionService:
-    return DecisionService(decision_engine(), SqliteFoodStore(conn), SqliteTrainingStore(conn))
+def decisions() -> DecisionService:
+    return DecisionService(decision_engine())
 
 
 Accounts = Annotated[AccountService, Depends(accounts)]
@@ -213,4 +213,3 @@ Meals = Annotated[MealService, Depends(meals)]
 DailyPlan = Annotated[DailyPlanService, Depends(daily_plan)]
 MealPhotos = Annotated[MealPhotoService, Depends(meal_photos)]
 Extras = Annotated[ExtrasService, Depends(extras)]
-Decisions = Annotated[DecisionService, Depends(decisions)]

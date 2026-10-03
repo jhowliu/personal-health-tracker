@@ -203,20 +203,6 @@ class TrainingService:
         await self._template_owned_by(user_id, template_id)
         await self._store.archive_template(user_id, template_id)
 
-    async def reorder_items(
-        self, user_id: str, template_id: str, item_ids: tuple[str, ...]
-    ) -> WorkoutTemplate:
-        current = await self._template_owned_by(user_id, template_id)
-        by_id = {item.id: item for item in current.items}
-        missing = set(item_ids) ^ set(by_id)
-        if missing:
-            raise NotFound("順序清單和課表動作對不起來")
-
-        reordered = tuple(
-            replace(by_id[item_id], sort_order=index) for index, item_id in enumerate(item_ids)
-        )
-        await self._store.replace_items(user_id, template_id, reordered)
-        return await self.template(user_id, template_id)
 
     async def schedule(self, user_id: str) -> tuple[ScheduleEntry, ...]:
         return await self._store.load_schedule(user_id)

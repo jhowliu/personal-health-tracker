@@ -1,6 +1,6 @@
-"""Bounded category/settings suggestions over the single DecisionEngine seam."""
+"""Bounded picks among known options over the single DecisionEngine seam."""
 
-from app.application.ports import DecisionEngine, FoodStore, TrainingStore
+from app.application.ports import DecisionEngine
 from app.domain.decisions import DecisionOption, DecisionRequest, DecisionResult
 from app.domain.models import Exercise, Food
 
@@ -10,26 +10,8 @@ MIN_CONFIDENCE = 0.5
 
 
 class DecisionService:
-    def __init__(self, engine: DecisionEngine, foods: FoodStore, training: TrainingStore) -> None:
+    def __init__(self, engine: DecisionEngine) -> None:
         self._engine = engine
-        self._foods = foods
-        self._training = training
-
-    async def food_category(self, subject: str) -> DecisionResult:
-        categories = await self._foods.categories()
-        return await self._decide(
-            subject,
-            "Choose the closest food category.",
-            tuple(DecisionOption(category.id, category.name) for category in categories),
-        )
-
-    async def exercise_category(self, subject: str) -> DecisionResult:
-        categories = await self._training.exercise_categories()
-        return await self._decide(
-            subject,
-            "Choose the closest exercise category.",
-            tuple(DecisionOption(id, name) for id, name in categories),
-        )
 
     async def food_match(self, label: str, candidates: tuple[Food, ...]) -> DecisionResult:
         """Pick the library food a photo label refers to.
@@ -41,7 +23,6 @@ class DecisionService:
             label,
             "Choose the food from the library that this photo label refers to.",
             tuple(DecisionOption(food.id, food.name) for food in candidates),
-            min_confidence=MIN_CONFIDENCE,
         )
 
     async def exercise_alternative(
@@ -52,7 +33,6 @@ class DecisionService:
             subject,
             "Choose the substitute exercise that best fits the stated reason.",
             tuple(DecisionOption(exercise.id, exercise.name) for exercise in candidates),
-            min_confidence=MIN_CONFIDENCE,
         )
 
     async def _decide(
@@ -60,13 +40,12 @@ class DecisionService:
         subject: str,
         instruction: str,
         options: tuple[DecisionOption, ...],
-        min_confidence: float = 0.0,
     ) -> DecisionResult:
         result = await self._engine.decide(DecisionRequest(subject, instruction, options))
         if result.selection_id not in {option.id for option in options}:
-            # Do not turn a hallucinated id into a category assignment.
+            # Do not turn a hallucinated id into a pick.
             return DecisionResult(None, 0.0, "AI 回覆不在可用選項中，請自行選擇")
-        if result.confidence < min_confidence:
+        if result.confidence < MIN_CONFIDENCE:
             # Reported as no selection so callers fall back instead of pre-filling a guess.
             return DecisionResult(None, 0.0, "AI 信心不足，請自行確認")
         return result
