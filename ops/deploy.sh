@@ -13,6 +13,9 @@ git diff --quiet HEAD -- backend || TAG="$TAG-dirty"
 docker buildx build --platform linux/amd64 -t "pht-api:$TAG" -t pht-api:latest --load backend
 docker save "pht-api:$TAG" pht-api:latest | gzip | ssh "$REMOTE" 'gunzip | docker load'
 scp docker-compose.prod.yml "$REMOTE:$REMOTE_DIR/docker-compose.yml"
-ssh "$REMOTE" "cd $REMOTE_DIR && PHT_TAG=$TAG docker-compose up -d && docker image prune -f >/dev/null"
+# docker-compose 1.29 cannot recreate a container from an image built by a newer Docker
+# (KeyError: 'ContainerConfig'): it stops the old one and fails before starting the new.
+# Removing the old container first takes the same few seconds of downtime and always works.
+ssh "$REMOTE" "cd $REMOTE_DIR && docker-compose rm -sf api && PHT_TAG=$TAG docker-compose up -d && docker image prune -f >/dev/null"
 
 echo "Deployed pht-api:$TAG. Roll back with: ssh $REMOTE 'cd $REMOTE_DIR && PHT_TAG=<old-tag> docker-compose up -d'"
