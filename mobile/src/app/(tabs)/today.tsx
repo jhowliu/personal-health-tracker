@@ -1125,26 +1125,38 @@ function WorkoutStep({
     (entry) => completedSetCount(entry) >= (entry.item.sets ?? 1),
   ).length;
   const templateName = workout.template?.name;
+  const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
+  // Done rather than skipped: something was logged before the day was closed.
+  const finished = resolved && anyLogged;
 
   if (date === todayISO() && workout.items.length > 0 && !workoutSkipped && !listMode) {
     const done = (entry: WorkoutItem) =>
       entry.item.duration_sec ? entry.logs.length > 0 : completedSetCount(entry) >= (entry.item.sets ?? 1);
     const doneCount = workout.items.filter(done).length;
-    const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
     const underway = sessionStarted || anyLogged;
     return (
       <Screen
         footerSafeArea={false}
         footer={
           resolved ? (
-            // Finished workouts are not reopened: what was done stays as it was saved.
-            <View className="items-center gap-1 py-2">
+            // Focus mode does not reopen a finished workout, but an extra exercise done
+            // afterwards is added here and logged in the list.
+            <View className="items-center gap-1 pt-2">
               <Text className={`text-base font-semibold ${anyLogged ? 'text-good' : 'text-muted'}`}>
                 {anyLogged ? '✓ 今天的訓練已完成' : '今天已略過訓練'}
               </Text>
               {anyLogged && workout.estimated_burn_kcal ? (
                 <Hint>約消耗 {workout.estimated_burn_kcal} 大卡</Hint>
               ) : null}
+              <TextAction
+                icon={PlusIcon}
+                label="加入動作"
+                onPress={() => {
+                  setListMode(true);
+                  router.navigate(`/workouts/add-today?date=${date}`);
+                }}
+                className="min-h-[44px] justify-center"
+              />
             </View>
           ) : (
             <>
@@ -1230,6 +1242,18 @@ function WorkoutStep({
           <PrimaryButton onPress={complete} busy={busy}>
             仍要完成今日訓練
           </PrimaryButton>
+        ) : finished ? (
+          // Already done: logging an added exercise keeps it done, so neither 完成 nor 略過 applies.
+          <>
+            {date === todayISO() ? (
+              <PrimaryButton onPress={() => setListMode(false)} disabled={busy}>
+                完成修改
+              </PrimaryButton>
+            ) : (
+              <Text className="text-center text-base font-semibold text-good">✓ {word}的訓練已完成</Text>
+            )}
+            {progress}
+          </>
         ) : allComplete && workout.items.length > 0 ? (
           <>
             <PrimaryButton onPress={complete} busy={busy}>
