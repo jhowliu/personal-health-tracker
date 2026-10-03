@@ -203,6 +203,7 @@ class BodySummaryOut(BaseModel):
 class DayFlowOut(BaseModel):
     steps: list[str]
     completed: list[str]
+    waiting: list[str]
     current: str
     eaten: "NutrientsOut"
 
@@ -211,6 +212,7 @@ class DayFlowOut(BaseModel):
         return cls(
             steps=[s.value for s in flow.steps],
             completed=[s.value for s in flow.steps if s in flow.completed],
+            waiting=[s.value for s in flow.waiting],
             current=flow.current.value,
             eaten=NutrientsOut.of(flow.eaten),
         )

@@ -57,9 +57,9 @@ type WorkoutEdit = { sets: string; reps: string; durationMin: string; weight: st
 
 const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
-/** The label of the step that follows `step`, or 完成 after the last one. */
+/** Where finishing `step` leads: the first other step still to do, or 完成. */
 function stepAfter(day: Today, step: string) {
-  const next = day.flow.steps[day.flow.steps.indexOf(step) + 1];
+  const next = day.flow.waiting.find((waiting) => waiting !== step);
   return STEP_LABEL[next ?? 'done'];
 }
 
@@ -1261,7 +1261,7 @@ function WorkoutStep({
             </PrimaryButton>
             {progress}
           </>
-        ) : (
+        ) : workout.items.length === 0 ? null /* A rest day: nothing to finish or skip yet. */ : (
           <>
             {progress}
             <TextAction
@@ -1279,7 +1279,7 @@ function WorkoutStep({
         <View className="gap-1">
           <Hint>{word}的訓練</Hint>
           <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-            {templateName ?? `${word}沒有排定訓練`}
+            {templateName ?? (workout.items.length ? `${word}的訓練` : `${word}沒有排定訓練`)}
           </Text>
           {workout.items.length > 0 && !workoutSkipped ? (
             <Hint>點動作名稱可以換動作、編輯或移除。</Hint>

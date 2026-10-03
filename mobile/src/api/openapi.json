@@ -4064,6 +4064,13 @@
             "type": "array",
             "title": "Completed"
           },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Waiting"
+          },
           "current": {
             "type": "string",
             "title": "Current"
@@ -4076,6 +4083,7 @@
         "required": [
           "steps",
           "completed",
+          "waiting",
           "current",
           "eaten"
         ],

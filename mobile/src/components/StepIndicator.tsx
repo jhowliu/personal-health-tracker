@@ -1,4 +1,7 @@
-/** The progress track at the top of today's flow. Completed steps and the next open step can be tapped. */
+/**
+ * The progress track at the top of today's flow. Every step can be tapped: the order is a
+ * suggestion, and a workout done after breakfast should not wait for lunch to be logged.
+ */
 import { Pressable, Text, View } from 'react-native';
 
 import { CheckIcon } from '@/components/icons';
@@ -54,7 +57,7 @@ export function StepIndicator({
   completed: string[];
   /** The step on screen. It is not always the next open one: a finished step can be revisited. */
   current: string;
-  /** The first step still open. It stays tappable while an earlier step is on screen. */
+  /** The first step still open, marked so it stands out while another step is on screen. */
   next?: string;
   onSelect?: (step: string) => void;
 }) {
@@ -64,7 +67,6 @@ export function StepIndicator({
         const isDone = completed.includes(step);
         const isCurrent = step === current;
         const isNext = step === next;
-        const reachable = isDone || isCurrent || isNext;
         const name = STEP_LABEL[step] ?? step;
         // The track between two dots is filled once the step on its left is finished.
         const leftFilled = index > 0 && completed.includes(steps[index - 1]);
@@ -77,8 +79,8 @@ export function StepIndicator({
             accessibilityLabel={`${name}，第 ${index + 1} 步，共 ${steps.length} 步，${
               isDone ? '已完成' : '未完成'
             }${isCurrent ? '，目前顯示' : ''}`}
-            accessibilityState={{ selected: isCurrent, disabled: !reachable }}
-            disabled={!reachable || !onSelect}
+            accessibilityState={{ selected: isCurrent }}
+            disabled={!onSelect}
             onPress={() => onSelect?.(step)}
             className="flex-1 items-center gap-1"
           >

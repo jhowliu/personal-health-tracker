@@ -171,6 +171,7 @@ class DayFacts:
     workout_time: WorkoutTime
     workout_done_at: datetime | None
     workout_skipped_at: datetime | None
+    # A scheduled template, or exercises added to the day by hand.
     has_workout_planned: bool
 
 
@@ -178,6 +179,8 @@ class DayFacts:
 class DayFlow:
     steps: tuple[FlowStep, ...]
     completed: frozenset[FlowStep]
+    # Steps still to do, in order; a rest day's workout step is never among them.
+    waiting: tuple[FlowStep, ...]
     current: FlowStep
     eaten: Nutrients
 

@@ -57,8 +57,24 @@ def test_morning_workout_sits_after_breakfast():
     )
 
 
-def test_rest_day_has_four_steps():
-    assert FlowStep.WORKOUT not in resolve_flow(facts(has_workout_planned=False)).steps
+def test_rest_day_keeps_the_workout_step_without_waiting_on_it():
+    eaten = datetime(2026, 9, 22, 12, 0)
+    flow = resolve_flow(
+        facts(
+            has_workout_planned=False,
+            body_logged=True,
+            slots=(
+                MealSlot(MealTime.BREAKFAST, None, eaten, None, _kcal(0)),
+                MealSlot(MealTime.LUNCH, None, eaten, None, _kcal(0)),
+                MealSlot(MealTime.DINNER, None, None, None, _kcal(0)),
+            ),
+        )
+    )
+
+    assert FlowStep.WORKOUT in flow.steps
+    assert FlowStep.WORKOUT not in flow.completed
+    assert flow.waiting == (FlowStep.DINNER,)
+    assert flow.current is FlowStep.DINNER
 
 
 def test_day_starts_at_weigh_in():

@@ -837,6 +837,8 @@ export interface components {
             steps: string[];
             /** Completed */
             completed: string[];
+            /** Waiting */
+            waiting: string[];
             /** Current */
             current: string;
             eaten: components["schemas"]["NutrientsOut"];

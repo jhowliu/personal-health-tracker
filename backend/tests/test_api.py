@@ -118,7 +118,8 @@ async def test_new_day_starts_at_the_weigh_in_step(with_profile: AsyncClient):
     day = (await with_profile.get(f"/days/{TODAY}")).json()
 
     assert day["flow"]["current"] == "body"
-    assert day["flow"]["steps"] == ["body", "breakfast", "lunch", "dinner"]
+    # The workout step is always there; on a rest day it is simply never the one waited on.
+    assert day["flow"]["steps"] == ["body", "breakfast", "lunch", "workout", "dinner"]
     assert day["streak"] == 0
     assert day["targets"]["kcal"] == 1340
 
@@ -279,10 +280,13 @@ async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     with_profile: AsyncClient,
 ):
     """The day is opened first, the schedule set afterwards — today's flow must still
-    pick up the workout step.
+    wait on the workout step.
     """
-    before = (await with_profile.get(f"/days/{TODAY}")).json()
-    assert "workout" not in before["flow"]["steps"]
+    await with_profile.get(f"/days/{TODAY}")
+    await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1})
+    await with_profile.patch(f"/days/{TODAY}/meals/breakfast")
+    before = (await with_profile.patch(f"/days/{TODAY}/meals/lunch")).json()
+    assert before["flow"]["current"] == "dinner"
 
     exercise = (
         await with_profile.post("/exercises", json={"category_id": "strength", "name": "深蹲"})
@@ -304,7 +308,7 @@ async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     )
 
     after = (await with_profile.get(f"/days/{TODAY}")).json()
-    assert after["flow"]["steps"] == ["body", "breakfast", "lunch", "workout", "dinner"]
+    assert after["flow"]["current"] == "workout"
 
 
 async def test_deleting_the_account_removes_everything(with_profile: AsyncClient):

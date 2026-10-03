@@ -36,6 +36,12 @@ class SqliteDayStore:
             day_row = await cursor.fetchone()
 
         async with self._conn.execute(
+            "SELECT EXISTS (SELECT 1 FROM day_workout_items WHERE user_id = ? AND date = ?)",
+            (user_id, to_day(day)),
+        ) as cursor:
+            has_items = bool((await cursor.fetchone())[0])
+
+        async with self._conn.execute(
             "SELECT meal_time, meal_id, eaten_at, skipped_at FROM day_meals"
             " WHERE user_id = ? AND date = ?",
             (user_id, to_day(day)),
@@ -66,7 +72,7 @@ class SqliteDayStore:
             workout_time=WorkoutTime(day_row["workout_time"]),
             workout_done_at=from_iso(day_row["workout_done_at"]),
             workout_skipped_at=from_iso(day_row["workout_skipped_at"]),
-            has_workout_planned=day_row["template_id"] is not None,
+            has_workout_planned=day_row["template_id"] is not None or has_items,
         )
 
     async def update_day(
