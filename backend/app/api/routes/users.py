@@ -47,8 +47,6 @@ def _to_profile(user_id: str, payload: ProfileIn) -> Profile:
         weight_kg=payload.weight_kg,
         activity_level=ActivityLevel(payload.activity_level),
         deficit_pct=payload.deficit_pct,
-        carb_base_g=0,
-        auto_scale_carbs=payload.auto_scale_carbs,
         workout_time=WorkoutTime(payload.workout_time),
         default_location=Location(payload.default_location),
         reminder_time=payload.reminder_time,
@@ -91,11 +89,6 @@ def _profile_change(payload: ProfilePatch | RemindersPatch) -> ProfileChange:
         if value is not None or key in _CLEARABLE
     }
     return ProfileChange(**given)
-
-
-@router.get("/targets", response_model=TargetsOut)
-async def read_targets(user_id: CurrentUserId, service: Profiles) -> TargetsOut:
-    return TargetsOut.of(await service.targets(user_id))
 
 
 @router.patch("/reminders", response_model=ProfileOut)

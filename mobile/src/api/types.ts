@@ -162,23 +162,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/me/targets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Targets */
-        get: operations["read_targets_users_me_targets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/users/me/reminders": {
         parameters: {
             query?: never;
@@ -417,7 +400,7 @@ export interface paths {
         put?: never;
         /**
          * Add Plan Meal
-         * @description Put one of the user's saved meals on the plate, portions scaled to today's target.
+         * @description Put one of the user's saved meals on the plate, at its saved portions.
          */
         post: operations["add_plan_meal_days__day__plan__meal_time__meal_post"];
         delete?: never;
@@ -528,23 +511,6 @@ export interface paths {
         put?: never;
         /** Add Food */
         post: operations["add_food_foods_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/foods/suggest-category": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Suggest Category */
-        post: operations["suggest_category_foods_suggest_category_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -717,23 +683,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/exercises/suggest-category": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Suggest Category */
-        post: operations["suggest_category_exercises_suggest_category_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/exercises/{exercise_id}": {
         parameters: {
             query?: never;
@@ -801,23 +750,6 @@ export interface paths {
         post?: never;
         /** Remove Template */
         delete: operations["remove_template_workout_templates__template_id__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workout-templates/{template_id}/items/order": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Reorder Items */
-        put: operations["reorder_items_workout_templates__template_id__items_order_put"];
-        post?: never;
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -899,23 +831,14 @@ export interface components {
             /** Items */
             items: components["schemas"]["MealItemIn"][];
         };
-        /** CategorySuggestionOut */
-        CategorySuggestionOut: {
-            /** Category Id */
-            category_id: string | null;
-            /** Confidence */
-            confidence: number;
-            /** Rationale */
-            rationale: string | null;
-            /** Fallback Used */
-            fallback_used: boolean;
-        };
         /** DayFlowOut */
         DayFlowOut: {
             /** Steps */
             steps: string[];
             /** Completed */
             completed: string[];
+            /** Waiting */
+            waiting: string[];
             /** Current */
             current: string;
             eaten: components["schemas"]["NutrientsOut"];
@@ -1161,11 +1084,6 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
-        /** ItemOrderIn */
-        ItemOrderIn: {
-            /** Item Ids */
-            item_ids: string[];
-        };
         /** LoginIn */
         LoginIn: {
             /**
@@ -1367,11 +1285,6 @@ export interface components {
              */
             deficit_pct: 10 | 12 | 15 | 20;
             /**
-             * Auto Scale Carbs
-             * @default true
-             */
-            auto_scale_carbs: boolean;
-            /**
              * Workout Time
              * @default pm
              * @enum {string}
@@ -1408,8 +1321,6 @@ export interface components {
             activity_level: string;
             /** Deficit Pct */
             deficit_pct: number;
-            /** Auto Scale Carbs */
-            auto_scale_carbs: boolean;
             /** Workout Time */
             workout_time: string;
             /** Default Location */
@@ -1433,8 +1344,6 @@ export interface components {
             activity_level?: ("sedentary" | "light" | "moderate" | "active") | null;
             /** Deficit Pct */
             deficit_pct?: (10 | 12 | 15 | 20) | null;
-            /** Auto Scale Carbs */
-            auto_scale_carbs?: boolean | null;
             /** Workout Time */
             workout_time?: ("am" | "pm") | null;
             /** Default Location */
@@ -1565,11 +1474,6 @@ export interface components {
             /** Next Weight Kg */
             next_weight_kg: number | null;
         };
-        /** SuggestionIn */
-        SuggestionIn: {
-            /** Subject */
-            subject: string;
-        };
         /** SwapItemIn */
         SwapItemIn: {
             /** Item Id */
@@ -1585,6 +1489,10 @@ export interface components {
             bmr: number;
             /** Tdee */
             tdee: number;
+            /** Base Kcal */
+            base_kcal: number;
+            /** Exercise Kcal */
+            exercise_kcal: number;
             /** Kcal */
             kcal: number;
             /** Protein G */
@@ -1593,8 +1501,6 @@ export interface components {
             fat_g: number;
             /** Carb G */
             carb_g: number;
-            /** Carb Scale */
-            carb_scale: number;
         };
         /** TemplateIn */
         TemplateIn: {
@@ -2139,37 +2045,6 @@ export interface operations {
                 "application/json": components["schemas"]["ProfileIn"];
             };
         };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TargetsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    read_targets_users_me_targets_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -3090,41 +2965,6 @@ export interface operations {
             };
         };
     };
-    suggest_category_foods_suggest_category_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SuggestionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategorySuggestionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_food_foods__food_id__get: {
         parameters: {
             query?: never;
@@ -3641,41 +3481,6 @@ export interface operations {
             };
         };
     };
-    suggest_category_exercises_suggest_category_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SuggestionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CategorySuggestionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     remove_exercise_exercises__exercise_id__delete: {
         parameters: {
             query?: never;
@@ -3932,43 +3737,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reorder_items_workout_templates__template_id__items_order_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                template_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ItemOrderIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TemplateOut"];
-                };
             };
             /** @description Validation Error */
             422: {

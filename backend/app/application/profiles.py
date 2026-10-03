@@ -26,16 +26,8 @@ class ProfileService:
         return profile
 
     async def create_or_replace(self, profile: Profile) -> tuple[Profile, Targets]:
-        """On first setup, the carb target computed right now becomes the baseline that
-        meal portions are stored against.
-        """
-        today = self._clock.today(profile.timezone)
-        if profile.carb_base_g <= 0:
-            seeded = replace(profile, carb_base_g=0, auto_scale_carbs=False)
-            profile = replace(profile, carb_base_g=compute_targets(seeded, today).carb_g)
-
         await self._store.save_profile(profile)
-        return profile, compute_targets(profile, today)
+        return profile, compute_targets(profile, self._clock.today(profile.timezone))
 
     async def update(self, user_id: str, change: ProfileChange) -> tuple[Profile, Targets]:
         profile = replace(await self.get(user_id), **applied(change))
@@ -49,5 +41,6 @@ class ProfileService:
         return compute_targets(profile, self._clock.today(profile.timezone))
 
     async def targets(self, user_id: str, on: date | None = None) -> Targets:
+        """The base targets, before any workout: the day's own burn is added by the today view."""
         profile = await self.get(user_id)
         return compute_targets(profile, on or self._clock.today(profile.timezone))

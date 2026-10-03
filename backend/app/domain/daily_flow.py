@@ -12,17 +12,16 @@ _MEAL_STEP: dict[MealTime, FlowStep] = {
 }
 
 
-def _step_order(workout_time: WorkoutTime, has_workout: bool) -> tuple[FlowStep, ...]:
+def _step_order(workout_time: WorkoutTime) -> tuple[FlowStep, ...]:
+    """Every day has a workout step, so a rest day can still take an unplanned session."""
     meals = [FlowStep.BODY, FlowStep.BREAKFAST, FlowStep.LUNCH, FlowStep.DINNER]
-    if not has_workout:
-        return tuple(meals)
     # Morning workout goes after breakfast; evening workout goes before dinner.
     insert_at = 2 if workout_time is WorkoutTime.AM else 3
     return tuple(meals[:insert_at] + [FlowStep.WORKOUT] + meals[insert_at:])
 
 
 def resolve_flow(facts: DayFacts) -> DayFlow:
-    steps = _step_order(facts.workout_time, facts.has_workout_planned)
+    steps = _step_order(facts.workout_time)
 
     completed: set[FlowStep] = set()
     if facts.body_logged:
@@ -35,7 +34,13 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
         ) and slot.meal_time in _MEAL_STEP:
             completed.add(_MEAL_STEP[slot.meal_time])
 
-    current = next((s for s in steps if s not in completed), FlowStep.DONE)
+    # A rest day's workout step is there to open, never to wait on.
+    waiting = tuple(
+        s
+        for s in steps
+        if s not in completed and (s is not FlowStep.WORKOUT or facts.has_workout_planned)
+    )
+    current = waiting[0] if waiting else FlowStep.DONE
 
     eaten = Nutrients(0, 0, 0, 0)
     for slot in facts.slots:
@@ -47,6 +52,7 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
     return DayFlow(
         steps=steps,
         completed=frozenset(completed),
+        waiting=waiting,
         current=current,
         eaten=Nutrients(
             kcal=round(eaten.kcal, 1),

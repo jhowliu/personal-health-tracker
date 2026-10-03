@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { useSession } from '@/auth/session';
 import { MealCard } from '@/components/MealCard';
 import { ShowMore, usePaged } from '@/components/paging';
 import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';
@@ -85,7 +84,6 @@ export default function MealsScreen() {
 }
 
 function MyMeals() {
-  const { profile } = useSession();
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [slot, setSlot] = useState('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -145,8 +143,6 @@ function MyMeals() {
         ))}
       </View>
 
-      {profile?.profile.auto_scale_carbs ? <CarbScaleNotice /> : null}
-
       {meals === null ? (
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
@@ -167,27 +163,6 @@ function MyMeals() {
         </View>
       )}
     </>
-  );
-}
-
-function CarbScaleNotice() {
-  const { profile } = useSession();
-  const scale = profile?.targets.carb_scale ?? 1;
-  if (Math.abs(scale - 1) < 0.02) return null;
-
-  const direction = scale < 1 ? '減少' : '增加';
-  const percent = Math.round(Math.abs(1 - scale) * 100);
-
-  return (
-    <Card className="gap-2 border-warm bg-warm-soft">
-      <Text className="text-base font-semibold text-ink">
-        熱量目標更新為 {profile?.targets.kcal.toLocaleString()} 大卡
-      </Text>
-      <Text className="text-base text-ink">
-        所有餐點的主食份量已自動{direction}約 {percent}%，蛋白質和蔬菜不變。
-      </Text>
-      <Hint>編輯餐點時看到的仍是基準克數。</Hint>
-    </Card>
   );
 }
 

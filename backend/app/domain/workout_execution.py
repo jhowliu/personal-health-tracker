@@ -1,5 +1,6 @@
 """A day's workout: what was prescribed for that date, and what actually happened."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import StrEnum
@@ -115,12 +116,12 @@ class SetLogResult:
 
 
 def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
-    """Rough kcal for a session: each logged exercise costs MET x weight x its own time.
+    """Rough kcal the logged work burned beyond resting: (MET - 1) x weight x its time.
 
-    Display only. MET assumes steady effort and knows nothing about the load on the bar or
-    how long the rests were, so two identical-looking sessions can differ by half. It must
-    never reach compute_targets(): the profile's activity factor already prices training
-    into TDEE, and spending it again would count one workout twice.
+    MET assumes steady effort and knows nothing about the load on the bar or how long the
+    rests were, so two identical-looking sessions can differ by half; compute_targets()
+    therefore adds back only part of it. One MET is what the body burns sitting still, and
+    the day's base target already covers that, so it is taken off here.
 
     Timed work carries its own minutes. Counted work does not, so those exercises share
     out the planned session length between them — which is why a 90-minute tennis match
@@ -130,20 +131,51 @@ def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | N
     exercises, which carry no MET.
     """
     performed = [entry for entry in execution.items if entry.logs and entry.item.met]
-    if not performed:
+    return _burn(execution, performed, _seconds_spent, weight_kg)
+
+
+def planned_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
+    """The same estimate for the whole workout as prescribed, before any of it is done."""
+    planned = [entry for entry in execution.items if entry.item.met]
+    return _burn(execution, planned, _seconds_prescribed, weight_kg)
+
+
+def burn_for_targets(
+    execution: WorkoutExecution, weight_kg: float, *, settled: bool
+) -> int:
+    """The workout burn the day's calorie target should count.
+
+    Once the day is settled — the workout marked done or skipped, or the day in the past —
+    only what was logged counts. Before that the plan does, so the extra food is there to
+    plan around in the morning; sets logged beyond the plan are never undercounted.
+    """
+    logged = estimate_burn_kcal(execution, weight_kg) or 0
+    if settled:
+        return logged
+    return max(logged, planned_burn_kcal(execution, weight_kg) or 0)
+
+
+def _burn(
+    execution: WorkoutExecution,
+    entries: list[WorkoutExecutionItem],
+    seconds_of: Callable[[WorkoutExecutionItem], float],
+    weight_kg: float,
+) -> int | None:
+    if not entries:
         return None
 
-    timed = [entry for entry in performed if _seconds_spent(entry)]
-    counted = [entry for entry in performed if not _seconds_spent(entry)]
-    total = sum(
-        (entry.item.met or 0.0) * weight_kg * _seconds_spent(entry) / 3600 for entry in timed
-    )
+    def net(entry: WorkoutExecutionItem, seconds: float) -> float:
+        return max((entry.item.met or 0.0) - 1, 0.0) * weight_kg * seconds / 3600
+
+    timed = [entry for entry in entries if seconds_of(entry)]
+    counted = [entry for entry in entries if not seconds_of(entry)]
+    total = sum(net(entry, seconds_of(entry)) for entry in timed)
 
     planned_min = execution.template.duration_min if execution.template else None
     if counted and planned_min:
-        # The plan's minutes cover every item, so counted work only claims its share.
-        share = planned_min * 60 * (len(counted) / len(execution.items)) / len(counted)
-        total += sum((entry.item.met or 0.0) * weight_kg * share / 3600 for entry in counted)
+        # The plan's minutes cover every item, so each counted item claims an equal share.
+        share = planned_min * 60 / len(execution.items)
+        total += sum(net(entry, share) for entry in counted)
 
     return round(total) or None
 
@@ -155,6 +187,11 @@ def _seconds_spent(entry: WorkoutExecutionItem) -> float:
         return float(logged)
     prescribed = entry.item.duration_sec
     return float(prescribed * len(entry.logs)) if prescribed else 0.0
+
+
+def _seconds_prescribed(entry: WorkoutExecutionItem) -> float:
+    prescribed = entry.item.duration_sec
+    return float(prescribed * (entry.item.sets or 1)) if prescribed else 0.0
 
 
 def recommend_next_weight(weight_kg: float | None, effort: SetEffort | None) -> float | None:

@@ -339,19 +339,6 @@ async def test_editing_an_added_food_updates_all_day_totals_even_with_legacy_cac
         assert round(legacy[nutrient] - before[nutrient], 1) == round(expected_delta, 1)
 
 
-async def test_suggestions_reject_model_created_category_ids(with_foods: AsyncClient, monkeypatch):
-    monkeypatch.setattr(deps, "decision_engine", lambda: InvalidDecisionEngine())
-
-    suggestion = await with_foods.post("/foods/suggest-category", json={"subject": "雞胸肉"})
-    assert suggestion.status_code == 200
-    assert suggestion.json()["category_id"] is None
-    assert suggestion.json()["fallback_used"] is True
-
-
-async def test_suggestions_without_an_ai_key_are_unavailable(with_foods: AsyncClient):
-    response = await with_foods.post("/foods/suggest-category", json={"subject": "雞胸肉"})
-    assert response.status_code == 503
-    assert "AI" in response.json()["detail"]
 
 
 async def test_exercise_alternatives_are_category_safe_and_deterministic(

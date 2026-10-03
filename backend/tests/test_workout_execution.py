@@ -1,3 +1,6 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
 from httpx import AsyncClient
 
 from seeds.exercises import seed as seed_exercises
@@ -300,8 +303,9 @@ async def test_session_burn_is_estimated_only_once_sets_are_logged(with_exercise
     )
     assert logged.status_code == 200
 
-    # 5.0 MET x 56 kg x 1 hour, the whole plan being this one exercise.
-    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 280
+    # (5.0 - 1) MET x 56 kg x 1 hour, the whole plan being this one exercise; the resting
+    # MET is already in the day's base target.
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 224
 
 
 async def test_custom_exercises_carry_no_burn_estimate(with_profile: AsyncClient):
@@ -439,9 +443,9 @@ async def test_long_and_short_items_are_costed_separately(with_exercises: AsyncC
         )
         assert logged.status_code == 200
 
-    # 7.3 x 56 x 1.5h + 2.3 x 56 x (10/60)h. Averaging the two METs over the whole 100
-    # minutes, as the old session-level estimate did, would read ~450 instead.
-    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 635
+    # 6.3 x 56 x 1.5h + 1.3 x 56 x (10/60)h, net of the resting MET. Averaging the two METs
+    # over the whole 100 minutes would read far lower.
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 541
 
 
 async def test_a_logged_duration_beats_the_prescribed_one(with_exercises: AsyncClient):
@@ -461,8 +465,8 @@ async def test_a_logged_duration_beats_the_prescribed_one(with_exercises: AsyncC
         },
     )
     assert logged.status_code == 200
-    # Planned 90 minutes, played 40: 7.3 x 56 x (40/60)h.
-    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 273
+    # Planned 90 minutes, played 40: (7.3 - 1) x 56 x (40/60)h.
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 235
 
 
 async def test_editing_the_template_leaves_a_day_already_underway_alone(
@@ -626,3 +630,51 @@ async def test_day_items_say_which_equipment_the_exercise_uses(with_profile: Asy
     items = await _day_items(with_profile)
 
     assert items[0]["equipment"] == "bodyweight"
+
+
+async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: AsyncClient):
+    await _profile(with_exercises)
+    today = datetime.now(ZoneInfo("Asia/Taipei")).date()
+    template = (
+        await with_exercises.post(
+            "/workout-templates",
+            json={
+                "category_id": "strength",
+                "name": "全身",
+                "location": "home",
+                "duration_min": 60,
+                "items": [
+                    {"exercise_id": "barbell-back-squat", "sets": 1, "reps": "10"},
+                    {"exercise_id": "barbell-bench-press", "sets": 1, "reps": "10"},
+                ],
+            },
+        )
+    ).json()
+    await with_exercises.put(
+        "/workout-schedule",
+        json=[{"weekday": today.weekday(), "location": "home", "template_id": template["id"]}],
+    )
+
+    # Before training: the whole plan, (5 - 1) MET x 56 kg x 1 h = 224, half added back.
+    planned = (await with_exercises.get(f"/days/{today}")).json()["targets"]
+    assert (planned["base_kcal"], planned["exercise_kcal"], planned["kcal"]) == (1340, 112, 1452)
+
+    squat = (await with_exercises.get(f"/days/{today}/workout")).json()["items"][0]["item"]
+    await with_exercises.put(
+        f"/days/{today}/workout/sets",
+        json={
+            "day_workout_item_id": squat["id"],
+            "exercise_id": squat["exercise_id"],
+            "set_index": 0,
+        },
+    )
+    # Halfway, the plan still stands.
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 112
+
+    # Finished with only the squat done: its half hour is what counts now.
+    await with_exercises.patch(f"/days/{today}", json={"workout_done": True})
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 56
+
+    # The profile's own targets never include a workout.
+    profile = (await with_exercises.get("/users/me/profile")).json()["targets"]
+    assert (profile["exercise_kcal"], profile["kcal"]) == (0, 1340)

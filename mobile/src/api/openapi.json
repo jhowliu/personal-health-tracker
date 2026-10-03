@@ -500,55 +500,6 @@
         }
       }
     },
-    "/users/me/targets": {
-      "get": {
-        "tags": [
-          "users"
-        ],
-        "summary": "Read Targets",
-        "operationId": "read_targets_users_me_targets_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TargetsOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/users/me/reminders": {
       "patch": {
         "tags": [
@@ -1619,7 +1570,7 @@
           "days"
         ],
         "summary": "Add Plan Meal",
-        "description": "Put one of the user's saved meals on the plate, portions scaled to today's target.",
+        "description": "Put one of the user's saved meals on the plate, at its saved portions.",
         "operationId": "add_plan_meal_days__day__plan__meal_time__meal_post",
         "parameters": [
           {
@@ -2282,65 +2233,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FoodOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/foods/suggest-category": {
-      "post": {
-        "tags": [
-          "foods"
-        ],
-        "summary": "Suggest Category",
-        "operationId": "suggest_category_foods_suggest_category_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SuggestionIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CategorySuggestionOut"
                 }
               }
             }
@@ -3370,65 +3262,6 @@
         }
       }
     },
-    "/exercises/suggest-category": {
-      "post": {
-        "tags": [
-          "training"
-        ],
-        "summary": "Suggest Category",
-        "operationId": "suggest_category_exercises_suggest_category_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SuggestionIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CategorySuggestionOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/exercises/{exercise_id}": {
       "patch": {
         "tags": [
@@ -3896,74 +3729,6 @@
         }
       }
     },
-    "/workout-templates/{template_id}/items/order": {
-      "put": {
-        "tags": [
-          "training"
-        ],
-        "summary": "Reorder Items",
-        "operationId": "reorder_items_workout_templates__template_id__items_order_put",
-        "parameters": [
-          {
-            "name": "template_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Template Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ItemOrderIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TemplateOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/workout-schedule": {
       "get": {
         "tags": [
@@ -4283,48 +4048,6 @@
         ],
         "title": "CalculateIn"
       },
-      "CategorySuggestionOut": {
-        "properties": {
-          "category_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category Id"
-          },
-          "confidence": {
-            "type": "number",
-            "title": "Confidence"
-          },
-          "rationale": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rationale"
-          },
-          "fallback_used": {
-            "type": "boolean",
-            "title": "Fallback Used"
-          }
-        },
-        "type": "object",
-        "required": [
-          "category_id",
-          "confidence",
-          "rationale",
-          "fallback_used"
-        ],
-        "title": "CategorySuggestionOut"
-      },
       "DayFlowOut": {
         "properties": {
           "steps": {
@@ -4341,6 +4064,13 @@
             "type": "array",
             "title": "Completed"
           },
+          "waiting": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Waiting"
+          },
           "current": {
             "type": "string",
             "title": "Current"
@@ -4353,6 +4083,7 @@
         "required": [
           "steps",
           "completed",
+          "waiting",
           "current",
           "eaten"
         ],
@@ -5215,22 +4946,6 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "ItemOrderIn": {
-        "properties": {
-          "item_ids": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Item Ids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "item_ids"
-        ],
-        "title": "ItemOrderIn"
-      },
       "LoginIn": {
         "properties": {
           "email": {
@@ -5833,11 +5548,6 @@
             ],
             "title": "Deficit Pct"
           },
-          "auto_scale_carbs": {
-            "type": "boolean",
-            "title": "Auto Scale Carbs",
-            "default": true
-          },
           "workout_time": {
             "type": "string",
             "enum": [
@@ -5912,10 +5622,6 @@
             "type": "integer",
             "title": "Deficit Pct"
           },
-          "auto_scale_carbs": {
-            "type": "boolean",
-            "title": "Auto Scale Carbs"
-          },
           "workout_time": {
             "type": "string",
             "title": "Workout Time"
@@ -5948,7 +5654,6 @@
           "weight_kg",
           "activity_level",
           "deficit_pct",
-          "auto_scale_carbs",
           "workout_time",
           "default_location",
           "reminder_time",
@@ -6044,17 +5749,6 @@
               }
             ],
             "title": "Deficit Pct"
-          },
-          "auto_scale_carbs": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Auto Scale Carbs"
           },
           "workout_time": {
             "anyOf": [
@@ -6508,21 +6202,6 @@
         ],
         "title": "SetLogResultOut"
       },
-      "SuggestionIn": {
-        "properties": {
-          "subject": {
-            "type": "string",
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Subject"
-          }
-        },
-        "type": "object",
-        "required": [
-          "subject"
-        ],
-        "title": "SuggestionIn"
-      },
       "SwapItemIn": {
         "properties": {
           "item_id": {
@@ -6567,6 +6246,14 @@
             "type": "integer",
             "title": "Tdee"
           },
+          "base_kcal": {
+            "type": "integer",
+            "title": "Base Kcal"
+          },
+          "exercise_kcal": {
+            "type": "integer",
+            "title": "Exercise Kcal"
+          },
           "kcal": {
             "type": "integer",
             "title": "Kcal"
@@ -6582,21 +6269,18 @@
           "carb_g": {
             "type": "integer",
             "title": "Carb G"
-          },
-          "carb_scale": {
-            "type": "number",
-            "title": "Carb Scale"
           }
         },
         "type": "object",
         "required": [
           "bmr",
           "tdee",
+          "base_kcal",
+          "exercise_kcal",
           "kcal",
           "protein_g",
           "fat_g",
-          "carb_g",
-          "carb_scale"
+          "carb_g"
         ],
         "title": "TargetsOut"
       },

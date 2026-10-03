@@ -77,8 +77,6 @@ class Profile:
     weight_kg: float
     activity_level: ActivityLevel
     deficit_pct: int
-    carb_base_g: float
-    auto_scale_carbs: bool
     workout_time: WorkoutTime
     default_location: Location
     reminder_time: str | None
@@ -95,11 +93,13 @@ class Profile:
 class Targets:
     bmr: int
     tdee: int
+    # The day without exercise, and what the day's workout adds back to it.
+    base_kcal: int
+    exercise_kcal: int
     kcal: int
     protein_g: int
     fat_g: int
     carb_g: int
-    carb_scale: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +171,7 @@ class DayFacts:
     workout_time: WorkoutTime
     workout_done_at: datetime | None
     workout_skipped_at: datetime | None
+    # A scheduled template, or exercises added to the day by hand.
     has_workout_planned: bool
 
 
@@ -178,6 +179,8 @@ class DayFacts:
 class DayFlow:
     steps: tuple[FlowStep, ...]
     completed: frozenset[FlowStep]
+    # Steps still to do, in order; a rest day's workout step is never among them.
+    waiting: tuple[FlowStep, ...]
     current: FlowStep
     eaten: Nutrients
 
@@ -276,7 +279,7 @@ class Food:
 
 @dataclass(frozen=True, slots=True)
 class MealItem:
-    """One food in a meal, at its baseline grams (before any carb_scale)."""
+    """One food in a meal, at its saved grams."""
 
     id: str
     food: Food
@@ -304,8 +307,8 @@ class Meal:
 class PlannedMeal:
     """What is actually on the plate for one slot today.
 
-    A snapshot, not a pointer: grams already have carb_scale and any swaps baked in, so
-    editing the meal template later never rewrites history.
+    A snapshot, not a pointer: grams already have any swaps baked in, so editing the meal
+    template later never rewrites history.
     """
 
     meal_time: MealTime
@@ -413,8 +416,3 @@ class Exchange:
     nutrients: Nutrients
     delta: Nutrients
     capped: bool
-
-    @property
-    def basis_matched(self) -> bool:
-        """False when max_grams stopped us short of an equal swap."""
-        return not self.capped

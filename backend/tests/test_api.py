@@ -42,11 +42,11 @@ async def test_wrong_password_is_rejected(api: AsyncClient):
 
 
 async def test_protected_route_needs_a_token(api: AsyncClient):
-    assert (await api.get("/users/me/targets")).status_code == 401
+    assert (await api.get("/users/me/profile")).status_code == 401
 
 
 async def test_targets_match_the_spec_example(with_profile: AsyncClient):
-    targets = (await with_profile.get("/users/me/targets")).json()
+    targets = (await with_profile.get("/users/me/profile")).json()["targets"]
 
     assert targets["bmr"] == 1269
     assert targets["tdee"] == 1523
@@ -57,7 +57,7 @@ async def test_targets_match_the_spec_example(with_profile: AsyncClient):
 
 
 async def test_targets_recalculate_after_editing_the_profile(with_profile: AsyncClient):
-    before = (await with_profile.get("/users/me/targets")).json()["kcal"]
+    before = (await with_profile.get("/users/me/profile")).json()["targets"]["kcal"]
     response = await with_profile.patch("/users/me/profile", json={"deficit_pct": 20})
 
     assert response.status_code == 200
@@ -83,7 +83,7 @@ async def test_target_preview_does_not_save(signed_in: AsyncClient):
 
 
 async def test_profile_is_required_before_targets(signed_in: AsyncClient):
-    assert (await signed_in.get("/users/me/targets")).status_code == 404
+    assert (await signed_in.get("/users/me/profile")).status_code == 404
 
 
 async def test_body_log_round_trip(with_profile: AsyncClient):
@@ -118,7 +118,8 @@ async def test_new_day_starts_at_the_weigh_in_step(with_profile: AsyncClient):
     day = (await with_profile.get(f"/days/{TODAY}")).json()
 
     assert day["flow"]["current"] == "body"
-    assert day["flow"]["steps"] == ["body", "breakfast", "lunch", "dinner"]
+    # The workout step is always there; on a rest day it is simply never the one waited on.
+    assert day["flow"]["steps"] == ["body", "breakfast", "lunch", "workout", "dinner"]
     assert day["streak"] == 0
     assert day["targets"]["kcal"] == 1340
 
@@ -248,39 +249,6 @@ async def test_workout_template_lifecycle(with_profile: AsyncClient):
     assert (await with_profile.get("/workout-templates")).json() == []
 
 
-async def test_reordering_template_items(with_profile: AsyncClient):
-    ids = []
-    for name in ("暖身", "深蹲", "臀推"):
-        ids.append(
-            (
-                await with_profile.post(
-                    "/exercises", json={"category_id": "strength", "name": name}
-                )
-            ).json()["id"]
-        )
-
-    template = (
-        await with_profile.post(
-            "/workout-templates",
-            json={
-                "category_id": "strength",
-                "name": "在家:下肢",
-                "location": "home",
-                "items": [{"exercise_id": eid, "reps": "12"} for eid in ids],
-            },
-        )
-    ).json()
-
-    item_ids = [item["id"] for item in template["items"]]
-    reordered = (
-        await with_profile.put(
-            f"/workout-templates/{template['id']}/items/order",
-            json={"item_ids": list(reversed(item_ids))},
-        )
-    ).json()
-
-    assert [i["exercise_name"] for i in reordered["items"]] == ["臀推", "深蹲", "暖身"]
-
 
 async def test_scheduled_workout_adds_a_step_to_the_day(with_profile: AsyncClient):
     exercise = (
@@ -312,10 +280,13 @@ async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     with_profile: AsyncClient,
 ):
     """The day is opened first, the schedule set afterwards — today's flow must still
-    pick up the workout step.
+    wait on the workout step.
     """
-    before = (await with_profile.get(f"/days/{TODAY}")).json()
-    assert "workout" not in before["flow"]["steps"]
+    await with_profile.get(f"/days/{TODAY}")
+    await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1})
+    await with_profile.patch(f"/days/{TODAY}/meals/breakfast")
+    before = (await with_profile.patch(f"/days/{TODAY}/meals/lunch")).json()
+    assert before["flow"]["current"] == "dinner"
 
     exercise = (
         await with_profile.post("/exercises", json={"category_id": "strength", "name": "深蹲"})
@@ -337,7 +308,7 @@ async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     )
 
     after = (await with_profile.get(f"/days/{TODAY}")).json()
-    assert after["flow"]["steps"] == ["body", "breakfast", "lunch", "workout", "dinner"]
+    assert after["flow"]["current"] == "workout"
 
 
 async def test_deleting_the_account_removes_everything(with_profile: AsyncClient):

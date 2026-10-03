@@ -12,7 +12,6 @@ from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
 from app.application.accounts import TokenPair
 from app.application.daily_flow import TodayView
-from app.domain.decisions import DecisionResult
 from app.domain.meal_photos import MealPhoto, RecognizedItem
 from app.domain.meals import planned_total, total
 from app.domain.models import (
@@ -102,7 +101,6 @@ class ProfileIn(BaseModel):
     weight_kg: float = Field(ge=30, le=300)
     activity_level: Literal["sedentary", "light", "moderate", "active"]
     deficit_pct: Literal[10, 12, 15, 20]
-    auto_scale_carbs: bool = True
     workout_time: Literal["am", "pm"] = "pm"
     default_location: Literal["home", "gym"] = "home"
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
@@ -116,7 +114,6 @@ class ProfilePatch(BaseModel):
     weight_kg: float | None = Field(default=None, ge=30, le=300)
     activity_level: Literal["sedentary", "light", "moderate", "active"] | None = None
     deficit_pct: Literal[10, 12, 15, 20] | None = None
-    auto_scale_carbs: bool | None = None
     workout_time: Literal["am", "pm"] | None = None
     default_location: Literal["home", "gym"] | None = None
     timezone: Timezone | None = None
@@ -129,11 +126,12 @@ class RemindersPatch(BaseModel):
 class TargetsOut(BaseModel):
     bmr: int
     tdee: int
+    base_kcal: int
+    exercise_kcal: int
     kcal: int
     protein_g: int
     fat_g: int
     carb_g: int
-    carb_scale: float
 
     @classmethod
     def of(cls, targets: Targets) -> "TargetsOut":
@@ -147,7 +145,6 @@ class ProfileOut(BaseModel):
     weight_kg: float
     activity_level: str
     deficit_pct: int
-    auto_scale_carbs: bool
     workout_time: str
     default_location: str
     reminder_time: str | None
@@ -206,6 +203,7 @@ class BodySummaryOut(BaseModel):
 class DayFlowOut(BaseModel):
     steps: list[str]
     completed: list[str]
+    waiting: list[str]
     current: str
     eaten: "NutrientsOut"
 
@@ -214,6 +212,7 @@ class DayFlowOut(BaseModel):
         return cls(
             steps=[s.value for s in flow.steps],
             completed=[s.value for s in flow.steps if s in flow.completed],
+            waiting=[s.value for s in flow.waiting],
             current=flow.current.value,
             eaten=NutrientsOut.of(flow.eaten),
         )
@@ -524,9 +523,6 @@ class WorkoutExecutionOut(BaseModel):
             estimated_burn_kcal=workout.estimated_burn_kcal,
         )
 
-
-class ItemOrderIn(BaseModel):
-    item_ids: list[str]
 
 
 class ScheduleEntryIn(BaseModel):
@@ -891,21 +887,4 @@ class ExtraItemOut(BaseModel):
         )
 
 
-class SuggestionIn(BaseModel):
-    subject: str = Field(min_length=1, max_length=500)
 
-
-class CategorySuggestionOut(BaseModel):
-    category_id: str | None
-    confidence: float
-    rationale: str | None
-    fallback_used: bool
-
-    @classmethod
-    def of(cls, result: DecisionResult) -> "CategorySuggestionOut":
-        return cls(
-            category_id=result.selection_id,
-            confidence=result.confidence,
-            rationale=result.rationale,
-            fallback_used=result.selection_id is None,
-        )

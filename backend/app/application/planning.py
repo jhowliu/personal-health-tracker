@@ -1,26 +1,17 @@
 """Today's plate: what was eaten at each slot, at what portions.
 
 Nothing is dealt in ahead of time; foods arrive from a photo, one at a time, or as a whole
-saved meal. Two things separate this from `MealService`:
-
-* a saved meal's portions get carb_scale applied, so they follow the current calorie target
-* what gets written is a *snapshot*: editing a meal tomorrow never rewrites today
+saved meal. What gets written is a *snapshot*, which separates this from `MealService`:
+editing a meal tomorrow never rewrites today.
 """
 
 from datetime import date
 
 from app.application.plate_intake import PlateIntake
-from app.application.ports import (
-    AccountStore,
-    Clock,
-    DayStore,
-    FoodStore,
-    MealStore,
-)
+from app.application.ports import DayStore, FoodStore, MealStore
 from app.domain.errors import NotFound, ValidationFailed
 from app.domain.exchange import convert, default_basis
 from app.domain.ids import new_id
-from app.domain.meals import apply_carb_scale
 from app.domain.models import (
     PLANNED_SLOTS,
     DayPlan,
@@ -29,7 +20,6 @@ from app.domain.models import (
     PlateItem,
     SwapBasis,
 )
-from app.domain.nutrition import compute_targets
 
 
 class DailyPlanService:
@@ -38,15 +28,11 @@ class DailyPlanService:
         days: DayStore,
         meals: MealStore,
         foods: FoodStore,
-        accounts: AccountStore,
-        clock: Clock,
         intake: PlateIntake,
     ) -> None:
         self._days = days
         self._meals = meals
         self._foods = foods
-        self._accounts = accounts
-        self._clock = clock
         self._intake = intake
 
     async def view(self, user_id: str, day: date) -> DayPlan:
@@ -64,14 +50,10 @@ class DailyPlanService:
         meal = await self._meals.load(user_id, meal_id)
         if meal is None:
             raise NotFound("找不到這道餐點")
-        profile = await self._accounts.load_profile(user_id)
-        if profile is None:
-            raise NotFound("還沒有建立個人資料")
 
         slot = DayPlan(date=day, meals=await self._days.load_plan(user_id, day)).slot(meal_time)
         was_empty = slot is None or not slot.items
-        scale = compute_targets(profile, day).carb_scale
-        for item in apply_carb_scale(meal.items, scale):
+        for item in meal.items:
             await self._days.add_plan_item(
                 user_id,
                 day,

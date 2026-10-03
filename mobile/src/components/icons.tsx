@@ -151,14 +151,6 @@ export function DropletIcon(props: IconProps) {
   );
 }
 
-export function FlameIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <Path d="M13 3c1 4-2 5-2 8 0 1.4.8 2.3 2 2.3 1.7 0 2.8-1.5 2.5-3.3 2.2 1.7 3.5 4 3.5 6.2A7 7 0 0 1 5 16c0-3.5 2-6.3 5.5-9.2C10 10 12 10 13 3Z" />
-    </Icon>
-  );
-}
-
 export function EyeIcon(props: IconProps) {
   return (
     <Icon {...props}>

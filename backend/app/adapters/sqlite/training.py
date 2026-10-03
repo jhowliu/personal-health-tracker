@@ -108,18 +108,6 @@ class SqliteTrainingStore:
             (exercise_id, user_id),
         )
 
-    async def exercise_categories(self) -> tuple[tuple[str, str], ...]:
-        async with self._conn.execute(
-            """
-            SELECT c.id, COALESCE(t.text, c.name_key) AS name
-            FROM exercise_categories c
-            LEFT JOIN translations t ON t.key = c.name_key AND t.locale = ?
-            ORDER BY c.sort_order, c.id
-            """,
-            (self._locale,),
-        ) as cursor:
-            rows = await cursor.fetchall()
-        return tuple((row["id"], row["name"]) for row in rows)
 
     async def list_templates(
         self, user_id: str, location: str | None

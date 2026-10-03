@@ -2,7 +2,7 @@
  * Putting one of the user's saved meals on a day's slot, whole.
  *
  * For the dishes someone cooks again and again: one tap instead of a photo or food by food.
- * Portions arrive scaled to the day's target; the meal itself is left alone.
+ * Portions arrive as saved; the meal itself is left alone.
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';

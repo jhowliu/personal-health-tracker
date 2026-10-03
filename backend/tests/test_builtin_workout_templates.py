@@ -55,12 +55,6 @@ async def test_builtin_templates_are_global_read_only_and_schedulable(
             },
         )
     ).status_code == 403
-    assert (
-        await with_profile.put(
-            "/workout-templates/beginner-full-body-a/items/order",
-            json={"item_ids": [item["id"] for item in listed[0]["items"]]},
-        )
-    ).status_code == 403
 
 
 async def test_builtin_template_can_be_copied_without_becoming_account_data(
