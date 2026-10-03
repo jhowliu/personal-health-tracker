@@ -151,6 +151,15 @@ export function DropletIcon(props: IconProps) {
   );
 }
 
+export function RunIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Circle cx={15} cy={4.5} r={1.8} />
+      <Path d="M14 7.5 11 13M14 7.5l3.5 2.5 2.5-1M13.2 9l-3.7.5-2 2.5M11 13l3.5 2.5-1 5M11 13l-2 4-4 1" />
+    </Icon>
+  );
+}
+
 export function EyeIcon(props: IconProps) {
   return (
     <Icon {...props}>
