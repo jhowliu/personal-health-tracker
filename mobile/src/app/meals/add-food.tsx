@@ -1,12 +1,14 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
+import { PlusIcon } from '@/components/icons';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { ShowMore, usePaged } from '@/components/paging';
 import { draft } from '@/meals/draft';
+import { newFoodHandoff } from '@/meals/new-food-handoff';
 import { byCategoryOrder } from '@/meals/order';
 import { amountToGrams, describeFood, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
@@ -80,17 +82,15 @@ export default function AddFood() {
     setAmount(readableAmount(gramsToAmount(food, food.usual_grams)));
   };
 
-  const add = async () => {
-    if (!picked) return;
-    const portion = amountToGrams(picked, Number(amount)) || picked.usual_grams;
+  const addFood = async (food: Food, portion: number) => {
     setBusy(true);
     try {
       if (destination === 'day') {
         if (!date || !slot) throw new Error('找不到要加入的日期或餐次。');
-        await api.post(`/days/${date}/plan/${slot}/items`, { food_id: picked.id, grams: portion });
+        await api.post(`/days/${date}/plan/${slot}/items`, { food_id: food.id, grams: portion });
       } else {
         if (!meal_id || !draft.has(meal_id)) throw new Error('找不到目前餐點草稿，請重新開啟餐點。');
-        draft.addItem(meal_id, picked, portion);
+        draft.addItem(meal_id, food, portion);
       }
       backOrReplace(parentRoute);
     } catch (error) {
@@ -99,6 +99,27 @@ export default function AddFood() {
       setBusy(false);
     }
   };
+
+  const add = () => {
+    if (picked) void addFood(picked, amountToGrams(picked, Number(amount)) || picked.usual_grams);
+  };
+
+  // A food just created from the empty search goes straight in at its usual portion, and the
+  // screen returns to where 加入食物 was opened from; the portion can be changed there.
+  useFocusEffect(
+    useCallback(() => {
+      const created = newFoodHandoff.take();
+      if (created) void addFood(created, created.usual_grams);
+      // addFood is rebuilt every render; the handoff is what this effect waits for.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  const createFood = () =>
+    router.navigate({
+      pathname: '/foods/new',
+      params: { name: query.trim(), category_id: filter === 'all' ? '' : filter, from: 'add-food' },
+    });
 
   const addFromPhoto = async () => {
     if (destination === 'day' && (!date || !slot)) {
@@ -193,7 +214,16 @@ export default function AddFood() {
       {ordered === null ? (
         <ActivityIndicator color={color.primary} />
       ) : ordered.length === 0 ? (
-        <Empty compact>找不到符合的食物。換個關鍵字，或到食物庫新增自訂食物。</Empty>
+        <Empty
+          compact
+          action={
+            <PrimaryButton tone="plain" icon={PlusIcon} onPress={createFood} disabled={busy}>
+              {query.trim() ? `新增「${query.trim()}」到食物庫` : '新增食物到食物庫'}
+            </PrimaryButton>
+          }
+        >
+          食物庫裡找不到{query.trim() ? `「${query.trim()}」` : '符合的食物'}。新增後會直接加進來。
+        </Empty>
       ) : (
         <Card className="px-0 py-0">
           <Rows>
