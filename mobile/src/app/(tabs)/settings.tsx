@@ -1,14 +1,12 @@
-import { useState } from 'react';
-import { Alert, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, Text } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
 import { TimezoneRow } from '@/components/TimezoneRow';
-import { Card, LabelWithTip, PrimaryButton, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { Card, PrimaryButton, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { syncWeighInReminder } from '@/notifications/reminder';
-import { color } from '@/theme/tokens';
 
 const SEX_OPTIONS = [
   { value: 'f' as const, label: '女' },
@@ -16,32 +14,19 @@ const SEX_OPTIONS = [
 ];
 const ACTIVITY_OPTIONS = [
   { value: 'sedentary' as const, label: '久坐' },
-  { value: 'light' as const, label: '每週 1–3 天' },
-  { value: 'moderate' as const, label: '每週 3–5 天' },
-  { value: 'active' as const, label: '每週 6–7 天' },
+  { value: 'light' as const, label: '常走動' },
+  { value: 'moderate' as const, label: '勞力工作' },
+  { value: 'active' as const, label: '粗重勞力' },
 ];
 const DEFICIT_OPTIONS = ([10, 12, 15, 20] as const).map((value) => ({ value, label: `少吃 ${value}%` }));
 
 export default function SettingsScreen() {
   const { profile, signOut, reload } = useSession();
-  const [busy, setBusy] = useState(false);
 
   if (!profile) return null;
   const { profile: me, targets } = profile;
 
   const age = new Date().getFullYear() - Number(me.birth_date.slice(0, 4));
-
-  const toggleAutoCarbs = async (next: boolean) => {
-    setBusy(true);
-    try {
-      await api.patch('/users/me/profile', { auto_scale_carbs: next });
-      await reload();
-    } catch (error) {
-      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const saveReminder = async (next: string | null) => {
     try {
@@ -123,7 +108,7 @@ export default function SettingsScreen() {
             onSave={(weight_kg) => patchProfile({ weight_kg })}
           />
           <ChoiceRow
-            label="平常活動量"
+            label="日常活動量（不含運動）"
             value={me.activity_level}
             options={ACTIVITY_OPTIONS}
             onSave={(activity_level) => patchProfile({ activity_level })}
@@ -140,12 +125,12 @@ export default function SettingsScreen() {
       <SectionHeading>每日目標</SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="熱量" value={`${targets.kcal.toLocaleString()} 大卡`} />
+          <Row label="熱量（不含運動）" value={`${targets.kcal.toLocaleString()} 大卡`} />
           <Row label="蛋白質" value={`${targets.protein_g} g`} />
           <Row label="脂肪" value={`${targets.fat_g} g`} />
           <Row label="碳水" value={`${targets.carb_g} g`} />
           <Row label="基礎代謝" value={`${targets.bmr.toLocaleString()} 大卡`} />
-          <Row label="每日總消耗" value={`${targets.tdee.toLocaleString()} 大卡`} />
+          <Row label="日常總消耗" value={`${targets.tdee.toLocaleString()} 大卡`} />
         </Rows>
       </Card>
 
@@ -156,15 +141,6 @@ export default function SettingsScreen() {
           <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
           <TimezoneRow value={me.timezone} onSave={saveTimezone} />
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
-          <View className="flex-row items-center justify-between py-3">
-            <LabelWithTip label="主食份量自動調整" tip="熱量目標改變時，自動增減主食份量。蛋白質和蔬菜不變。" />
-            <Switch
-              value={me.auto_scale_carbs}
-              onValueChange={toggleAutoCarbs}
-              disabled={busy}
-              trackColor={{ true: color.good, false: color.line }}
-            />
-          </View>
         </Rows>
       </Card>
 

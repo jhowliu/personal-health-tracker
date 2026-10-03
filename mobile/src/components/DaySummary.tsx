@@ -7,11 +7,10 @@
  * A ring rather than a pie. A pie encodes parts of a whole; this is progress toward a
  * goal and it can pass 100%, which is exactly when it most needs to be readable.
  *
- * Deliberately absent: the BMR floor and the training burn. `compute_targets` clamps the
- * target with `max(..., bmr, floor)`, so clearing the target always clears the floor —
- * two gaps pointing the same way, one of them always redundant. The burn belongs next to the
- * workout that produced it, not next to the calories, where it only invites "can I eat
- * that back?" — the activity factor has already spent it.
+ * Deliberately absent: the BMR floor. `compute_targets` clamps the target with
+ * `max(..., bmr, floor)`, so clearing the target always clears the floor — two gaps pointing
+ * the same way, one of them always redundant. The training does show, as the part of the
+ * target it added: on a workout day the extra food is the first thing worth knowing.
  */
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -172,6 +171,11 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
         {open ? null : (
           <Bar value={kcal} target={targets.kcal} tone={remaining >= 0 ? color.primary : color.warm} />
         )}
+        {targets.exercise_kcal > 0 ? (
+          <Text className="text-xs text-muted">
+            含訓練加回 {targets.exercise_kcal.toLocaleString()} 大卡（基礎 {targets.base_kcal.toLocaleString()}）
+          </Text>
+        ) : null}
       </Pressable>
 
       {open ? (

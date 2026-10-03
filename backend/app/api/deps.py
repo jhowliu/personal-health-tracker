@@ -144,7 +144,9 @@ def meal_store(conn: DbConn) -> SqliteMealStore:
 
 
 def daily_flow(conn: DbConn) -> DailyFlowService:
-    return DailyFlowService(day_store(conn), SqliteAccountStore(conn), clock())
+    return DailyFlowService(
+        day_store(conn), SqliteAccountStore(conn), SqliteWorkoutExecutionStore(conn), clock()
+    )
 
 
 def workout_execution(conn: DbConn) -> WorkoutExecutionService:
@@ -170,8 +172,6 @@ def daily_plan(conn: DbConn) -> DailyPlanService:
         day_store(conn),
         meal_store(conn),
         SqliteFoodStore(conn),
-        SqliteAccountStore(conn),
-        clock(),
         plate_intake(conn),
     )
 

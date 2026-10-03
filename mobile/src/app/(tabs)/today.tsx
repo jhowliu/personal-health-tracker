@@ -1480,8 +1480,8 @@ function WorkoutStep({
 
             {workout.estimated_burn_kcal ? (
               <Hint>
-                {word}訓練約消耗 {workout.estimated_burn_kcal} 大卡。這是依動作強度和課表時間的粗估，
-                沒有算進你的熱量目標——目標裡的活動量已經含了訓練。
+                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡，是依動作強度和時間的粗估；
+                其中一半已加進{word}的熱量目標。
               </Hint>
             ) : null}
 

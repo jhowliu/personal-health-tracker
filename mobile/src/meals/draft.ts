@@ -5,8 +5,7 @@
  * live here instead of being threaded through route params. Each draft is keyed by the
  * meal route id so two mounted editors can never write through the same mutable state.
  *
- * Grams here are always *baseline* grams, the same thing the server stores. carb_scale
- * is applied when a day is planned, never to the template being edited.
+ * Grams here are the same thing the server stores.
  */
 import { useSyncExternalStore } from 'react';
 

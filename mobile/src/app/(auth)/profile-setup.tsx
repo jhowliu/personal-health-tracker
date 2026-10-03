@@ -13,11 +13,12 @@ type Sex = 'f' | 'm';
 type Activity = 'sedentary' | 'light' | 'moderate' | 'active';
 type Deficit = 10 | 12 | 15 | 20;
 
+// Daily life only: the day's workout is added to the target on its own.
 const ACTIVITY_LABEL: Record<Activity, string> = {
-  sedentary: '久坐，幾乎不運動',
-  light: '每週運動 1–3 天',
-  moderate: '每週運動 3–5 天',
-  active: '每週運動 6–7 天',
+  sedentary: '久坐（辦公室、開車通勤）',
+  light: '常走動（站立、外勤、走路通勤）',
+  moderate: '勞力工作（搬運、餐飲、照護）',
+  active: '粗重勞力（工地、農務）',
 };
 
 const DEFICIT_LABEL: Record<Deficit, string> = {
@@ -155,7 +156,7 @@ export default function ProfileSetup() {
         </View>
 
         <Picker
-          label="平常活動量"
+          label="日常活動量（不含運動）"
           value={activity}
           labels={ACTIVITY_LABEL}
           onChange={setActivity}
@@ -233,7 +234,8 @@ function TargetPreview({ targets }: { targets: Targets | null }) {
       </View>
 
       <Hint>
-        基礎代謝 {targets.bmr.toLocaleString()} 大卡，每日總消耗 {targets.tdee.toLocaleString()} 大卡
+        基礎代謝 {targets.bmr.toLocaleString()} 大卡，不運動的一天約消耗 {targets.tdee.toLocaleString()} 大卡。
+        有訓練的日子，會再加回訓練消耗的一半。
       </Hint>
     </Card>
   );

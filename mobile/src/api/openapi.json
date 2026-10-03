@@ -1619,7 +1619,7 @@
           "days"
         ],
         "summary": "Add Plan Meal",
-        "description": "Put one of the user's saved meals on the plate, portions scaled to today's target.",
+        "description": "Put one of the user's saved meals on the plate, at its saved portions.",
         "operationId": "add_plan_meal_days__day__plan__meal_time__meal_post",
         "parameters": [
           {
@@ -5833,11 +5833,6 @@
             ],
             "title": "Deficit Pct"
           },
-          "auto_scale_carbs": {
-            "type": "boolean",
-            "title": "Auto Scale Carbs",
-            "default": true
-          },
           "workout_time": {
             "type": "string",
             "enum": [
@@ -5912,10 +5907,6 @@
             "type": "integer",
             "title": "Deficit Pct"
           },
-          "auto_scale_carbs": {
-            "type": "boolean",
-            "title": "Auto Scale Carbs"
-          },
           "workout_time": {
             "type": "string",
             "title": "Workout Time"
@@ -5948,7 +5939,6 @@
           "weight_kg",
           "activity_level",
           "deficit_pct",
-          "auto_scale_carbs",
           "workout_time",
           "default_location",
           "reminder_time",
@@ -6044,17 +6034,6 @@
               }
             ],
             "title": "Deficit Pct"
-          },
-          "auto_scale_carbs": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Auto Scale Carbs"
           },
           "workout_time": {
             "anyOf": [
@@ -6567,6 +6546,14 @@
             "type": "integer",
             "title": "Tdee"
           },
+          "base_kcal": {
+            "type": "integer",
+            "title": "Base Kcal"
+          },
+          "exercise_kcal": {
+            "type": "integer",
+            "title": "Exercise Kcal"
+          },
           "kcal": {
             "type": "integer",
             "title": "Kcal"
@@ -6582,21 +6569,18 @@
           "carb_g": {
             "type": "integer",
             "title": "Carb G"
-          },
-          "carb_scale": {
-            "type": "number",
-            "title": "Carb Scale"
           }
         },
         "type": "object",
         "required": [
           "bmr",
           "tdee",
+          "base_kcal",
+          "exercise_kcal",
           "kcal",
           "protein_g",
           "fat_g",
-          "carb_g",
-          "carb_scale"
+          "carb_g"
         ],
         "title": "TargetsOut"
       },

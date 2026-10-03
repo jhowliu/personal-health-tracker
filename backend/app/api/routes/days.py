@@ -141,7 +141,7 @@ async def read_plan(day: date, user_id: CurrentUserId, service: DailyPlan) -> Da
 async def add_plan_meal(
     day: date, meal_time: str, payload: PlanMealIn, user_id: CurrentUserId, service: DailyPlan
 ) -> DayPlanOut:
-    """Put one of the user's saved meals on the plate, portions scaled to today's target."""
+    """Put one of the user's saved meals on the plate, at its saved portions."""
     return DayPlanOut.of(
         await service.add_meal(user_id, day, _meal_time(meal_time), payload.meal_id)
     )

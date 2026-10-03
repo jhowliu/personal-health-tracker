@@ -42,8 +42,6 @@ def to_profile(row: aiosqlite.Row) -> Profile:
         weight_kg=row["weight_kg"],
         activity_level=ActivityLevel(row["activity_level"]),
         deficit_pct=row["deficit_pct"],
-        carb_base_g=row["carb_base_g"],
-        auto_scale_carbs=bool(row["auto_scale_carbs"]),
         workout_time=WorkoutTime(row["workout_time"]),
         default_location=Location(row["default_location"]),
         reminder_time=row["reminder_time"],

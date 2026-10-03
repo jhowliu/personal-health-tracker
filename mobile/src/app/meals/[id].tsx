@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
-import { useSession } from '@/auth/session';
 import { CameraIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
@@ -43,7 +42,6 @@ export default function EditMeal() {
   const isNew = id === 'new';
   const current = useDraft(id ?? '');
   const navigation = useNavigation();
-  const { profile } = useSession();
   const [allowLeave, setAllowLeave] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -162,7 +160,6 @@ export default function EditMeal() {
   })).filter((group) => group.items.length > 0);
 
   const shownTotals = current.items.length > 0 ? totals : null;
-  const autoScaled = profile?.profile.auto_scale_carbs && (profile?.targets.carb_scale ?? 1) !== 1;
 
   return (
     <Screen
@@ -238,12 +235,7 @@ export default function EditMeal() {
                 </View>
 
                 {group.items.map((item) => (
-                  <ItemRow
-                    key={item.key}
-                     item={item}
-                     draftKey={id}
-                    scaled={Boolean(autoScaled) && group.category === 'staple'}
-                  />
+                  <ItemRow key={item.key} item={item} draftKey={id} />
                 ))}
               </View>
             ))}
@@ -272,7 +264,7 @@ export default function EditMeal() {
   );
 }
 
-function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string; scaled: boolean }) {
+function ItemRow({ item, draftKey }: { item: DraftItem; draftKey: string }) {
   const unit = portionUnit(item.food);
   const display = readableAmount(gramsToAmount(item.food, item.grams));
 
@@ -315,8 +307,6 @@ function ItemRow({ item, draftKey, scaled }: { item: DraftItem; draftKey: string
           <CloseIcon size={18} tint={color.muted} />
         </Pressable>
       </View>
-
-      {scaled ? <Hint>主食份量會隨熱量目標自動調整，這裡顯示的是基準克數。</Hint> : null}
     </View>
   );
 }

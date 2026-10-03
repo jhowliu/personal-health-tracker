@@ -417,7 +417,7 @@ export interface paths {
         put?: never;
         /**
          * Add Plan Meal
-         * @description Put one of the user's saved meals on the plate, portions scaled to today's target.
+         * @description Put one of the user's saved meals on the plate, at its saved portions.
          */
         post: operations["add_plan_meal_days__day__plan__meal_time__meal_post"];
         delete?: never;
@@ -1367,11 +1367,6 @@ export interface components {
              */
             deficit_pct: 10 | 12 | 15 | 20;
             /**
-             * Auto Scale Carbs
-             * @default true
-             */
-            auto_scale_carbs: boolean;
-            /**
              * Workout Time
              * @default pm
              * @enum {string}
@@ -1408,8 +1403,6 @@ export interface components {
             activity_level: string;
             /** Deficit Pct */
             deficit_pct: number;
-            /** Auto Scale Carbs */
-            auto_scale_carbs: boolean;
             /** Workout Time */
             workout_time: string;
             /** Default Location */
@@ -1433,8 +1426,6 @@ export interface components {
             activity_level?: ("sedentary" | "light" | "moderate" | "active") | null;
             /** Deficit Pct */
             deficit_pct?: (10 | 12 | 15 | 20) | null;
-            /** Auto Scale Carbs */
-            auto_scale_carbs?: boolean | null;
             /** Workout Time */
             workout_time?: ("am" | "pm") | null;
             /** Default Location */
@@ -1585,6 +1576,10 @@ export interface components {
             bmr: number;
             /** Tdee */
             tdee: number;
+            /** Base Kcal */
+            base_kcal: number;
+            /** Exercise Kcal */
+            exercise_kcal: number;
             /** Kcal */
             kcal: number;
             /** Protein G */
@@ -1593,8 +1588,6 @@ export interface components {
             fat_g: number;
             /** Carb G */
             carb_g: number;
-            /** Carb Scale */
-            carb_scale: number;
         };
         /** TemplateIn */
         TemplateIn: {

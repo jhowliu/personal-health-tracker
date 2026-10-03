@@ -102,7 +102,6 @@ class ProfileIn(BaseModel):
     weight_kg: float = Field(ge=30, le=300)
     activity_level: Literal["sedentary", "light", "moderate", "active"]
     deficit_pct: Literal[10, 12, 15, 20]
-    auto_scale_carbs: bool = True
     workout_time: Literal["am", "pm"] = "pm"
     default_location: Literal["home", "gym"] = "home"
     reminder_time: str | None = Field(default=None, pattern=r"^\d{2}:\d{2}$")
@@ -116,7 +115,6 @@ class ProfilePatch(BaseModel):
     weight_kg: float | None = Field(default=None, ge=30, le=300)
     activity_level: Literal["sedentary", "light", "moderate", "active"] | None = None
     deficit_pct: Literal[10, 12, 15, 20] | None = None
-    auto_scale_carbs: bool | None = None
     workout_time: Literal["am", "pm"] | None = None
     default_location: Literal["home", "gym"] | None = None
     timezone: Timezone | None = None
@@ -129,11 +127,12 @@ class RemindersPatch(BaseModel):
 class TargetsOut(BaseModel):
     bmr: int
     tdee: int
+    base_kcal: int
+    exercise_kcal: int
     kcal: int
     protein_g: int
     fat_g: int
     carb_g: int
-    carb_scale: float
 
     @classmethod
     def of(cls, targets: Targets) -> "TargetsOut":
@@ -147,7 +146,6 @@ class ProfileOut(BaseModel):
     weight_kg: float
     activity_level: str
     deficit_pct: int
-    auto_scale_carbs: bool
     workout_time: str
     default_location: str
     reminder_time: str | None
