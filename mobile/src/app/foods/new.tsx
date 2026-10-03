@@ -1,10 +1,11 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
+import { newFoodHandoff } from '@/meals/new-food-handoff';
 import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 
 type Category = Schema<'FoodCategoryOut'>;
@@ -15,11 +16,18 @@ const calories = (protein: string, carbs: string, fat: string) =>
   number(protein) * 4 + number(carbs) * 4 + number(fat) * 9;
 
 export default function NewFoodScreen() {
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, name: typedName, category_id: typedCategory, from } = useLocalSearchParams<{
+    id?: string;
+    /** Opened from 加入食物's empty search: what was typed there, and the category in view. */
+    name?: string;
+    category_id?: string;
+    from?: 'add-food';
+  }>();
   const isNew = !id || id === 'new';
+  const fromSearch = isNew && from === 'add-food';
   const [categories, setCategories] = useState<Category[]>([]);
-  const [name, setName] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [name, setName] = useState(typedName ?? '');
+  const [categoryId, setCategoryId] = useState(typedCategory ?? '');
   const [state, setState] = useState<'raw' | 'cooked' | 'na'>('na');
   const [unit, setUnit] = useState<'g' | 'ml' | 'piece' | 'scoop' | 'bowl'>('g');
   const [gramsPerUnit, setGramsPerUnit] = useState('');
@@ -139,6 +147,12 @@ export default function NewFoodScreen() {
         usual_grams: grams,
         max_grams: max,
       };
+      if (fromSearch) {
+        // Back to 加入食物, which adds it to the meal and returns to the flow.
+        newFoodHandoff.set(await api.post('/foods', payload));
+        router.back();
+        return;
+      }
       if (isNew) await api.post('/foods', payload);
       else await api.patch(`/foods/${id}`, payload);
       backOrReplace('/meals');
@@ -176,12 +190,16 @@ export default function NewFoodScreen() {
             <Text className="font-display text-2xl font-bold text-ink">約 {kcal} 大卡</Text>
           </View>
           <PrimaryButton onPress={save} busy={busy}>
-            {busy ? '處理中…' : isNew ? '新增食物' : '儲存食物'}
+            {busy ? '處理中…' : fromSearch ? '新增並加入' : isNew ? '新增食物' : '儲存食物'}
           </PrimaryButton>
         </>
       }
     >
-      <BackLink label="食物庫" onPress={() => backOrReplace('/meals')} disabled={busy} />
+      <BackLink
+        label={fromSearch ? '加入食物' : '食物庫'}
+        onPress={() => (fromSearch ? router.back() : backOrReplace('/meals'))}
+        disabled={busy}
+      />
       <Title sub="營養以每 100 g 計；編輯後會更新既有餐點，已吃紀錄保留原值。">
         {isNew ? '新增食物' : '編輯食物'}
       </Title>
@@ -229,6 +247,7 @@ export default function NewFoodScreen() {
           <Field label="常用份量" value={usualGrams} onChangeText={setUsualGrams} suffix="g" keyboardType="decimal-pad" />
           <Field label="最大份量" value={maxGrams} onChangeText={setMaxGrams} suffix="g" keyboardType="decimal-pad" placeholder="常用份量的兩倍" />
         </View>
+        {fromSearch ? <Hint>新增後會用常用份量加入，之後可以再調整。</Hint> : null}
       </Card>
 
       <Card className="gap-3">
