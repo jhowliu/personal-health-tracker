@@ -145,6 +145,8 @@ async def test_extras_calculate_known_food_and_preserve_custom_nutrition(
         known.json()["id"],
         custom.json()["id"],
     }
+    # Each extra carries a name to list it by: the food's, or the one typed in.
+    assert {item["name"] for item in plan.json()["extras"]} == {"雞胸肉(熟)", "手搖飲"}
     assert plan.json()["nutrients"]["kcal"] == 345
     assert (
         await with_foods.delete(f"/days/2026-09-23/meals/extras/items/{custom.json()['id']}")

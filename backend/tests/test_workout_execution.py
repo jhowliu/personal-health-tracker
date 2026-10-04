@@ -901,3 +901,27 @@ async def test_an_impossible_speed_or_incline_is_rejected(with_exercises: AsyncC
         )
         assert response.status_code == 422, bad
 
+
+async def test_reps_are_a_number_or_a_range(with_exercises: AsyncClient):
+    await _profile(with_exercises)
+    for reps, status in (("12", 201), ("10-12", 201), ("10–12", 201), ("abc", 422), ("10次", 422)):
+        response = await with_exercises.post(
+            f"/days/{DAY}/workout/items",
+            json={"exercise_id": "barbell-back-squat", "sets": 3, "reps": reps},
+        )
+        assert response.status_code == status, reps
+    item_id = (await _day_items(with_exercises))[0]["id"]
+    patched = await with_exercises.patch(
+        f"/days/{DAY}/workout/items/{item_id}", json={"reps": "abc"}
+    )
+    assert patched.status_code == 422
+    template = await with_exercises.post(
+        "/workout-templates",
+        json={
+            "category_id": "strength",
+            "name": "壞次數",
+            "items": [{"exercise_id": "barbell-back-squat", "sets": 3, "reps": "abc"}],
+        },
+    )
+    assert template.status_code == 422
+

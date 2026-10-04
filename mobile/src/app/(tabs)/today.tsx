@@ -16,10 +16,10 @@ import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
 import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
-import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, PlusIcon, TrashIcon } from '@/components/icons';
+import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, CloseIcon, PlusIcon, TrashIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
-import { Card, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
+import { Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { photoDraft } from '@/meals/photo-draft';
 import { loadSession } from '@/workouts/focus/storage';
@@ -185,7 +185,7 @@ export default function TodayScreen() {
     return (
       <Screen key={day.date} footerSafeArea={false}>
         {header}
-        <DoneStep day={day} />
+        <DoneStep day={day} onChanged={() => load()} />
       </Screen>
     );
   }
@@ -268,10 +268,19 @@ function TodayHeader({
       {isToday ? null : (
         <TextAction label="回到今天" onPress={onToday} className="min-h-[44px] justify-center self-center" />
       )}
-      <DaySummary eaten={day.flow.eaten} targets={day.targets} />
+      <DaySummary
+        eaten={day.flow.eaten}
+        targets={day.targets}
+        // Until the workout is done or skipped, today's target counts the plan's burn.
+        burnPlanned={isToday && !day.flow.completed.includes('workout')}
+        onAddSnack={() =>
+          router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } })
+        }
+      />
       <StepIndicator
         steps={day.flow.steps}
         completed={day.flow.completed}
+        skipped={day.flow.skipped}
         current={step}
         next={day.flow.current}
         onSelect={onSelect}
@@ -1561,8 +1570,52 @@ function targetChanges(entry: WorkoutItem, edit: WorkoutEdit) {
     : { ...common, sets: Number(edit.sets), reps: edit.reps.trim() };
 }
 
-function DoneStep({ day }: { day: Today }) {
-  const remaining = day.targets.kcal - day.flow.eaten.kcal;
+// Below this share of the target, a finished day reads as too little rather than room to spare:
+// in a deficit already, undereating costs muscle and comes back as hunger the next day.
+const UNDER_EATING_SHARE = 0.7;
+
+function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
+  const [extras, setExtras] = useState<Schema<'ExtraItemOut'>[] | null>(null);
+  const target = day.targets.kcal;
+  const eaten = Math.round(day.flow.eaten.kcal);
+  const remaining = target - eaten;
+  const share = target ? eaten / target : 1;
+  const proteinShort = Math.round(day.targets.protein_g - day.flow.eaten.protein_g);
+
+  const loadExtras = useCallback(async () => {
+    try {
+      setExtras(((await api.get(`/days/${day.date}/plan`)) as Schema<'DayPlanOut'>).extras);
+    } catch {
+      setExtras([]);
+    }
+  }, [day.date]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadExtras();
+    }, [loadExtras]),
+  );
+
+  const removeExtra = (item: Schema<'ExtraItemOut'>) =>
+    Alert.alert('移除點心', `確定移除「${item.name}」？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '移除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/days/${day.date}/meals/extras/items/${item.id}`);
+            await loadExtras();
+            onChanged();
+          } catch (error) {
+            Alert.alert('移除不了', error instanceof ApiError ? error.message : '請稍後再試');
+          }
+        },
+      },
+    ]);
+
+  const addSnack = () =>
+    router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } });
 
   return (
     <View className="flex-1 gap-4">
@@ -1570,17 +1623,51 @@ function DoneStep({ day }: { day: Today }) {
 
       <Card className="gap-3">
         <Text className="font-display text-4xl font-bold text-ink">
-          {Math.round(day.flow.eaten.kcal).toLocaleString()}{' '}
-          <Text className="text-base font-normal text-muted">
-            / {day.targets.kcal.toLocaleString()} 大卡
-          </Text>
+          {eaten.toLocaleString()}{' '}
+          <Text className="text-base font-normal text-muted">/ {target.toLocaleString()} 大卡</Text>
         </Text>
-        <Text className={`text-base ${remaining >= 0 ? 'text-good' : 'text-warm'}`}>
-          {remaining >= 0
-            ? `還有 ${Math.round(remaining)} 大卡的空間`
-            : `超過 ${Math.round(-remaining)} 大卡`}
-        </Text>
+        {remaining < 0 ? (
+          <Text className="text-base text-warm">超過 {(-remaining).toLocaleString()} 大卡</Text>
+        ) : share < UNDER_EATING_SHARE ? (
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-warm">只吃了目標的 {Math.round(share * 100)}%</Text>
+            <Hint>
+              吃太少容易流失肌肉，隔天也更容易餓。
+              {proteinShort > 0 ? `可以補一份蛋白質，還差 ${proteinShort} g。` : ''}
+            </Hint>
+          </View>
+        ) : (
+          <Text className="text-base text-good">還有 {remaining.toLocaleString()} 大卡的空間</Text>
+        )}
         {day.streak > 0 ? <Hint>連續 {day.streak} 天完成流程。</Hint> : null}
+      </Card>
+
+      <Card className="gap-2">
+        <SectionHeading
+          action={<TextAction icon={PlusIcon} label="補記點心" onPress={addSnack} className="min-h-[44px] justify-center" />}
+        >
+          點心
+        </SectionHeading>
+        {extras === null ? null : extras.length ? (
+          extras.map((item) => (
+            <View key={item.id} className="min-h-[44px] flex-row items-center gap-2">
+              <Text className="flex-1 text-base text-ink" numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text className="text-sm text-muted">{Math.round(item.nutrients.kcal)} 大卡</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`移除${item.name}`}
+                onPress={() => removeExtra(item)}
+                className="h-11 w-11 items-center justify-center active:opacity-60"
+              >
+                <CloseIcon size={18} tint={color.muted} />
+              </Pressable>
+            </View>
+          ))
+        ) : (
+          <Hint>三餐以外吃的東西記在這裡，記下就算吃了。</Hint>
+        )}
       </Card>
 
       <Hint>想改哪一步，點上面的進度列回去。</Hint>

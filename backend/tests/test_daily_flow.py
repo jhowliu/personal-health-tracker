@@ -156,3 +156,21 @@ def test_skipped_meals_and_workout_complete_their_flow_steps_without_adding_kcal
     )
     assert flow.current is FlowStep.DONE
     assert flow.eaten.kcal == 430
+
+
+def test_a_skipped_step_is_done_but_says_it_was_skipped():
+    flow = resolve_flow(
+        facts(
+            slots=(
+                MealSlot(MealTime.BREAKFAST, None, NOON, None, _kcal(0)),
+                MealSlot(MealTime.LUNCH, None, None, NOON, _kcal(0)),
+                MealSlot(MealTime.DINNER, None, None, None, _kcal(0)),
+            ),
+            workout_skipped_at=NOON,
+        )
+    )
+    # Skipped still counts as done for the flow and the streak...
+    assert {FlowStep.BREAKFAST, FlowStep.LUNCH, FlowStep.WORKOUT} <= flow.completed
+    # ...but the track can tell the two apart: lunch and the workout were skipped.
+    assert flow.skipped == frozenset({FlowStep.LUNCH, FlowStep.WORKOUT})
+

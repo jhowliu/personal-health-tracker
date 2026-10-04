@@ -50,6 +50,10 @@ export default function AddFood() {
       ? '/today'
       : ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const);
   const parentLabel = destination === 'day' ? (slot && STEP_LABEL[slot]) || '今天' : '編輯餐點';
+  // A snack goes into the day's Extras, outside the three meals, and counts as eaten at once.
+  const snack = destination === 'day' && slot === 'extras';
+  // Where the food goes, not which category the list is filtered to.
+  const heading = snack ? '補記點心' : destination === 'day' && slot && STEP_LABEL[slot] ? `加入${STEP_LABEL[slot]}` : '加入食物';
 
   useEffect(() => {
     if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
@@ -92,7 +96,10 @@ export default function AddFood() {
     try {
       if (destination === 'day') {
         if (!date || !slot) throw new Error('找不到要加入的日期或餐次。');
-        await api.post(`/days/${date}/plan/${slot}/items`, { food_id: food.id, grams: portion });
+        await api.post(
+          snack ? `/days/${date}/meals/extras/items` : `/days/${date}/plan/${slot}/items`,
+          { food_id: food.id, grams: portion },
+        );
       } else {
         if (!meal_id || !draft.has(meal_id)) throw new Error('找不到目前餐點草稿，請重新開啟餐點。');
         draft.addItem(meal_id, food, portion);
@@ -140,13 +147,16 @@ export default function AddFood() {
       photoDraft.set(analysis);
       router.navigate({
         pathname: '/meals/photo-results',
-        params: {
-          destination,
-          meal_id,
-          date,
-          slot,
-          analysis_id: analysis.id,
-        },
+        // A photographed snack is recorded for the day as it is, like 只記錄這一天.
+        params: snack
+          ? { destination: 'today', date, analysis_id: analysis.id }
+          : {
+              destination,
+              meal_id,
+              date,
+              slot,
+              analysis_id: analysis.id,
+            },
       });
     } catch (error) {
       Alert.alert('無法辨識餐點', photoErrorMessage(error));
@@ -155,7 +165,6 @@ export default function AddFood() {
     }
   };
 
-  const label = categories.find((c) => c.id === filter)?.name;
   const unit = portionUnit(picked);
   const pickedGrams = picked ? amountToGrams(picked, Number(amount) || 0) : 0;
   const kcal = picked ? Math.round((picked.per_100g.kcal * pickedGrams) / 100) : 0;
@@ -185,7 +194,7 @@ export default function AddFood() {
             />
             {unit.gramsPerUnit === 1 || !pickedGrams ? null : <Hint>約 {readableAmount(pickedGrams)} g</Hint>}
             <PrimaryButton onPress={add} disabled={!Number(amount) || photoBusy} busy={busy}>
-              {busy ? '加入中…' : `加入${label ?? '食物'}`}
+              {busy ? '加入中…' : snack ? '記下這份點心' : `加入${picked.name}`}
             </PrimaryButton>
           </>
         ) : added.length ? (
@@ -209,7 +218,7 @@ export default function AddFood() {
         disabled={busy || photoBusy}
       />
 
-      <Title>{label ? `加入${label}` : '加入食物'}</Title>
+      <Title sub={snack ? '三餐以外吃的，記下就算吃了。' : undefined}>{heading}</Title>
 
       <PrimaryButton tone="plain" onPress={addFromPhoto} disabled={busy} busy={photoBusy}>
         {photoBusy ? '辨識中…' : '用照片辨識多個食物'}

@@ -206,6 +206,8 @@ class DayFlowOut(BaseModel):
     waiting: list[str]
     current: str
     eaten: "NutrientsOut"
+    # Completed steps that were skipped rather than done.
+    skipped: list[str]
 
     @classmethod
     def of(cls, flow: DayFlow) -> "DayFlowOut":
@@ -215,6 +217,7 @@ class DayFlowOut(BaseModel):
             waiting=[s.value for s in flow.waiting],
             current=flow.current.value,
             eaten=NutrientsOut.of(flow.eaten),
+            skipped=[s.value for s in flow.steps if s in flow.skipped],
         )
 
 
@@ -350,11 +353,15 @@ class ExerciseAlternativeOut(BaseModel):
     hint: str
 
 
+# A count or a range of them: 12, 10-12; built-in templates write the range with an en dash.
+REPS_PATTERN = r"^\d+(\s*[-–~]\s*\d+)?$"
+
+
 class TemplateItemIn(BaseModel):
     id: str | None = None
     exercise_id: str
     sets: int | None = Field(default=None, ge=1, le=10)
-    reps: str | None = None
+    reps: str | None = Field(default=None, pattern=REPS_PATTERN)
     duration_sec: int | None = Field(default=None, gt=0)
     weight_kg: float | None = Field(default=None, ge=0)
     rest_sec: int = 60
@@ -420,7 +427,7 @@ class SaveDayTemplateIn(BaseModel):
 class WorkoutItemIn(BaseModel):
     exercise_id: str
     sets: int | None = Field(default=None, ge=1, le=10)
-    reps: str | None = Field(default=None, min_length=1)
+    reps: str | None = Field(default=None, pattern=REPS_PATTERN)
     duration_sec: int | None = Field(default=None, gt=0)
     weight_kg: float | None = Field(default=None, ge=0)
     rest_sec: int = Field(default=60, ge=0)
@@ -439,7 +446,7 @@ class WorkoutItemPatch(BaseModel):
         "equipment_occupied", "knee_discomfort", "missing_equipment", "variety"
     ] | None = None
     sets: int | None = Field(default=None, ge=1, le=10)
-    reps: str | None = Field(default=None, min_length=1)
+    reps: str | None = Field(default=None, pattern=REPS_PATTERN)
     duration_sec: int | None = Field(default=None, gt=0)
     weight_kg: float | None = Field(default=None, ge=0)
     rest_sec: int | None = Field(default=None, ge=0)
@@ -896,6 +903,8 @@ class ExtraItemIn(BaseModel):
 
 class ExtraItemOut(BaseModel):
     id: str
+    # What to list it by: the food's name, or the one typed in for a custom item.
+    name: str
     food_id: str | None
     custom_name: str | None
     grams: float | None
@@ -906,6 +915,7 @@ class ExtraItemOut(BaseModel):
     def of(cls, item: PlateItem) -> "ExtraItemOut":
         return cls(
             id=item.id,
+            name=item.food.name if item.food else item.custom_name or "",
             food_id=item.food_id,
             custom_name=item.custom_name,
             grams=item.grams,

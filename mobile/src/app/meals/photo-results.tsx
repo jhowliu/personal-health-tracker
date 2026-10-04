@@ -68,7 +68,8 @@ export default function MealPhotoResults() {
         : null,
     })),
   );
-  const [recordDate, setRecordDate] = useState(today);
+  // Opened from 補記點心 on another day, the photo is recorded for that day.
+  const [recordDate, setRecordDate] = useState(() => dayDate ?? today());
   const [busy, setBusy] = useState(false);
   // The whole library is small enough to load once: it prices each row and backs the search.
   const [library, setLibrary] = useState<Food[] | null>(null);

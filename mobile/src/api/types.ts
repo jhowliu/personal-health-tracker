@@ -859,6 +859,8 @@ export interface components {
             /** Current */
             current: string;
             eaten: components["schemas"]["NutrientsOut"];
+            /** Skipped */
+            skipped: string[];
         };
         /** DayPatch */
         DayPatch: {
@@ -1016,6 +1018,8 @@ export interface components {
         ExtraItemOut: {
             /** Id */
             id: string;
+            /** Name */
+            name: string;
             /** Food Id */
             food_id: string | null;
             /** Custom Name */

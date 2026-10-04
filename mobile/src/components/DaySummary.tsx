@@ -18,7 +18,8 @@ import { type ComponentType, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
-import { BowlIcon, ChevronIcon, DropletIcon, ProteinIcon, RunIcon } from '@/components/icons';
+import { BowlIcon, ChevronIcon, DropletIcon, PlusIcon, ProteinIcon, RunIcon } from '@/components/icons';
+import { TextAction } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -84,12 +85,24 @@ function MacroColumn({
   );
 }
 
-export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targets }) {
+export function DaySummary({
+  eaten,
+  targets,
+  burnPlanned = false,
+  onAddSnack,
+}: {
+  eaten: Nutrients;
+  targets: Targets;
+  /** The workout is still ahead, so what it adds back is the plan's, not what was done. */
+  burnPlanned?: boolean;
+  onAddSnack?: () => void;
+}) {
   const [open, setOpen] = useState(expanded);
   const kcal = Math.round(eaten.kcal);
   const remaining = targets.kcal - kcal;
   const over = remaining < 0;
   const added = targets.exercise_kcal;
+  const addedLabel = burnPlanned ? '預計加回' : '訓練加回';
 
   const toggle = () => {
     expanded = !open;
@@ -97,7 +110,7 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
   };
 
   const spoken = `${over ? '超出' : '還可以吃'} ${Math.abs(remaining).toLocaleString()} 大卡，已吃 ${kcal.toLocaleString()}，目標 ${targets.kcal.toLocaleString()} 大卡${
-    added > 0 ? `，含訓練加回 ${added.toLocaleString()}` : ''
+    added > 0 ? `，含${addedLabel} ${added.toLocaleString()}` : ''
   }`;
 
   return (
@@ -129,7 +142,7 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
             <View className="flex-row items-center gap-2 rounded-field bg-primary-soft px-3 py-2">
               <RunIcon size={20} tint={color.primary} />
               <View>
-                <Text className="text-xs text-muted">訓練加回</Text>
+                <Text className="text-xs text-muted">{addedLabel}</Text>
                 <Text className="text-sm font-bold text-primary">+{added.toLocaleString()} 大卡</Text>
               </View>
             </View>
@@ -140,31 +153,42 @@ export function DaySummary({ eaten, targets }: { eaten: Nutrients; targets: Targ
       </Pressable>
 
       {open ? (
-        <View className="flex-row gap-4 border-t border-line pt-3">
-          <MacroColumn
-            label="蛋白質"
-            value={eaten.protein_g}
-            target={targets.protein_g}
-            tone={color.good}
-            soft={color.goodSoft}
-            icon={ProteinIcon}
-          />
-          <MacroColumn
-            label="脂肪"
-            value={eaten.fat_g}
-            target={targets.fat_g}
-            tone={color.warm}
-            soft={color.warmSoft}
-            icon={DropletIcon}
-          />
-          <MacroColumn
-            label="碳水"
-            value={eaten.carb_g}
-            target={targets.carb_g}
-            tone={color.primary}
-            soft={color.primarySoft}
-            icon={BowlIcon}
-          />
+        <View className="gap-1 border-t border-line pt-3">
+          <View className="flex-row gap-4">
+            <MacroColumn
+              label="蛋白質"
+              value={eaten.protein_g}
+              target={targets.protein_g}
+              tone={color.good}
+              soft={color.goodSoft}
+              icon={ProteinIcon}
+            />
+            <MacroColumn
+              label="脂肪"
+              value={eaten.fat_g}
+              target={targets.fat_g}
+              tone={color.warm}
+              soft={color.warmSoft}
+              icon={DropletIcon}
+            />
+            <MacroColumn
+              label="碳水"
+              value={eaten.carb_g}
+              target={targets.carb_g}
+              tone={color.primary}
+              soft={color.primarySoft}
+              icon={BowlIcon}
+            />
+          </View>
+          {/* A snack eaten between meals has nowhere else to go before the day is done. */}
+          {onAddSnack ? (
+            <TextAction
+              icon={PlusIcon}
+              label="補記點心"
+              onPress={onAddSnack}
+              className="min-h-[44px] justify-center self-start"
+            />
+          ) : null}
         </View>
       ) : null}
     </View>
