@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
 import { NumberStepper } from '@/components/NumberStepper';
 import { PlusIcon } from '@/components/icons';

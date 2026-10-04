@@ -1,18 +1,18 @@
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { View } from 'react-native';
 
 import { ProtectedRoute } from '@/auth/route-gates';
 import { useSession } from '@/auth/session';
+import { CalendarCheckIcon, DumbbellIcon, ScaleIcon, SlidersIcon, UtensilsIcon } from '@/components/icons';
 import { registerPushToken } from '@/notifications/push';
 import { color } from '@/theme/tokens';
 
 const TABS = [
-  { name: 'today', title: '今天' },
-  { name: 'body', title: '身形' },
-  { name: 'meals', title: '餐點' },
-  { name: 'workouts', title: '訓練' },
-  { name: 'settings', title: '設定' },
+  { name: 'today', title: '今天', icon: CalendarCheckIcon },
+  { name: 'body', title: '身形', icon: ScaleIcon },
+  { name: 'meals', title: '餐點', icon: UtensilsIcon },
+  { name: 'workouts', title: '訓練', icon: DumbbellIcon },
+  { name: 'settings', title: '設定', icon: SlidersIcon },
 ] as const;
 
 export default function TabsLayout() {
@@ -39,23 +39,11 @@ export default function TabsLayout() {
             name={tab.name}
             options={{
               title: tab.title,
-              tabBarIcon: ({ focused }) => <Dot focused={focused} />,
+              tabBarIcon: ({ focused }) => <tab.icon tint={focused ? color.primary : color.muted} size={24} />,
             }}
           />
         ))}
       </Tabs>
     </ProtectedRoute>
-  );
-}
-
-function Dot({ focused }: { focused: boolean }) {
-  return (
-    <View
-      className={`h-4 w-4 items-center justify-center rounded-full border-2 ${
-        focused ? 'border-primary' : 'border-muted'
-      }`}
-    >
-      {focused ? <View className="h-1.5 w-1.5 rounded-full bg-primary" /> : null}
-    </View>
   );
 }

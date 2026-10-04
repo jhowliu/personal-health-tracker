@@ -6,9 +6,10 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { BackLink, Card, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';

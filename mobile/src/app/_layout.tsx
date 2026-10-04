@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SessionProvider } from '@/auth/session';
+import { AlertHost } from '@/components/alert';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
 import { PhoneFrame } from '@/components/PhoneFrame';
 import { draft } from '@/meals/draft';
@@ -30,6 +31,7 @@ export default function RootLayout() {
             <ReminderSync />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
             <NumericDoneBar />
+            <AlertHost />
           </SessionProvider>
         </SafeAreaProvider>
       </PhoneFrame>

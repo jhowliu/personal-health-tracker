@@ -8,10 +8,11 @@
  */
 import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';

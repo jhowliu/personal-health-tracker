@@ -169,6 +169,44 @@ export function EyeIcon(props: IconProps) {
   );
 }
 
+/** 今天: the day's flow. */
+export function CalendarCheckIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Path d="M5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5ZM4 10h16M8 3v4M16 3v4M9 15l2 2 4-4" />
+    </Icon>
+  );
+}
+
+/** 身形: a bathroom scale. */
+export function ScaleIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM8.5 11a3.5 3.5 0 0 1 7 0M12 11l1.5-2" />
+    </Icon>
+  );
+}
+
+/** 訓練. */
+export function DumbbellIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Path d="M3.5 9.5v5M7 7v10M17 7v10M20.5 9.5v5M7 12h10" />
+    </Icon>
+  );
+}
+
+/** 設定. */
+export function SlidersIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <Path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <Circle cx={15} cy={7} r={2} />
+      <Circle cx={9} cy={17} r={2} />
+    </Icon>
+  );
+}
+
 export function CopyIcon(props: IconProps) {
   return (
     <Icon {...props}>

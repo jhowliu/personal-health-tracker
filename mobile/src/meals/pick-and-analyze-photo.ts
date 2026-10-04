@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
 
 import { ApiError } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { analyzeMealPhoto } from '@/meals/analyze-photo';
 
 /** What to tell the user when picking or recognizing a meal photo fails. */

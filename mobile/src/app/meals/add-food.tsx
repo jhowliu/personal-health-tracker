@@ -1,8 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { PlusIcon } from '@/components/icons';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';

@@ -1,8 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { color } from '@/theme/tokens';

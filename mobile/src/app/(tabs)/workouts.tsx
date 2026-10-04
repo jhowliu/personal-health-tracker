@@ -1,8 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { ChevronIcon, PlusIcon } from '@/components/icons';
 import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { TemplateCard } from '@/components/TemplateCard';

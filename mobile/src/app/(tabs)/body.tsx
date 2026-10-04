@@ -1,9 +1,10 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { Alert } from '@/components/alert';
 import { Sheet } from '@/components/Sheet';
 import { TrendChart } from '@/components/TrendChart';
 import { ChevronIcon } from '@/components/icons';

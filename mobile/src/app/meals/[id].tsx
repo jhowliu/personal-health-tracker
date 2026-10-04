@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { CameraIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';

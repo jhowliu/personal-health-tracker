@@ -1,7 +1,8 @@
-import { Alert, Pressable, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { Alert } from '@/components/alert';
 import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
 import { TimezoneRow } from '@/components/TimezoneRow';

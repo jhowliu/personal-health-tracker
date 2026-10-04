@@ -2,7 +2,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
 import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
@@ -875,11 +875,13 @@ function PortionEditor({
           onPress={close}
           className="flex-1 justify-end bg-scrim"
         >
-          <SafeAreaView
-            edges={keyboardVisible ? [] : ['bottom']}
-            className="rounded-t-sheet bg-bg px-5 pb-3 pt-5"
-          >
-            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-4">
+          {/* Padding sits on the inner Pressable: on web SafeAreaView overwrites className padding. */}
+          <SafeAreaView edges={keyboardVisible ? [] : ['bottom']} className="rounded-t-sheet bg-bg">
+            <Pressable
+              accessible={false}
+              onPress={(event) => event.stopPropagation()}
+              className="gap-4 px-5 pb-3 pt-5"
+            >
               {keyboardVisible ? (
                 <Text accessibilityRole="header" className="text-base font-semibold text-ink">
                   調整 {itemName} 的份量

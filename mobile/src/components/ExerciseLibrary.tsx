@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { CheckIcon, ChevronIcon, PlusIcon } from '@/components/icons';
 import { ShowMore, usePaged } from '@/components/paging';
 import { Sheet } from '@/components/Sheet';
