@@ -1037,6 +1037,8 @@ function WorkoutStep({
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
       await load();
+      // The sets change the day's burn, so the target in the header is read again too.
+      onStateChanged();
       setBusy(false);
     }
   };

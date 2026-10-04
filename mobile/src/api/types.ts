@@ -1235,6 +1235,10 @@ export interface components {
             duration_sec: number | null;
             /** Effort */
             effort: string | null;
+            /** Speed Kmh */
+            speed_kmh: number | null;
+            /** Incline Pct */
+            incline_pct: number | null;
         };
         /** PlanItemPatchIn */
         PlanItemPatchIn: {
@@ -1467,6 +1471,10 @@ export interface components {
             weight_kg?: number | null;
             /** Effort */
             effort?: ("easy" | "appropriate" | "hard") | null;
+            /** Speed Kmh */
+            speed_kmh?: number | null;
+            /** Incline Pct */
+            incline_pct?: number | null;
         };
         /** SetLogOut */
         SetLogOut: {
@@ -1486,6 +1494,10 @@ export interface components {
             effort: string | null;
             /** Done At */
             done_at: string;
+            /** Speed Kmh */
+            speed_kmh: number | null;
+            /** Incline Pct */
+            incline_pct: number | null;
         };
         /** SetLogResultOut */
         SetLogResultOut: {
@@ -1503,6 +1515,10 @@ export interface components {
             weight_kg?: number | null;
             /** Effort */
             effort?: ("easy" | "appropriate" | "hard") | null;
+            /** Speed Kmh */
+            speed_kmh?: number | null;
+            /** Incline Pct */
+            incline_pct?: number | null;
         };
         /**
          * SetRecordsIn

@@ -7,9 +7,18 @@ import type { Schema } from '@/api/client';
 
 type Entry = Schema<'WorkoutExecutionItemOut'>;
 export type Effort = 'easy' | 'appropriate' | 'hard';
-export type RecordRow = { reps: string; weight: string; minutes: string; effort: Effort | null };
+export type RecordRow = {
+  reps: string;
+  weight: string;
+  minutes: string;
+  /** A treadmill's settings, optional: given, they cost the walk by speed and incline. */
+  speed: string;
+  incline: string;
+  effort: Effort | null;
+};
 
 export const isTimed = (entry: Entry) => entry.item.duration_sec !== null;
+export const isTreadmill = (entry: Entry) => entry.item.equipment === 'treadmill';
 
 const firstNumber = (text: string | null | undefined) => {
   const match = text?.match(/\d+/);
@@ -24,6 +33,8 @@ export function rowsFromLogs(entry: Entry): RecordRow[] {
     reps: shown(log.reps_done),
     weight: shown(log.weight_kg),
     minutes: log.duration_sec ? String(Math.max(1, Math.round(log.duration_sec / 60))) : '',
+    speed: shown(log.speed_kmh),
+    incline: shown(log.incline_pct),
     effort: (log.effort as Effort | null) ?? null,
   }));
 }
@@ -41,6 +52,9 @@ export function nextRow(entry: Entry, rows: RecordRow[]): RecordRow {
     reps: shown(entry.last_set?.reps_done ?? firstNumber(item.reps) ?? 10),
     weight: shown(weight),
     minutes: String(Math.max(1, Math.round((item.duration_sec ?? 60) / 60))),
+    // The last walk's settings carry over; the first time they are left for the user.
+    speed: isTreadmill(entry) ? shown(entry.last_set?.speed_kmh) : '',
+    incline: isTreadmill(entry) ? shown(entry.last_set?.incline_pct) : '',
     effort: null,
   };
 }
@@ -64,7 +78,19 @@ export function toRecords(
     if (timed) {
       const minutes = Number(row.minutes);
       if (!/^\d+$/.test(row.minutes.trim()) || minutes < 1) return { error: `${which}要填 1 以上的整數分鐘` };
-      sets.push({ duration_sec: minutes * 60, effort: row.effort });
+      const speed = optionalNumber(row.speed);
+      if (speed === undefined || (speed !== null && (speed <= 0 || speed > 30))) {
+        return { error: '速度要填 30 以內的 km/h' };
+      }
+      const incline = optionalNumber(row.incline);
+      if (incline === undefined || (incline !== null && (incline < 0 || incline > 40))) {
+        return { error: '坡度要填 0 到 40 的 %' };
+      }
+      sets.push({
+        duration_sec: minutes * 60,
+        effort: row.effort,
+        ...(speed !== null ? { speed_kmh: speed, incline_pct: incline ?? 0 } : {}),
+      });
       continue;
     }
     const reps = Number(row.reps);
@@ -75,4 +101,12 @@ export function toRecords(
     sets.push({ reps_done: reps, weight_kg: weightText ? weight : null, effort: row.effort });
   }
   return { sets };
+}
+
+/** A field left blank is null; one that is not a number is undefined. */
+function optionalNumber(text: string): number | null | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const value = Number(trimmed);
+  return Number.isFinite(value) ? value : undefined;
 }

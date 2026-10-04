@@ -128,6 +128,8 @@ async def replace_sets(
                 duration_sec=record.duration_sec,
                 weight_kg=record.weight_kg,
                 effort=SetEffort(record.effort) if record.effort else None,
+                speed_kmh=record.speed_kmh,
+                incline_pct=record.incline_pct,
             )
             for record in payload.sets
         ),
@@ -155,6 +157,8 @@ async def log_set(
         duration_sec=payload.duration_sec,
         weight_kg=payload.weight_kg,
         effort=SetEffort(payload.effort) if payload.effort else None,
+        speed_kmh=payload.speed_kmh,
+        incline_pct=payload.incline_pct,
     )
     return SetLogResultOut(
         today=TodayOut.of(await flow.view(user_id, day)), next_weight_kg=result.next_weight_kg

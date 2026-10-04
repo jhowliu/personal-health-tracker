@@ -15,7 +15,13 @@ WEIGHT_KG = 56
 
 
 def _entry(
-    exercise: str, met: float, minutes: list[float], *, duration_sec: int | None = None
+    exercise: str,
+    met: float,
+    minutes: list[float],
+    *,
+    duration_sec: int | None = None,
+    speed_kmh: float | None = None,
+    incline_pct: float | None = None,
 ) -> WorkoutExecutionItem:
     """An exercise whose sets were logged `minutes` after T0."""
     item = DayWorkoutItem(
@@ -44,6 +50,8 @@ def _entry(
             weight_kg=None,
             effort=None,
             done_at=T0 + timedelta(minutes=at),
+            speed_kmh=speed_kmh,
+            incline_pct=incline_pct,
         )
         for index, at in enumerate(minutes)
     )
@@ -86,3 +94,24 @@ def test_a_longer_clock_still_wins_over_the_logged_gaps():
     pulldown = _entry("pulldown", 3.5, [0, 3, 6])
     # Focus mode clocked half an hour; the gaps only show six minutes of it.
     assert _burn(pulldown, trained_sec=1800) == 70
+
+
+def test_a_treadmill_walk_with_speed_and_incline_is_costed_by_the_acsm_equation():
+    # 4 km/h is 66.7 m/min; up 10 %: 3.5 + 0.1 x 66.7 + 1.8 x 66.7 x 0.10 = 22.2 ml/kg/min,
+    # 6.33 MET. (6.33 - 1) x 56 kg x 40 min = 199, where the flat MET 6.0 said 187.
+    walk = _entry("walk", 6.0, [0], duration_sec=2400, speed_kmh=4, incline_pct=10)
+    assert _burn(walk) == 199
+
+
+def test_a_run_is_costed_by_the_running_equation():
+    # 10 km/h is 166.7 m/min, up 1 %: 3.5 + 0.2 x 166.7 + 0.9 x 166.7 x 0.01 = 38.3,
+    # 10.95 MET. (10.95 - 1) x 56 kg x 30 min = 279.
+    run = _entry("walk", 6.0, [0], duration_sec=1800, speed_kmh=10, incline_pct=1)
+    assert _burn(run) == 279
+
+
+def test_a_speed_without_an_incline_is_level_ground():
+    # 5 km/h flat: 3.5 + 8.3 = 11.8 ml/kg/min, 3.38 MET: (3.38 - 1) x 56 x 30 min = 67.
+    walk = _entry("walk", 6.0, [0], duration_sec=1800, speed_kmh=5)
+    assert _burn(walk) == 67
+

@@ -78,3 +78,5 @@ class SetRecord:
     duration_sec: int | None
     weight_kg: float | None
     effort: SetEffort | None
+    speed_kmh: float | None = None
+    incline_pct: float | None = None

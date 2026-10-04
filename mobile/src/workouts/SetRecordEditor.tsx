@@ -8,7 +8,7 @@ import type { Schema } from '@/api/client';
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Chip, Field, Hint, TextAction } from '@/components/ui';
 import { color } from '@/theme/tokens';
-import { isTimed, nextRow, prescribedRows, type Effort, type RecordRow } from '@/workouts/record';
+import { isTimed, isTreadmill, nextRow, prescribedRows, type Effort, type RecordRow } from '@/workouts/record';
 
 const EFFORTS: readonly (readonly [Effort, string, 'good' | 'primary' | 'warm'])[] = [
   ['easy', '輕鬆', 'good'],
@@ -34,16 +34,43 @@ export function SetRecordEditor({
 
   if (timed) {
     return rows.length ? (
-      <View className="flex-row items-end gap-2">
-        <Field
-          label="實際時間"
-          suffix="分鐘"
-          value={rows[0].minutes}
-          onChangeText={(minutes) => update(0, { minutes })}
-          keyboardType="number-pad"
-          selectTextOnFocus
-        />
-        <RemoveButton label="清除時間" onPress={() => remove(0)} />
+      <View className="gap-2">
+        <View className="flex-row items-end gap-2">
+          <Field
+            label="實際時間"
+            suffix="分鐘"
+            value={rows[0].minutes}
+            onChangeText={(minutes) => update(0, { minutes })}
+            keyboardType="number-pad"
+            selectTextOnFocus
+          />
+          <RemoveButton label="清除時間" onPress={() => remove(0)} />
+        </View>
+        {isTreadmill(entry) ? (
+          <>
+            {/* Lines up with the time field, clear of the remove button beside it. */}
+            <View className="flex-row gap-2 pr-[52px]">
+              <Field
+                label="速度（選填）"
+                suffix="km/h"
+                value={rows[0].speed}
+                onChangeText={(speed) => update(0, { speed })}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+              />
+              <Field
+                label="坡度（選填）"
+                suffix="%"
+                placeholder="0"
+                value={rows[0].incline}
+                onChangeText={(incline) => update(0, { incline })}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+              />
+            </View>
+            <Hint>填了速度和坡度，熱量會照實際走或跑的強度算。</Hint>
+          </>
+        ) : null}
       </View>
     ) : (
       <TextAction

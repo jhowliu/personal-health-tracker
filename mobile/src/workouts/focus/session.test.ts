@@ -31,8 +31,19 @@ type ItemSpec = {
   durationSec?: number | null;
   weightKg?: number | null;
   equipment?: string | null;
-  logs?: { weight_kg: number | null; reps_done: number | null; duration_sec?: number | null }[];
-  lastSet?: { weight_kg: number | null; reps_done: number | null } | null;
+  logs?: {
+    weight_kg: number | null;
+    reps_done: number | null;
+    duration_sec?: number | null;
+    speed_kmh?: number | null;
+    incline_pct?: number | null;
+  }[];
+  lastSet?: {
+    weight_kg: number | null;
+    reps_done: number | null;
+    speed_kmh?: number | null;
+    incline_pct?: number | null;
+  } | null;
   best?: number | null;
   suggested?: number | null;
 };
@@ -110,6 +121,41 @@ describe('starting values', () => {
     const session = fromWorkout(workout([{ id: 'squat', weightKg: null, equipment: 'barbell' }]), T0);
 
     expect(session.exercises[0].weightKg).toBe(0);
+  });
+});
+
+describe('a treadmill', () => {
+  const treadmill = (spec: Partial<ItemSpec> = {}) =>
+    workout([{ id: 'walk', durationSec: 10 * 60, reps: null, weightKg: null, equipment: 'treadmill', ...spec }]);
+
+  it('starts from the last speed and incline, or leaves them unset the first time', () => {
+    const before = fromWorkout(
+      treadmill({ lastSet: { weight_kg: null, reps_done: null, speed_kmh: 4, incline_pct: 10 } }),
+      T0,
+    );
+    expect(before.exercises[0]).toMatchObject({ treadmill: true, speedKmh: 4, inclinePct: 10 });
+
+    // Unset means the exercise's own MET costs it; a default nobody chose would not.
+    expect(fromWorkout(treadmill(), T0).exercises[0]).toMatchObject({ speedKmh: null, inclinePct: null });
+  });
+
+  it('steps from 5 km/h and level ground once touched', () => {
+    const start = fromWorkout(treadmill(), T0);
+    expect(step(start, 'speed', 1).exercises[0].speedKmh).toBe(5.5);
+    expect(step(start, 'incline', 1).exercises[0].inclinePct).toBe(1);
+    expect(step(step(start, 'incline', 1), 'incline', -1).exercises[0].inclinePct).toBe(0);
+  });
+
+  it('logs the speed and incline with the minutes', () => {
+    const tuned = step(step(fromWorkout(treadmill({ lastSet: { weight_kg: null, reps_done: null, speed_kmh: 4, incline_pct: 10 } }), T0), 'speed', 1), 'incline', -1);
+    const { log } = completeCurrent(tuned, T0);
+    expect(log).toMatchObject({ durationSec: 600, speedKmh: 4.5, inclinePct: 9 });
+  });
+
+  it('is the only thing that gets the two steppers', () => {
+    const session = fromWorkout(workout([{ id: 'run', durationSec: 600, reps: null, weightKg: null, equipment: null }]), T0);
+    expect(session.exercises[0].treadmill).toBe(false);
+    expect(step(session, 'speed', 1).exercises[0].speedKmh).toBeNull();
   });
 });
 

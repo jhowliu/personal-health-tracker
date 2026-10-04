@@ -5425,6 +5425,28 @@
               }
             ],
             "title": "Effort"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "incline_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incline Pct"
           }
         },
         "type": "object",
@@ -5433,7 +5455,9 @@
           "weight_kg",
           "reps_done",
           "duration_sec",
-          "effort"
+          "effort",
+          "speed_kmh",
+          "incline_pct"
         ],
         "title": "PastSetOut"
       },
@@ -6183,6 +6207,32 @@
               }
             ],
             "title": "Effort"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "incline_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 40.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incline Pct"
           }
         },
         "type": "object",
@@ -6254,6 +6304,28 @@
           "done_at": {
             "type": "string",
             "title": "Done At"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "incline_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incline Pct"
           }
         },
         "type": "object",
@@ -6265,7 +6337,9 @@
           "duration_sec",
           "weight_kg",
           "effort",
-          "done_at"
+          "done_at",
+          "speed_kmh",
+          "incline_pct"
         ],
         "title": "SetLogOut"
       },
@@ -6346,6 +6420,32 @@
               }
             ],
             "title": "Effort"
+          },
+          "speed_kmh": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 30.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Speed Kmh"
+          },
+          "incline_pct": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 40.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incline Pct"
           }
         },
         "type": "object",

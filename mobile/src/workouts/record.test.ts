@@ -11,6 +11,8 @@ function entry(spec: {
   equipment?: string | null;
   suggested?: number | null;
   lastReps?: number | null;
+  lastSpeed?: number | null;
+  lastIncline?: number | null;
   logs?: Partial<Schema<'SetLogOut'>>[];
 }): Entry {
   return {
@@ -39,7 +41,18 @@ function entry(spec: {
       ...log,
     })),
     completed_set_count: spec.logs?.length ?? 0,
-    last_set: spec.lastReps ? { date: '2026-10-01', weight_kg: 8, reps_done: spec.lastReps, duration_sec: null, effort: null } : null,
+    last_set:
+      spec.lastReps || spec.lastSpeed
+        ? {
+            date: '2026-10-01',
+            weight_kg: 8,
+            reps_done: spec.lastReps ?? null,
+            duration_sec: null,
+            effort: null,
+            speed_kmh: spec.lastSpeed ?? null,
+            incline_pct: spec.lastIncline ?? null,
+          }
+        : null,
     best_weight_kg: null,
     suggested_weight_kg: spec.suggested ?? null,
   } as unknown as Entry;
@@ -49,6 +62,8 @@ const row = (reps: string, weight = '', effort: RecordRow['effort'] = null): Rec
   reps,
   weight,
   minutes: '1',
+  speed: '',
+  incline: '',
   effort,
 });
 
@@ -74,7 +89,7 @@ describe('an exercise record', () => {
   it('fills every prescribed set, or one stretch of time', () => {
     expect(prescribedRows(entry({ sets: 4 }))).toHaveLength(4);
     expect(prescribedRows(entry({ durationSec: 600, reps: null, sets: null }))).toEqual([
-      { reps: '10', weight: '', minutes: '10', effort: null },
+      { reps: '10', weight: '', minutes: '10', speed: '', incline: '', effort: null },
     ]);
   });
 
@@ -99,5 +114,30 @@ describe('an exercise record', () => {
     expect(toRecords(entry({ durationSec: 600 }), [{ ...row(''), minutes: '0' }])).toEqual({
       error: '時間要填 1 以上的整數分鐘',
     });
+  });
+
+  it('carries a treadmill walk\'s last speed and incline, and sends them', () => {
+    const walk = entry({ durationSec: 600, reps: null, sets: null, equipment: 'treadmill', lastSpeed: 4, lastIncline: 10 });
+    const [first] = prescribedRows(walk);
+    expect(first).toMatchObject({ minutes: '10', speed: '4', incline: '10' });
+    expect(toRecords(walk, [first])).toEqual({
+      sets: [{ duration_sec: 600, effort: null, speed_kmh: 4, incline_pct: 10 }],
+    });
+  });
+
+  it('leaves speed and incline out when they are blank, and reads a blank incline as level', () => {
+    const walk = entry({ durationSec: 600, reps: null, sets: null, equipment: 'treadmill' });
+    const [first] = prescribedRows(walk);
+    expect(toRecords(walk, [first])).toEqual({ sets: [{ duration_sec: 600, effort: null }] });
+    expect(toRecords(walk, [{ ...first, speed: '5' }])).toEqual({
+      sets: [{ duration_sec: 600, effort: null, speed_kmh: 5, incline_pct: 0 }],
+    });
+  });
+
+  it('rejects a speed or incline no treadmill has', () => {
+    const walk = entry({ durationSec: 600, reps: null, sets: null, equipment: 'treadmill' });
+    const [first] = prescribedRows(walk);
+    expect(toRecords(walk, [{ ...first, speed: '40' }])).toEqual({ error: '速度要填 30 以內的 km/h' });
+    expect(toRecords(walk, [{ ...first, speed: '5', incline: 'x' }])).toEqual({ error: '坡度要填 0 到 40 的 %' });
   });
 });

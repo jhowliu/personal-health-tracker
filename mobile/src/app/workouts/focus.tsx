@@ -208,6 +208,8 @@ export default function FocusWorkout() {
         reps_done: log.reps,
         duration_sec: log.durationSec,
         weight_kg: log.weightKg,
+        speed_kmh: log.speedKmh,
+        incline_pct: log.inclinePct,
       });
     } catch (error) {
       Alert.alert('這組沒有記錄到', error instanceof ApiError ? error.message : '請確認網路後再按一次。');
@@ -427,12 +429,35 @@ export default function FocusWorkout() {
 
         <Text className="mt-2 text-[13px] text-muted">{carriedNote(exercise)}</Text>
         {exercise.kind === 'time' ? (
-          <Stepper
-            label="實際時間"
-            value={String(exercise.minutes)}
-            unit="分鐘"
-            onStep={(direction) => setSession(step(session, 'minutes', direction))}
-          />
+          <>
+            <Stepper
+              label="實際時間"
+              value={String(exercise.minutes)}
+              unit="分鐘"
+              onStep={(direction) => setSession(step(session, 'minutes', direction))}
+            />
+            {exercise.treadmill ? (
+              <>
+                <Stepper
+                  label="速度"
+                  value={exercise.speedKmh === null ? '—' : kg(exercise.speedKmh)}
+                  unit="km/h"
+                  onStep={(direction) => setSession(step(session, 'speed', direction))}
+                />
+                <Stepper
+                  label="坡度"
+                  value={exercise.inclinePct === null ? '—' : kg(exercise.inclinePct)}
+                  unit="%"
+                  onStep={(direction) => setSession(step(session, 'incline', direction))}
+                />
+                <Text className="text-[13px] text-muted">
+                  {exercise.speedKmh === null
+                    ? '選填：填了速度和坡度，熱量會照實際走或跑的強度算。'
+                    : '熱量會照這個速度和坡度算。'}
+                </Text>
+              </>
+            ) : null}
+          </>
         ) : (
           <>
             {exercise.weightKg !== null ? (
@@ -688,7 +713,13 @@ function Summary({
               <Text className="mt-0.5 text-[13px] text-muted" style={tabular}>
                 {exercise.kind === 'time'
                   ? exercise.timeDone
-                    ? `${exercise.minutes} 分鐘`
+                    ? [
+                        `${exercise.minutes} 分鐘`,
+                        exercise.speedKmh !== null ? `${kg(exercise.speedKmh)} km/h` : null,
+                        exercise.speedKmh !== null && exercise.inclinePct !== null ? `坡度 ${kg(exercise.inclinePct)}%` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
                     : '未完成'
                   : exercise.logs.length
                     ? exercise.logs

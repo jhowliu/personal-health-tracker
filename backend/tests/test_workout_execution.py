@@ -642,6 +642,8 @@ async def test_each_exercise_carries_its_last_set_and_best_weight_from_earlier_d
         "reps_done": 10,
         "duration_sec": None,
         "effort": "easy",
+        "speed_kmh": None,
+        "incline_pct": None,
     }
     assert entry["best_weight_kg"] == 52.5
     # It felt easy last time, so the next session starts one step heavier.
@@ -847,4 +849,55 @@ async def test_rewriting_a_record_keeps_when_its_sets_were_logged(with_profile: 
     # edit adds no gap that would read as training time.
     assert [log["done_at"] for log in logs] == [first["done_at"]] * 2
     assert [log["reps_done"] for log in logs] == [12, 10]
+
+
+async def test_a_treadmill_set_keeps_its_speed_and_incline(with_exercises: AsyncClient):
+    _squat, walk = await _unplanned_day(with_exercises)
+    logged = await with_exercises.put(
+        f"/days/{DAY}/workout/sets",
+        json={
+            "day_workout_item_id": walk,
+            "exercise_id": "incline-treadmill-walk",
+            "set_index": 0,
+            "duration_sec": 2400,
+            "speed_kmh": 4,
+            "incline_pct": 10,
+        },
+    )
+    assert logged.status_code == 200
+    workout = (await with_exercises.get(f"/days/{DAY}/workout")).json()
+    log = workout["items"][1]["logs"][0]
+    assert (log["speed_kmh"], log["incline_pct"]) == (4, 10)
+    # Costed by the ACSM walking equation: (6.33 - 1) x 56 kg x 40 min.
+    assert workout["estimated_burn_kcal"] == 199
+
+    # The next time the walk comes up, it starts from the same speed and incline.
+    later = "2026-09-29"
+    added = await with_exercises.post(
+        f"/days/{later}/workout/items",
+        json={"exercise_id": "incline-treadmill-walk", "duration_sec": 600},
+    )
+    last = added.json()["items"][0]["last_set"]
+    assert (last["speed_kmh"], last["incline_pct"]) == (4, 10)
+
+
+async def test_a_typed_in_record_keeps_speed_and_incline(with_exercises: AsyncClient):
+    _squat, walk = await _unplanned_day(with_exercises)
+    recorded = await with_exercises.put(
+        f"/days/{DAY}/workout/items/{walk}/sets",
+        json={"sets": [{"duration_sec": 2400, "speed_kmh": 4, "incline_pct": 10}]},
+    )
+    assert recorded.status_code == 200
+    log = (await with_exercises.get(f"/days/{DAY}/workout")).json()["items"][1]["logs"][0]
+    assert (log["speed_kmh"], log["incline_pct"]) == (4, 10)
+
+
+async def test_an_impossible_speed_or_incline_is_rejected(with_exercises: AsyncClient):
+    _squat, walk = await _unplanned_day(with_exercises)
+    for bad in ({"speed_kmh": 0}, {"speed_kmh": 31}, {"incline_pct": -1}, {"incline_pct": 41}):
+        response = await with_exercises.put(
+            f"/days/{DAY}/workout/items/{walk}/sets",
+            json={"sets": [{"duration_sec": 600, **bad}]},
+        )
+        assert response.status_code == 422, bad
 

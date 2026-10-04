@@ -62,6 +62,9 @@ class SetLog:
     weight_kg: float | None
     effort: SetEffort | None
     done_at: datetime
+    # A treadmill set's settings, when given; they cost it by the ACSM equations.
+    speed_kmh: float | None = None
+    incline_pct: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +76,8 @@ class PastSet:
     reps_done: int | None
     duration_sec: int | None
     effort: SetEffort | None
+    speed_kmh: float | None = None
+    incline_pct: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +126,9 @@ class SetLogResult:
 # A counted set with no clock on it is costed at about this long a rep, plus its rest.
 SECONDS_PER_REP = 3
 DEFAULT_REPS = 10
+# Above this a treadmill set is a run, below it a walk (ACSM: walking holds to about
+# 100 m/min, running from about 134; this splits the jog in between).
+RUNNING_KMH = 8.0
 # Between two sets logged one at a time, the gap is the later set's time, rest included;
 # one longer than this is a break, not training.
 LONGEST_GAP_SEC = 20 * 60
@@ -151,10 +159,20 @@ def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | N
     estimated = sum(counted.values())
     stretch = max(taken / estimated, 1.0) if estimated else 1.0
 
-    def seconds(entry: WorkoutExecutionItem) -> float:
-        return _seconds_spent(entry) or counted[entry.item.id] * stretch
+    def kcal(entry: WorkoutExecutionItem) -> float:
+        if any(log.speed_kmh for log in entry.logs):
+            # A treadmill set with its speed (and incline) says more than the flat MET.
+            return sum(
+                _net_kcal(_log_met(entry, log), weight_kg, _log_seconds(entry, log))
+                for log in entry.logs
+            )
+        seconds = _seconds_spent(entry) or counted[entry.item.id] * stretch
+        return _net_kcal(entry.item.met, weight_kg, seconds)
 
-    return _burn([entry for entry in logged if entry.item.met], seconds, weight_kg)
+    costed = [
+        entry for entry in logged if entry.item.met or any(log.speed_kmh for log in entry.logs)
+    ]
+    return _burn(costed, kcal)
 
 
 def planned_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
@@ -166,10 +184,11 @@ def planned_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | No
     planned_min = execution.template.duration_min if execution.template else None
     share = planned_min * 60 / len(execution.items) if planned_min else None
 
-    def seconds(entry: WorkoutExecutionItem) -> float:
-        return _seconds_prescribed(entry) or share or _prescribed_set_seconds(entry)
+    def kcal(entry: WorkoutExecutionItem) -> float:
+        seconds = _seconds_prescribed(entry) or share or _prescribed_set_seconds(entry)
+        return _net_kcal(entry.item.met, weight_kg, seconds)
 
-    return _burn([entry for entry in execution.items if entry.item.met], seconds, weight_kg)
+    return _burn([entry for entry in execution.items if entry.item.met], kcal)
 
 
 def burn_for_targets(
@@ -187,18 +206,40 @@ def burn_for_targets(
     return max(logged, planned_burn_kcal(execution, weight_kg) or 0)
 
 
+def treadmill_met(speed_kmh: float, incline_pct: float | None) -> float:
+    """The ACSM metabolic equations: oxygen cost from speed and grade, in METs.
+
+    Walking costs 0.1 ml/kg/min per m/min plus 1.8 per m/min of climb; running 0.2 and 0.9.
+    Each adds to the 3.5 ml/kg/min of rest, which is also what one MET is.
+    """
+    metres_per_min = speed_kmh * 1000 / 60
+    grade = (incline_pct or 0.0) / 100
+    if speed_kmh <= RUNNING_KMH:
+        vo2 = 3.5 + 0.1 * metres_per_min + 1.8 * metres_per_min * grade
+    else:
+        vo2 = 3.5 + 0.2 * metres_per_min + 0.9 * metres_per_min * grade
+    return vo2 / 3.5
+
+
 def _burn(
-    entries: list[WorkoutExecutionItem],
-    seconds_of: Callable[[WorkoutExecutionItem], float],
-    weight_kg: float,
+    entries: list[WorkoutExecutionItem], kcal_of: Callable[[WorkoutExecutionItem], float]
 ) -> int | None:
     if not entries:
         return None
-    total = sum(
-        max((entry.item.met or 0.0) - 1, 0.0) * weight_kg * seconds_of(entry) / 3600
-        for entry in entries
-    )
-    return round(total) or None
+    return round(sum(kcal_of(entry) for entry in entries)) or None
+
+
+def _net_kcal(met: float | None, weight_kg: float, seconds: float) -> float:
+    """kcal beyond resting: the resting MET is already in the day's base target."""
+    return max((met or 0.0) - 1, 0.0) * weight_kg * seconds / 3600
+
+
+def _log_met(entry: WorkoutExecutionItem, log: SetLog) -> float | None:
+    return treadmill_met(log.speed_kmh, log.incline_pct) if log.speed_kmh else entry.item.met
+
+
+def _log_seconds(entry: WorkoutExecutionItem, log: SetLog) -> float:
+    return float(log.duration_sec or entry.item.duration_sec or 0)
 
 
 def _logged_gaps(logged: list[WorkoutExecutionItem]) -> float:

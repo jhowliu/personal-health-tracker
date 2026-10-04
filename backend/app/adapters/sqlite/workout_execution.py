@@ -45,11 +45,13 @@ class SqliteWorkoutExecutionStore:
                            'duration_sec', duration_sec,
                            'weight_kg', weight_kg,
                            'effort', effort,
-                           'done_at', done_at
+                           'done_at', done_at,
+                           'speed_kmh', speed_kmh,
+                           'incline_pct', incline_pct
                        )) AS logs_json
                 FROM (
                     SELECT day_workout_item_id, exercise_id, set_index, reps_done,
-                           duration_sec, weight_kg, effort, done_at
+                           duration_sec, weight_kg, effort, done_at, speed_kmh, incline_pct
                     FROM set_logs
                     WHERE user_id = ? AND date = ? AND day_workout_item_id IS NOT NULL
                     ORDER BY day_workout_item_id, set_index
@@ -215,14 +217,16 @@ class SqliteWorkoutExecutionStore:
             """
             INSERT INTO set_logs
                 (id, user_id, date, day_workout_item_id, exercise_id, set_index,
-                 reps_done, duration_sec, weight_kg, effort, done_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reps_done, duration_sec, weight_kg, effort, done_at, speed_kmh, incline_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (user_id, date, day_workout_item_id, set_index) DO UPDATE SET
                 reps_done = excluded.reps_done,
                 duration_sec = excluded.duration_sec,
                 weight_kg = excluded.weight_kg,
                 effort = excluded.effort,
-                done_at = excluded.done_at
+                done_at = excluded.done_at,
+                speed_kmh = excluded.speed_kmh,
+                incline_pct = excluded.incline_pct
             """,
             (
                 new_id(),
@@ -236,6 +240,8 @@ class SqliteWorkoutExecutionStore:
                 log.weight_kg,
                 log.effort.value if log.effort else None,
                 to_iso(log.done_at),
+                log.speed_kmh,
+                log.incline_pct,
             ),
         )
 
@@ -259,7 +265,8 @@ class SqliteWorkoutExecutionStore:
         params = (user_id, to_day(before), *exercise_ids)
         async with self._conn.execute(
             f"""
-            SELECT exercise_id, date, weight_kg, reps_done, duration_sec, effort
+            SELECT exercise_id, date, weight_kg, reps_done, duration_sec, effort,
+                   speed_kmh, incline_pct
             FROM (
                 SELECT *, ROW_NUMBER() OVER (
                     PARTITION BY exercise_id ORDER BY date DESC, set_index DESC
@@ -278,6 +285,8 @@ class SqliteWorkoutExecutionStore:
                     reps_done=row["reps_done"],
                     duration_sec=row["duration_sec"],
                     effort=SetEffort(row["effort"]) if row["effort"] else None,
+                    speed_kmh=row["speed_kmh"],
+                    incline_pct=row["incline_pct"],
                 )
                 for row in await cursor.fetchall()
             }
@@ -330,6 +339,8 @@ class SqliteWorkoutExecutionStore:
                 weight_kg=value["weight_kg"],
                 effort=SetEffort(value["effort"]) if value["effort"] else None,
                 done_at=from_iso(value["done_at"]),
+                speed_kmh=value.get("speed_kmh"),
+                incline_pct=value.get("incline_pct"),
             )
             for value in json.loads(row["logs_json"] or "[]")
         )

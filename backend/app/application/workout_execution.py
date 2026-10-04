@@ -173,6 +173,8 @@ class WorkoutExecutionService:
         duration_sec: int | None,
         weight_kg: float | None,
         effort: SetEffort | None,
+        speed_kmh: float | None = None,
+        incline_pct: float | None = None,
     ) -> SetLogResult:
         await self._store.log_set(
             user_id,
@@ -186,6 +188,8 @@ class WorkoutExecutionService:
                 weight_kg=weight_kg,
                 effort=effort,
                 done_at=self._clock.now(),
+                speed_kmh=speed_kmh,
+                incline_pct=incline_pct,
             ),
         )
         return SetLogResult(recommend_next_weight(weight_kg, effort))
@@ -220,6 +224,8 @@ class WorkoutExecutionService:
                 weight_kg=record.weight_kg,
                 effort=record.effort,
                 done_at=kept.get(index, latest),
+                speed_kmh=record.speed_kmh,
+                incline_pct=record.incline_pct,
             )
             for index, record in enumerate(sets)
         )
