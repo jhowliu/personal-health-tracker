@@ -1,7 +1,7 @@
 from dataclasses import replace
 from datetime import date
 
-from app.application.commands import WorkoutItemChange, applied
+from app.application.commands import SetRecord, WorkoutItemChange, applied
 from app.application.ports import AccountStore, Clock, WorkoutExecutionStore
 from app.application.training import TrainingService
 from app.domain.errors import NotFound, ValidationFailed
@@ -173,6 +173,8 @@ class WorkoutExecutionService:
         duration_sec: int | None,
         weight_kg: float | None,
         effort: SetEffort | None,
+        speed_kmh: float | None = None,
+        incline_pct: float | None = None,
     ) -> SetLogResult:
         await self._store.log_set(
             user_id,
@@ -186,9 +188,50 @@ class WorkoutExecutionService:
                 weight_kg=weight_kg,
                 effort=effort,
                 done_at=self._clock.now(),
+                speed_kmh=speed_kmh,
+                incline_pct=incline_pct,
             ),
         )
         return SetLogResult(recommend_next_weight(weight_kg, effort))
+
+    async def replace_sets(
+        self, user_id: str, day: date, item_id: str, sets: tuple[SetRecord, ...]
+    ) -> SetLogResult:
+        """Rewrite one exercise's record for the day, set by set, as entered after the fact."""
+        workout = await self._store.load(user_id, day)
+        entry = next((entry for entry in workout.items if entry.item.id == item_id), None)
+        if entry is None:
+            raise NotFound("找不到這天排定的動作")
+        item = entry.item
+        timed = item.duration_sec is not None
+        if any((record.duration_sec if timed else record.reps_done) is None for record in sets):
+            raise ValidationFailed("每一組都要填時間" if timed else "每一組都要填次數")
+        # When a set was logged says how long the work took (see estimate_burn_kcal). A set
+        # kept keeps its time; one typed in now is stamped with the day's last log, so an
+        # edit made hours later does not read as hours of training.
+        kept = {log.set_index: log.done_at for log in entry.logs}
+        latest = max(
+            (log.done_at for logged in workout.items for log in logged.logs),
+            default=self._clock.now(),
+        )
+        logs = tuple(
+            SetLog(
+                day_workout_item_id=item.id,
+                exercise_id=item.exercise_id,
+                set_index=index,
+                reps_done=record.reps_done,
+                duration_sec=record.duration_sec,
+                weight_kg=record.weight_kg,
+                effort=record.effort,
+                done_at=kept.get(index, latest),
+                speed_kmh=record.speed_kmh,
+                incline_pct=record.incline_pct,
+            )
+            for index, record in enumerate(sets)
+        )
+        await self._store.replace_sets(user_id, day, item.id, logs)
+        last = sets[-1] if sets else None
+        return SetLogResult(recommend_next_weight(last.weight_kg, last.effort) if last else None)
 
     async def _profile(self, user_id: str):
         profile = await self._accounts.load_profile(user_id)

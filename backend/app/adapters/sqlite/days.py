@@ -83,23 +83,26 @@ class SqliteDayStore:
         workout_time: str | None = None,
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
+        trained_sec: int | None = None,
     ) -> None:
         await open_day(self._conn, user_id, day)
-        applied: dict[str, str | None] = {}
+        applied: dict[str, str | int | None] = {}
         if workout_time is not None:
-            applied["workout_time"] = workout_time
+            applied["workout_time = ?"] = workout_time
         if workout_state == "done":
-            applied["workout_done_at"] = to_iso(workout_state_at)
-            applied["workout_skipped_at"] = None
+            applied["workout_done_at = ?"] = to_iso(workout_state_at)
+            applied["workout_skipped_at = ?"] = None
         elif workout_state == "skipped":
-            applied["workout_done_at"] = None
-            applied["workout_skipped_at"] = to_iso(workout_state_at)
+            applied["workout_done_at = ?"] = None
+            applied["workout_skipped_at = ?"] = to_iso(workout_state_at)
+        if trained_sec is not None:
+            # Each focus session adds its own time; a resumed workout keeps the first.
+            applied["workout_trained_sec = COALESCE(workout_trained_sec, 0) + ?"] = trained_sec
         if not applied:
             return
 
-        assignments = ", ".join(f"{column} = ?" for column in applied)
         await self._conn.execute(
-            f"UPDATE days SET {assignments} WHERE user_id = ? AND date = ?",
+            f"UPDATE days SET {', '.join(applied)} WHERE user_id = ? AND date = ?",
             (*applied.values(), user_id, to_day(day)),
         )
 

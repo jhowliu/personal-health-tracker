@@ -4,13 +4,15 @@
  * For the dishes someone cooks again and again: one tap instead of a photo or food by food.
  * Portions arrive as saved; the meal itself is left alone.
  */
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { BackLink, Card, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
+import { PlusIcon } from '@/components/icons';
+import { BackLink, Card, Empty, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
@@ -66,7 +68,22 @@ export default function PickMealForToday() {
       {meals === null ? (
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
-        <Empty>還沒有存過餐點。記錄一餐之後，可以在今天的畫面按「存成我的餐點」。</Empty>
+        <Empty
+          action={
+            // A first-time user lands here with nothing to pick; the catalog is the way on.
+            <PrimaryButton
+              tone="plain"
+              icon={PlusIcon}
+              onPress={() =>
+                router.replace({ pathname: '/meals/add-food', params: { destination: 'day', date, slot } })
+              }
+            >
+              改從食物庫加入
+            </PrimaryButton>
+          }
+        >
+          還沒有存過餐點。記錄一餐之後，可以在今天的畫面按「存成我的餐點」。
+        </Empty>
       ) : (
         <Card className="px-0 py-0">
           <Rows>
@@ -82,7 +99,7 @@ export default function PickMealForToday() {
           </Rows>
         </Card>
       )}
-      <Hint>只會加入這一天；之後改這道餐點，不會影響已經記錄的內容。</Hint>
+      {meals?.length ? <Hint>只會加入這一天；之後改這道餐點，不會影響已經記錄的內容。</Hint> : null}
     </Screen>
   );
 }

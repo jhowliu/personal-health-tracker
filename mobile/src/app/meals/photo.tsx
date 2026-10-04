@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Text, View } from 'react-native';
 
+import { Alert } from '@/components/alert';
 import { CameraIcon } from '@/components/icons';
 import { BackLink, Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';

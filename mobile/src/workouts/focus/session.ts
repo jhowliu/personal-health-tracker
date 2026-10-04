@@ -18,6 +18,10 @@ export type Effort = 'easy' | 'appropriate' | 'hard';
 export const REST_SEC = 90;
 export const REST_STEP_SEC = 30;
 export const WEIGHT_STEP_KG = 2.5;
+/** A treadmill's speed and incline start here when first touched, and move this much. */
+export const SPEED_FROM_KMH = 5;
+export const SPEED_STEP_KMH = 0.5;
+export const INCLINE_STEP_PCT = 1;
 
 export type SetRecord = { weightKg: number | null; reps: number };
 
@@ -36,6 +40,13 @@ export type FocusExercise = {
   weightKg: number | null;
   reps: number;
   minutes: number;
+  /**
+   * A treadmill's settings, null until given: then the exercise's own MET costs it rather
+   * than a speed and incline nobody chose. Only a treadmill gets the two steppers.
+   */
+  treadmill: boolean;
+  speedKmh: number | null;
+  inclinePct: number | null;
   /** Heaviest weight on earlier days, for the summary's 新紀錄. */
   bestWeightKg: number | null;
   /** The last set on an earlier day, for 「上次 45 kg × 12，已帶入」; null the first time. */
@@ -72,6 +83,8 @@ export type SetToLog = {
   weightKg: number | null;
   reps: number | null;
   durationSec: number | null;
+  speedKmh: number | null;
+  inclinePct: number | null;
 };
 
 export const isDone = (exercise: FocusExercise) =>
@@ -86,6 +99,15 @@ export function nextIndex(exercises: FocusExercise[], from: number): number {
     if (!isDone(exercises[index])) return index;
   }
   return -1;
+}
+
+/**
+ * The exercise after the one on screen, or -1 when this is the last still to do. nextIndex
+ * wraps round to the current exercise while it is unfinished, which is not a next one.
+ */
+export function upNext(session: Session): number {
+  const next = nextIndex(session.exercises, session.currentIndex);
+  return next === session.currentIndex ? -1 : next;
 }
 
 const firstNumber = (text: string | null | undefined) => {
@@ -105,6 +127,7 @@ export function fromWorkout(workout: Workout, now: number): Session {
     const bodyweight = item.equipment === 'bodyweight';
     const weightKg = bodyweight ? null : (latest?.weight_kg ?? suggested_weight_kg ?? item.weight_kg ?? 0);
     const reps = latest?.reps_done ?? last_set?.reps_done ?? firstNumber(item.reps) ?? 10;
+    const treadmill = item.equipment === 'treadmill';
     return {
       itemId: item.id,
       exerciseId: item.exercise_id,
@@ -118,6 +141,9 @@ export function fromWorkout(workout: Workout, now: number): Session {
       weightKg,
       reps: Math.max(1, reps),
       minutes: latest?.duration_sec ? Math.max(1, Math.round(latest.duration_sec / 60)) : targetMin,
+      treadmill,
+      speedKmh: treadmill ? (latest?.speed_kmh ?? last_set?.speed_kmh ?? null) : null,
+      inclinePct: treadmill ? (latest?.incline_pct ?? last_set?.incline_pct ?? null) : null,
       bestWeightKg: best_weight_kg ?? null,
       last: last_set
         ? { weightKg: last_set.weight_kg, reps: last_set.reps_done, effort: (last_set.effort as Effort | null) ?? null }
@@ -149,7 +175,16 @@ export function restore(stored: Session, fresh: Session): Session {
   const exercises = fresh.exercises.map((exercise) => {
     const before = kept.get(exercise.itemId);
     return before && before.exerciseId === exercise.exerciseId
-      ? { ...exercise, weightKg: before.weightKg, reps: before.reps, minutes: before.minutes, feedback: before.feedback }
+      ? {
+          ...exercise,
+          weightKg: before.weightKg,
+          reps: before.reps,
+          minutes: before.minutes,
+          // A session stored by an older version has neither.
+          speedKmh: before.speedKmh ?? exercise.speedKmh,
+          inclinePct: before.inclinePct ?? exercise.inclinePct,
+          feedback: before.feedback,
+        }
       : exercise;
   });
   const merged = { ...stored, exercises, currentIndex: Math.min(stored.currentIndex, exercises.length - 1) };
@@ -184,6 +219,8 @@ export function completeCurrent(
           weightKg: null,
           reps: null,
           durationSec: exercise.minutes * 60,
+          speedKmh: exercise.speedKmh,
+          inclinePct: exercise.inclinePct,
         }
       : {
           itemId: exercise.itemId,
@@ -192,6 +229,8 @@ export function completeCurrent(
           weightKg: exercise.weightKg,
           reps: exercise.reps,
           durationSec: null,
+          speedKmh: null,
+          inclinePct: null,
         };
   const updated: FocusExercise =
     exercise.kind === 'time'
@@ -266,7 +305,7 @@ export function jumpTo(session: Session, index: number): Session {
   return { ...session, currentIndex: index, rest: null };
 }
 
-export type Stepper = 'weight' | 'reps' | 'minutes';
+export type Stepper = 'weight' | 'reps' | 'minutes' | 'speed' | 'incline';
 
 /** The steppers act on the exercise on screen, which during a rest is the one coming up. */
 export function step(session: Session, stepper: Stepper, direction: 1 | -1): Session {
@@ -279,9 +318,20 @@ export function step(session: Session, stepper: Stepper, direction: 1 | -1): Ses
         : { ...exercise, weightKg: Math.max(0, exercise.weightKg + direction * WEIGHT_STEP_KG) }
       : stepper === 'reps'
         ? { ...exercise, reps: Math.max(1, exercise.reps + direction) }
-        : { ...exercise, minutes: Math.max(1, exercise.minutes + direction) };
+        : stepper === 'minutes'
+          ? { ...exercise, minutes: Math.max(1, exercise.minutes + direction) }
+          : !exercise.treadmill
+            ? exercise
+            : stepper === 'speed'
+              ? {
+                  ...exercise,
+                  speedKmh: clamp((exercise.speedKmh ?? SPEED_FROM_KMH) + direction * SPEED_STEP_KMH, SPEED_STEP_KMH, 30),
+                }
+              : { ...exercise, inclinePct: clamp((exercise.inclinePct ?? 0) + direction * INCLINE_STEP_PCT, 0, 40) };
   return { ...session, exercises: replaceAt(session.exercises, index, updated) };
 }
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
 export function setFeedback(session: Session, itemId: string, effort: Effort): Session {
   return {

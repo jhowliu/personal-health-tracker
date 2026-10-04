@@ -1,9 +1,10 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { Alert } from '@/components/alert';
 import { Field, PrimaryButton, Screen, Title } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
 

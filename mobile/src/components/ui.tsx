@@ -88,13 +88,11 @@ export function Screen({
           </Pressable>
         )}
 
-        {/* Inside KeyboardAvoidingView so it rides up with the keyboard. */}
+        {/* Inside KeyboardAvoidingView so it rides up with the keyboard. Padding sits on the inner
+            View: on web SafeAreaView writes its own inline padding over any className padding. */}
         {footer ? (
-          <SafeAreaView
-            edges={footerSafeArea ? ['bottom'] : []}
-            className="gap-2 border-t border-line bg-surface px-5 pb-3 pt-3"
-          >
-            {footer}
+          <SafeAreaView edges={footerSafeArea ? ['bottom'] : []} className="border-t border-line bg-surface">
+            <View className="gap-2 px-5 pb-3 pt-3">{footer}</View>
           </SafeAreaView>
         ) : null}
       </KeyboardAvoidingView>
@@ -183,7 +181,8 @@ export function Field({
       ) : null}
       <View className="flex-row items-center rounded-field border border-line bg-surface px-3">
         <TextInput
-          className={`min-h-[44px] flex-1 text-base text-ink ${className}`}
+          // min-w-0: a browser input keeps its default width otherwise and pushes the suffix out.
+          className={`min-h-[44px] min-w-0 flex-1 text-base text-ink ${className}`}
           placeholderTextColor={color.placeholder}
           inputAccessoryViewID={needsDoneBar ? NUMERIC_ACCESSORY_ID : undefined}
           accessibilityLabel={props.accessibilityLabel ?? label}

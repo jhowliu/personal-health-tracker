@@ -14,6 +14,7 @@ from app.api.schemas import (
     SaveDayTemplateIn,
     SetLogIn,
     SetLogResultOut,
+    SetRecordsIn,
     SwapItemIn,
     TemplateOut,
     TodayOut,
@@ -21,7 +22,7 @@ from app.api.schemas import (
     WorkoutItemIn,
     WorkoutItemPatch,
 )
-from app.application.commands import DayAdjustment, WorkoutItemChange
+from app.application.commands import DayAdjustment, SetRecord, WorkoutItemChange
 from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis, WorkoutTime
 from app.domain.workout_execution import ReplacementReason, SetEffort
 
@@ -41,6 +42,7 @@ async def update_day(
         workout_time=WorkoutTime(payload.workout_time) if payload.workout_time else None,
         workout_done=payload.workout_done,
         workout_skipped=payload.workout_skipped,
+        trained_sec=payload.trained_sec,
     )
     return TodayOut.of(await service.adjust(user_id, day, change))
 
@@ -107,6 +109,36 @@ async def delete_workout_item(
     await service.delete_item(user_id, day, item_id)
 
 
+@router.put("/{day}/workout/items/{item_id}/sets", response_model=SetLogResultOut)
+async def replace_sets(
+    day: date,
+    item_id: str,
+    payload: SetRecordsIn,
+    user_id: CurrentUserId,
+    service: WorkoutExecution,
+    flow: DailyFlow,
+) -> SetLogResultOut:
+    result = await service.replace_sets(
+        user_id,
+        day,
+        item_id,
+        tuple(
+            SetRecord(
+                reps_done=record.reps_done,
+                duration_sec=record.duration_sec,
+                weight_kg=record.weight_kg,
+                effort=SetEffort(record.effort) if record.effort else None,
+                speed_kmh=record.speed_kmh,
+                incline_pct=record.incline_pct,
+            )
+            for record in payload.sets
+        ),
+    )
+    return SetLogResultOut(
+        today=TodayOut.of(await flow.view(user_id, day)), next_weight_kg=result.next_weight_kg
+    )
+
+
 @router.put("/{day}/workout/sets", response_model=SetLogResultOut)
 async def log_set(
     day: date,
@@ -125,6 +157,8 @@ async def log_set(
         duration_sec=payload.duration_sec,
         weight_kg=payload.weight_kg,
         effort=SetEffort(payload.effort) if payload.effort else None,
+        speed_kmh=payload.speed_kmh,
+        incline_pct=payload.incline_pct,
     )
     return SetLogResultOut(
         today=TodayOut.of(await flow.view(user_id, day)), next_weight_kg=result.next_weight_kg

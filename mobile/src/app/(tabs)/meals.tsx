@@ -1,8 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { MealCard } from '@/components/MealCard';
 import { ShowMore, usePaged } from '@/components/paging';
 import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';

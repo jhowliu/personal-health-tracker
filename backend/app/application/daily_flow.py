@@ -68,6 +68,7 @@ class DailyFlowService:
             workout_time=change.workout_time.value if change.workout_time else None,
             workout_state=state,
             workout_state_at=self._clock.now() if state else None,
+            trained_sec=change.trained_sec,
         )
         return await self.view(user_id, day)
 

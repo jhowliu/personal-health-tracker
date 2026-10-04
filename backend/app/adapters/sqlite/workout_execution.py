@@ -45,11 +45,13 @@ class SqliteWorkoutExecutionStore:
                            'duration_sec', duration_sec,
                            'weight_kg', weight_kg,
                            'effort', effort,
-                           'done_at', done_at
+                           'done_at', done_at,
+                           'speed_kmh', speed_kmh,
+                           'incline_pct', incline_pct
                        )) AS logs_json
                 FROM (
                     SELECT day_workout_item_id, exercise_id, set_index, reps_done,
-                           duration_sec, weight_kg, effort, done_at
+                           duration_sec, weight_kg, effort, done_at, speed_kmh, incline_pct
                     FROM set_logs
                     WHERE user_id = ? AND date = ? AND day_workout_item_id IS NOT NULL
                     ORDER BY day_workout_item_id, set_index
@@ -65,6 +67,7 @@ class SqliteWorkoutExecutionStore:
                    t.id AS template_id, t.category_id AS template_category_id,
                    t.name AS template_name, t.location AS template_location, t.duration_min,
                    t.user_id IS NULL AS template_is_builtin,
+                   d.workout_trained_sec,
                    logs.logs_json
             FROM days d
             LEFT JOIN workout_templates t ON t.id = d.template_id
@@ -100,7 +103,7 @@ class SqliteWorkoutExecutionStore:
                 is_builtin=bool(first["template_is_builtin"]),
                 items=(),
             )
-        return WorkoutExecution(day, template, entries)
+        return WorkoutExecution(day, template, entries, trained_sec=first["workout_trained_sec"])
 
     async def load_visible_exercise(self, user_id: str, exercise_id: str) -> Exercise | None:
         async with self._conn.execute(
@@ -214,14 +217,16 @@ class SqliteWorkoutExecutionStore:
             """
             INSERT INTO set_logs
                 (id, user_id, date, day_workout_item_id, exercise_id, set_index,
-                 reps_done, duration_sec, weight_kg, effort, done_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 reps_done, duration_sec, weight_kg, effort, done_at, speed_kmh, incline_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (user_id, date, day_workout_item_id, set_index) DO UPDATE SET
                 reps_done = excluded.reps_done,
                 duration_sec = excluded.duration_sec,
                 weight_kg = excluded.weight_kg,
                 effort = excluded.effort,
-                done_at = excluded.done_at
+                done_at = excluded.done_at,
+                speed_kmh = excluded.speed_kmh,
+                incline_pct = excluded.incline_pct
             """,
             (
                 new_id(),
@@ -235,8 +240,21 @@ class SqliteWorkoutExecutionStore:
                 log.weight_kg,
                 log.effort.value if log.effort else None,
                 to_iso(log.done_at),
+                log.speed_kmh,
+                log.incline_pct,
             ),
         )
+
+    async def replace_sets(
+        self, user_id: str, day: date, item_id: str, logs: tuple[SetLog, ...]
+    ) -> None:
+        await open_day(self._conn, user_id, day)
+        await self._conn.execute(
+            "DELETE FROM set_logs WHERE user_id = ? AND date = ? AND day_workout_item_id = ?",
+            (user_id, to_day(day), item_id),
+        )
+        for log in logs:
+            await self.log_set(user_id, day, log)
 
     async def exercise_history(
         self, user_id: str, exercise_ids: tuple[str, ...], before: date
@@ -247,7 +265,8 @@ class SqliteWorkoutExecutionStore:
         params = (user_id, to_day(before), *exercise_ids)
         async with self._conn.execute(
             f"""
-            SELECT exercise_id, date, weight_kg, reps_done, duration_sec, effort
+            SELECT exercise_id, date, weight_kg, reps_done, duration_sec, effort,
+                   speed_kmh, incline_pct
             FROM (
                 SELECT *, ROW_NUMBER() OVER (
                     PARTITION BY exercise_id ORDER BY date DESC, set_index DESC
@@ -266,6 +285,8 @@ class SqliteWorkoutExecutionStore:
                     reps_done=row["reps_done"],
                     duration_sec=row["duration_sec"],
                     effort=SetEffort(row["effort"]) if row["effort"] else None,
+                    speed_kmh=row["speed_kmh"],
+                    incline_pct=row["incline_pct"],
                 )
                 for row in await cursor.fetchall()
             }
@@ -318,6 +339,8 @@ class SqliteWorkoutExecutionStore:
                 weight_kg=value["weight_kg"],
                 effort=SetEffort(value["effort"]) if value["effort"] else None,
                 done_at=from_iso(value["done_at"]),
+                speed_kmh=value.get("speed_kmh"),
+                incline_pct=value.get("incline_pct"),
             )
             for value in json.loads(row["logs_json"] or "[]")
         )

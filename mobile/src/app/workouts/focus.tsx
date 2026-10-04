@@ -8,10 +8,11 @@
  */
 import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';
@@ -29,7 +30,6 @@ import {
   isDone,
   isFinished,
   jumpTo,
-  nextIndex,
   pause,
   restLeftSec,
   restore,
@@ -39,6 +39,7 @@ import {
   skipRest,
   step,
   summary,
+  upNext,
   type Effort,
   type FocusExercise,
   type Session,
@@ -207,6 +208,8 @@ export default function FocusWorkout() {
         reps_done: log.reps,
         duration_sec: log.durationSec,
         weight_kg: log.weightKg,
+        speed_kmh: log.speedKmh,
+        incline_pct: log.inclinePct,
       });
     } catch (error) {
       Alert.alert('這組沒有記錄到', error instanceof ApiError ? error.message : '請確認網路後再按一次。');
@@ -293,7 +296,12 @@ export default function FocusWorkout() {
   const save = async () => {
     setBusy(true);
     try {
-      await api.patch(`/days/${date}`, { workout_done: true });
+      // The clocked time is what costs the counted sets, which carry no minutes of their own.
+      const trainedSec = Math.round(elapsedMs(session, Date.now()) / 1000);
+      await api.patch(`/days/${date}`, {
+        workout_done: true,
+        ...(trainedSec > 0 ? { trained_sec: Math.min(trainedSec, 6 * 3600) } : {}),
+      });
       saved.current = true;
       await clearSession(date);
       router.back();
@@ -322,7 +330,7 @@ export default function FocusWorkout() {
   );
   const setNumber = exercise.kind === 'sets' ? exercise.logs.length + 1 : 1;
   const finalSet = exercise.kind === 'time' || exercise.logs.length === exercise.plannedSets - 1;
-  const after = nextIndex(session.exercises, session.currentIndex);
+  const after = upNext(session);
   const lastOfDay = finalSet && after === -1;
   const finished = resting ? session.exercises.find((candidate) => candidate.itemId === session.rest?.finishedItemId) : undefined;
   const cardioLeftSec =
@@ -421,12 +429,35 @@ export default function FocusWorkout() {
 
         <Text className="mt-2 text-[13px] text-muted">{carriedNote(exercise)}</Text>
         {exercise.kind === 'time' ? (
-          <Stepper
-            label="實際時間"
-            value={String(exercise.minutes)}
-            unit="分鐘"
-            onStep={(direction) => setSession(step(session, 'minutes', direction))}
-          />
+          <>
+            <Stepper
+              label="實際時間"
+              value={String(exercise.minutes)}
+              unit="分鐘"
+              onStep={(direction) => setSession(step(session, 'minutes', direction))}
+            />
+            {exercise.treadmill ? (
+              <>
+                <Stepper
+                  label="速度"
+                  value={exercise.speedKmh === null ? '—' : kg(exercise.speedKmh)}
+                  unit="km/h"
+                  onStep={(direction) => setSession(step(session, 'speed', direction))}
+                />
+                <Stepper
+                  label="坡度"
+                  value={exercise.inclinePct === null ? '—' : kg(exercise.inclinePct)}
+                  unit="%"
+                  onStep={(direction) => setSession(step(session, 'incline', direction))}
+                />
+                <Text className="text-[13px] text-muted">
+                  {exercise.speedKmh === null
+                    ? '選填：填了速度和坡度，熱量會照實際走或跑的強度算。'
+                    : '熱量會照這個速度和坡度算。'}
+                </Text>
+              </>
+            ) : null}
+          </>
         ) : (
           <>
             {exercise.weightKg !== null ? (
@@ -613,7 +644,11 @@ function DockButton({ label, onPress }: { label: string; onPress: () => void }) 
 function FeedbackAsk({ exercise, onPick }: { exercise: FocusExercise; onPick: (exercise: FocusExercise, effort: Effort) => void }) {
   return (
     <View className="gap-2 rounded-card bg-surface/70 p-3">
-      <Text className="text-sm text-ink">「{exercise.name}」感覺如何？下次會依這個調整重量。</Text>
+      <Text className="text-sm text-ink">
+        「{exercise.name}」感覺如何？
+        {/* Only a weight has a next step to suggest; bodyweight work just keeps the note. */}
+        {exercise.weightKg !== null ? '下次會依這個調整重量。' : ''}
+      </Text>
       <View className="flex-row gap-2">
         {EFFORTS.map((effort) => (
           <Chip
@@ -659,7 +694,10 @@ function Summary({
         <View className="flex-row gap-2">
           <Stat value={clock(elapsedSec)} label="訓練時間" />
           <Stat value={String(totals.sets)} label="完成組數" />
-          <Stat value={Math.round(totals.volumeKg).toLocaleString('en-US')} label="總量 kg" />
+          {/* Bodyweight and timed work lift nothing; a 0 kg total reads as a mistake. */}
+          {totals.volumeKg > 0 ? (
+            <Stat value={Math.round(totals.volumeKg).toLocaleString('en-US')} label="總量 kg" />
+          ) : null}
         </View>
 
         {session.exercises
@@ -682,7 +720,13 @@ function Summary({
               <Text className="mt-0.5 text-[13px] text-muted" style={tabular}>
                 {exercise.kind === 'time'
                   ? exercise.timeDone
-                    ? `${exercise.minutes} 分鐘`
+                    ? [
+                        `${exercise.minutes} 分鐘`,
+                        exercise.speedKmh !== null ? `${kg(exercise.speedKmh)} km/h` : null,
+                        exercise.speedKmh !== null && exercise.inclinePct !== null ? `坡度 ${kg(exercise.inclinePct)}%` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
                     : '未完成'
                   : exercise.logs.length
                     ? exercise.logs

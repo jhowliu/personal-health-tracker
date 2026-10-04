@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
+import { Alert } from '@/components/alert';
 import { Card, Field, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
 import { deviceTimezone } from '@/timezone';

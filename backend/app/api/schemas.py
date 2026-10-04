@@ -238,6 +238,8 @@ class DayPatch(BaseModel):
     workout_time: Literal["am", "pm"] | None = None
     workout_done: bool = False
     workout_skipped: bool = False
+    # A focus session's clocked seconds, added to the day's total.
+    trained_sec: int | None = Field(default=None, gt=0, le=6 * 3600)
 
 
 class MealStateIn(BaseModel):
@@ -252,6 +254,23 @@ class SetLogIn(BaseModel):
     duration_sec: int | None = Field(default=None, gt=0)
     weight_kg: float | None = Field(default=None, ge=0)
     effort: Literal["easy", "appropriate", "hard"] | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=30)
+    incline_pct: float | None = Field(default=None, ge=0, le=40)
+
+
+class SetRecordIn(BaseModel):
+    reps_done: int | None = Field(default=None, ge=0)
+    duration_sec: int | None = Field(default=None, gt=0)
+    weight_kg: float | None = Field(default=None, ge=0)
+    effort: Literal["easy", "appropriate", "hard"] | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=30)
+    incline_pct: float | None = Field(default=None, ge=0, le=40)
+
+
+class SetRecordsIn(BaseModel):
+    """An exercise's whole record for the day, in order; a set left out is deleted."""
+
+    sets: list[SetRecordIn] = Field(max_length=30)
 
 
 class SetLogOut(BaseModel):
@@ -263,6 +282,8 @@ class SetLogOut(BaseModel):
     weight_kg: float | None
     effort: str | None
     done_at: str
+    speed_kmh: float | None
+    incline_pct: float | None
 
     @classmethod
     def of(cls, log: SetLog) -> "SetLogOut":
@@ -275,6 +296,8 @@ class SetLogOut(BaseModel):
             weight_kg=log.weight_kg,
             effort=log.effort.value if log.effort else None,
             done_at=log.done_at.isoformat(),
+            speed_kmh=log.speed_kmh,
+            incline_pct=log.incline_pct,
         )
 
 
@@ -453,6 +476,8 @@ class PastSetOut(BaseModel):
     reps_done: int | None
     duration_sec: int | None
     effort: str | None
+    speed_kmh: float | None
+    incline_pct: float | None
 
     @classmethod
     def of(cls, past: PastSet) -> "PastSetOut":
@@ -462,6 +487,8 @@ class PastSetOut(BaseModel):
             reps_done=past.reps_done,
             duration_sec=past.duration_sec,
             effort=past.effort.value if past.effort else None,
+            speed_kmh=past.speed_kmh,
+            incline_pct=past.incline_pct,
         )
 
 

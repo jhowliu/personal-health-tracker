@@ -60,8 +60,13 @@ export function Sheet({
           onPress={onClose}
           className="flex-1 justify-end bg-scrim"
         >
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet bg-bg px-5 pb-3 pt-5">
-            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-3">
+          {/* Padding sits on the inner Pressable: on web SafeAreaView overwrites className padding. */}
+          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet bg-bg">
+            <Pressable
+              accessible={false}
+              onPress={(event) => event.stopPropagation()}
+              className="gap-3 px-5 pb-3 pt-5"
+            >
               <View className="flex-row items-center justify-between gap-3">
                 <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
                   {title}

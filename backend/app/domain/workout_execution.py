@@ -1,5 +1,6 @@
 """A day's workout: what was prescribed for that date, and what actually happened."""
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -61,6 +62,9 @@ class SetLog:
     weight_kg: float | None
     effort: SetEffort | None
     done_at: datetime
+    # A treadmill set's settings, when given; they cost it by the ACSM equations.
+    speed_kmh: float | None = None
+    incline_pct: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +76,8 @@ class PastSet:
     reps_done: int | None
     duration_sec: int | None
     effort: SetEffort | None
+    speed_kmh: float | None = None
+    incline_pct: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,11 +114,24 @@ class WorkoutExecution:
     template: WorkoutTemplate | None
     items: tuple[WorkoutExecutionItem, ...]
     estimated_burn_kcal: int | None = None
+    # Seconds focus mode clocked on the day, over every session; None when it never ran.
+    trained_sec: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SetLogResult:
     next_weight_kg: float | None
+
+
+# A counted set with no clock on it is costed at about this long a rep, plus its rest.
+SECONDS_PER_REP = 3
+DEFAULT_REPS = 10
+# Above this a treadmill set is a run, below it a walk (ACSM: walking holds to about
+# 100 m/min, running from about 134; this splits the jog in between).
+RUNNING_KMH = 8.0
+# Between two sets logged one at a time, the gap is the later set's time, rest included;
+# one longer than this is a break, not training.
+LONGEST_GAP_SEC = 20 * 60
 
 
 def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
@@ -123,21 +142,53 @@ def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | N
     therefore adds back only part of it. One MET is what the body burns sitting still, and
     the day's base target already covers that, so it is taken off here.
 
-    Timed work carries its own minutes. Counted work does not, so those exercises share
-    out the planned session length between them — which is why a 90-minute tennis match
-    next to a 10-minute stretch no longer averages into one wrong number.
+    Timed work carries its own minutes. Counted work does not, so its time is the longest
+    of three readings, shared over the counted exercises in proportion to the first:
+    each set costed at its reps x SECONDS_PER_REP plus the rest after it; the time focus
+    mode clocked, less what the timed work took; and the gaps between the sets as they
+    were logged. Sets typed in afterwards have no gaps and nothing clocked, so they fall
+    back to the per-set cost; a short reading only means some work happened off it.
 
     Returns None when there is nothing honest to measure: no logged sets, or only custom
     exercises, which carry no MET.
     """
-    performed = [entry for entry in execution.items if entry.logs and entry.item.met]
-    return _burn(execution, performed, _seconds_spent, weight_kg)
+    logged = [entry for entry in execution.items if entry.logs]
+    counted = {entry.item.id: _set_seconds(entry) for entry in logged if not _seconds_spent(entry)}
+    clocked = (execution.trained_sec or 0) - sum(_seconds_spent(entry) for entry in logged)
+    taken = max(clocked, _logged_gaps(logged))
+    estimated = sum(counted.values())
+    stretch = max(taken / estimated, 1.0) if estimated else 1.0
+
+    def kcal(entry: WorkoutExecutionItem) -> float:
+        if any(log.speed_kmh for log in entry.logs):
+            # A treadmill set with its speed (and incline) says more than the flat MET.
+            return sum(
+                _net_kcal(_log_met(entry, log), weight_kg, _log_seconds(entry, log))
+                for log in entry.logs
+            )
+        seconds = _seconds_spent(entry) or counted[entry.item.id] * stretch
+        return _net_kcal(entry.item.met, weight_kg, seconds)
+
+    costed = [
+        entry for entry in logged if entry.item.met or any(log.speed_kmh for log in entry.logs)
+    ]
+    return _burn(costed, kcal)
 
 
 def planned_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
-    """The same estimate for the whole workout as prescribed, before any of it is done."""
-    planned = [entry for entry in execution.items if entry.item.met]
-    return _burn(execution, planned, _seconds_prescribed, weight_kg)
+    """The same estimate for the whole workout as prescribed, before any of it is done.
+
+    A template's planned minutes, where it gives them, are shared over every exercise in it;
+    without them each counted exercise is costed set by set from its prescription.
+    """
+    planned_min = execution.template.duration_min if execution.template else None
+    share = planned_min * 60 / len(execution.items) if planned_min else None
+
+    def kcal(entry: WorkoutExecutionItem) -> float:
+        seconds = _seconds_prescribed(entry) or share or _prescribed_set_seconds(entry)
+        return _net_kcal(entry.item.met, weight_kg, seconds)
+
+    return _burn([entry for entry in execution.items if entry.item.met], kcal)
 
 
 def burn_for_targets(
@@ -155,29 +206,52 @@ def burn_for_targets(
     return max(logged, planned_burn_kcal(execution, weight_kg) or 0)
 
 
+def treadmill_met(speed_kmh: float, incline_pct: float | None) -> float:
+    """The ACSM metabolic equations: oxygen cost from speed and grade, in METs.
+
+    Walking costs 0.1 ml/kg/min per m/min plus 1.8 per m/min of climb; running 0.2 and 0.9.
+    Each adds to the 3.5 ml/kg/min of rest, which is also what one MET is.
+    """
+    metres_per_min = speed_kmh * 1000 / 60
+    grade = (incline_pct or 0.0) / 100
+    if speed_kmh <= RUNNING_KMH:
+        vo2 = 3.5 + 0.1 * metres_per_min + 1.8 * metres_per_min * grade
+    else:
+        vo2 = 3.5 + 0.2 * metres_per_min + 0.9 * metres_per_min * grade
+    return vo2 / 3.5
+
+
 def _burn(
-    execution: WorkoutExecution,
-    entries: list[WorkoutExecutionItem],
-    seconds_of: Callable[[WorkoutExecutionItem], float],
-    weight_kg: float,
+    entries: list[WorkoutExecutionItem], kcal_of: Callable[[WorkoutExecutionItem], float]
 ) -> int | None:
     if not entries:
         return None
+    return round(sum(kcal_of(entry) for entry in entries)) or None
 
-    def net(entry: WorkoutExecutionItem, seconds: float) -> float:
-        return max((entry.item.met or 0.0) - 1, 0.0) * weight_kg * seconds / 3600
 
-    timed = [entry for entry in entries if seconds_of(entry)]
-    counted = [entry for entry in entries if not seconds_of(entry)]
-    total = sum(net(entry, seconds_of(entry)) for entry in timed)
+def _net_kcal(met: float | None, weight_kg: float, seconds: float) -> float:
+    """kcal beyond resting: the resting MET is already in the day's base target."""
+    return max((met or 0.0) - 1, 0.0) * weight_kg * seconds / 3600
 
-    planned_min = execution.template.duration_min if execution.template else None
-    if counted and planned_min:
-        # The plan's minutes cover every item, so each counted item claims an equal share.
-        share = planned_min * 60 / len(execution.items)
-        total += sum(net(entry, share) for entry in counted)
 
-    return round(total) or None
+def _log_met(entry: WorkoutExecutionItem, log: SetLog) -> float | None:
+    return treadmill_met(log.speed_kmh, log.incline_pct) if log.speed_kmh else entry.item.met
+
+
+def _log_seconds(entry: WorkoutExecutionItem, log: SetLog) -> float:
+    return float(log.duration_sec or entry.item.duration_sec or 0)
+
+
+def _logged_gaps(logged: list[WorkoutExecutionItem]) -> float:
+    """The time before each counted set, measured from whatever was logged just before it."""
+    logs = sorted(
+        ((log.done_at, entry) for entry in logged for log in entry.logs), key=lambda pair: pair[0]
+    )
+    return sum(
+        min((at - before).total_seconds(), LONGEST_GAP_SEC)
+        for (before, _), (at, entry) in zip(logs, logs[1:], strict=False)
+        if not _seconds_spent(entry)
+    )
 
 
 def _seconds_spent(entry: WorkoutExecutionItem) -> float:
@@ -192,6 +266,26 @@ def _seconds_spent(entry: WorkoutExecutionItem) -> float:
 def _seconds_prescribed(entry: WorkoutExecutionItem) -> float:
     prescribed = entry.item.duration_sec
     return float(prescribed * (entry.item.sets or 1)) if prescribed else 0.0
+
+
+def _prescribed_reps(entry: WorkoutExecutionItem) -> int:
+    match = re.search(r"\d+", entry.item.reps or "")
+    return int(match.group()) if match else DEFAULT_REPS
+
+
+def _set_seconds(entry: WorkoutExecutionItem) -> float:
+    """The logged sets of counted work, each at its reps' worth of time plus the rest."""
+    return float(
+        sum(
+            (log.reps_done or _prescribed_reps(entry)) * SECONDS_PER_REP + entry.item.rest_sec
+            for log in entry.logs
+        )
+    )
+
+
+def _prescribed_set_seconds(entry: WorkoutExecutionItem) -> float:
+    per_set = _prescribed_reps(entry) * SECONDS_PER_REP + entry.item.rest_sec
+    return float(per_set * (entry.item.sets or 1))
 
 
 def recommend_next_weight(weight_kg: float | None, effort: SetEffort | None) -> float | None:

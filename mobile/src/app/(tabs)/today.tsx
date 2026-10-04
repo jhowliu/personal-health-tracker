@@ -2,7 +2,6 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -13,13 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
 import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
 import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, PlusIcon, TrashIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
-import { Card, Chip, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
+import { Card, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { photoDraft } from '@/meals/photo-draft';
 import { loadSession } from '@/workouts/focus/storage';
@@ -28,6 +28,8 @@ import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmoun
 import { color, foodCategoryTone } from '@/theme/tokens';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { formatPrescription } from '@/workouts/prescription';
+import { rowsFromLogs, toRecords, type RecordRow } from '@/workouts/record';
+import { SetRecordEditor } from '@/workouts/SetRecordEditor';
 
 type Today = Schema<'TodayOut'>;
 type PlannedMealItem = {
@@ -51,7 +53,6 @@ type PlannedMeal = {
 type DayPlan = Omit<Schema<'DayPlanOut'>, 'meals'> & { meals: PlannedMeal[] };
 type WorkoutItem = Schema<'WorkoutExecutionItemOut'>;
 type Workout = Schema<'WorkoutExecutionOut'>;
-type SetEffort = 'easy' | 'appropriate' | 'hard';
 type SetLogResult = { next_weight_kg: number | null };
 type WorkoutEdit = { sets: string; reps: string; durationMin: string; weight: string; rest: string; note: string };
 
@@ -76,19 +77,40 @@ export default function TodayScreen() {
   const date = picked ?? today;
   // A reply for a day the user has already left is dropped.
   const loadVersion = useRef(0);
+  // What the screen showed last, read when a fresh copy of the day arrives.
+  const shown = useRef<{ day: Today | null; viewing: string | null }>({ day: null, viewing: null });
+  useEffect(() => {
+    shown.current = { day, viewing };
+  }, [day, viewing]);
+
+  /**
+   * Show a fresh copy of the day, staying on `step`, unless that step has just been finished
+   * — eaten, skipped, weighed, trained, from this screen or from focus mode. Then it moves on
+   * to what is left, however it was finished. Changing a step already done (a portion, 改回未吃)
+   * stays put.
+   */
+  const settle = useCallback((fresh: Today, step: string | null) => {
+    const before = shown.current.day;
+    const justFinished =
+      step !== null &&
+      before?.date === fresh.date &&
+      before.flow.waiting.includes(step) &&
+      !fresh.flow.waiting.includes(step);
+    setDay(fresh);
+    setViewing(justFinished ? null : step);
+  }, []);
 
   const load = useCallback(async (resetStep = false) => {
     const version = ++loadVersion.current;
     try {
       const fresh = await api.get(`/days/${date}`);
       if (version !== loadVersion.current) return;
-      setDay(fresh);
-      if (resetStep) setViewing(null);
+      settle(fresh, resetStep ? null : shown.current.viewing);
     } catch (error) {
       if (version !== loadVersion.current) return;
       Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
     }
-  }, [date]);
+  }, [date, settle]);
 
   const refreshAt = useCallback(
     async (step: string) => {
@@ -96,14 +118,13 @@ export default function TodayScreen() {
       try {
         const fresh = await api.get(`/days/${date}`);
         if (version !== loadVersion.current) return;
-        setDay(fresh);
-        setViewing(step);
+        settle(fresh, step);
       } catch (error) {
         if (version !== loadVersion.current) return;
         Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
       }
     },
-    [date],
+    [date, settle],
   );
 
   const goTo = (next: string) => {
@@ -627,7 +648,7 @@ function MealStep({
         // Foods added by hand: once they are all in, finishing the meal is the main step.
         <>
           <PrimaryButton icon={CheckIcon} onPress={() => setMealState('eaten')} busy={busy}>
-            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
+            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完，下一步：${stepAfter(day, step)}`}
           </PrimaryButton>
           {total}
           <TextAction
@@ -875,11 +896,13 @@ function PortionEditor({
           onPress={close}
           className="flex-1 justify-end bg-scrim"
         >
-          <SafeAreaView
-            edges={keyboardVisible ? [] : ['bottom']}
-            className="rounded-t-sheet bg-bg px-5 pb-3 pt-5"
-          >
-            <Pressable accessible={false} onPress={(event) => event.stopPropagation()} className="gap-4">
+          {/* Padding sits on the inner Pressable: on web SafeAreaView overwrites className padding. */}
+          <SafeAreaView edges={keyboardVisible ? [] : ['bottom']} className="rounded-t-sheet bg-bg">
+            <Pressable
+              accessible={false}
+              onPress={(event) => event.stopPropagation()}
+              className="gap-4 px-5 pb-3 pt-5"
+            >
               {keyboardVisible ? (
                 <Text accessibilityRole="header" className="text-base font-semibold text-ink">
                   調整 {itemName} 的份量
@@ -955,11 +978,12 @@ function WorkoutStep({
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [edit, setEdit] = useState<WorkoutEdit | null>(null);
   const [workoutSkipped, setWorkoutSkipped] = useState(false);
-  const [pendingEffort, setPendingEffort] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Record<string, number>>({});
-  const [minutes, setMinutes] = useState<Record<string, string>>({});
+  // Sets typed in but not saved yet, per item; an item without an entry shows what is logged.
+  const [drafts, setDrafts] = useState<Record<string, RecordRow[]>>({});
   const [actionItem, setActionItem] = useState<WorkoutItem | null>(null);
-  // Focus mode is for today; 直接記錄 (and any other day) keeps the list below.
+  // Focus mode is for doing today's workout. Recording it afterwards — 直接記錄, another day,
+  // or fixing what was logged — is the list below, where each exercise's sets are typed in.
   const [listMode, setListMode] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
   const word = dayWord(date);
@@ -967,7 +991,6 @@ function WorkoutStep({
   const load = useCallback(async () => {
     try {
       setWorkout(await api.get(`/days/${date}/workout`));
-      setPendingEffort(null);
     } catch (error) {
       Alert.alert(`讀不到${dayWord(date)}的訓練`, error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -980,31 +1003,62 @@ function WorkoutStep({
     }, [load, date]),
   );
 
-  const logSet = async (item: WorkoutItem, setIndex: number, effort?: SetEffort) => {
-    const prescribed = item.item;
-    // Timed work records what actually happened, which is rarely the planned number.
-    const typed = minutes[prescribed.id];
-    const durationSec = prescribed.duration_sec
-      ? Math.max(1, Number(typed ?? Math.round(prescribed.duration_sec / 60)) || 1) * 60
-      : null;
+  // One save for everything changed here — the sets typed in and a target open for editing —
+  // so the footer never offers a way out that drops them.
+  const dirty = Object.keys(drafts).length > 0 || editingItem !== null;
+
+  const discardChanges = () => {
+    setDrafts({});
+    setEditingItem(null);
+    setEdit(null);
+  };
+
+  const saveChanges = async () => {
+    if (!workout) return;
+    const records: { entry: WorkoutItem; sets: Schema<'SetRecordIn'>[] }[] = [];
+    for (const entry of workout.items) {
+      const rows = drafts[entry.item.id];
+      if (!rows) continue;
+      const result = toRecords(entry, rows);
+      if ('error' in result) {
+        Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${result.error}。`);
+        return;
+      }
+      records.push({ entry, sets: result.sets });
+    }
+    const editing = workout.items.find((entry) => entry.item.id === editingItem);
+    const problem = editing && edit ? targetError(editing, edit) : null;
+    if (editing && problem) {
+      Alert.alert('還不能儲存', `「${editing.item.exercise_name}」${problem}。`);
+      return;
+    }
+
     setBusy(true);
     try {
-      const result = (await api.put(`/days/${date}/workout/sets`, {
-        day_workout_item_id: prescribed.id,
-        exercise_id: prescribed.exercise_id,
-        set_index: setIndex,
-        duration_sec: durationSec,
-        weight_kg: prescribed.weight_kg,
-        effort,
-      })) as SetLogResult;
-      const nextWeight = result.next_weight_kg;
-      if (nextWeight !== null) {
-        setSuggestions((current) => ({ ...current, [prescribed.id]: nextWeight }));
+      for (const { entry, sets } of records) {
+        const result = (await api.put(`/days/${date}/workout/items/${entry.item.id}/sets`, {
+          sets,
+        })) as SetLogResult;
+        const itemId = entry.item.id;
+        const nextWeight = result.next_weight_kg;
+        // A record whose last set no longer says how it felt has nothing to suggest.
+        setSuggestions(({ [itemId]: _old, ...rest }) =>
+          nextWeight === null ? rest : { ...rest, [itemId]: nextWeight },
+        );
+        // Dropped one by one, so a failure further down does not send these twice.
+        setDrafts(({ [itemId]: _saved, ...rest }) => rest);
       }
-      await load();
+      if (editing && edit) {
+        await api.patch(`/days/${date}/workout/items/${editing.item.id}`, targetChanges(editing, edit));
+        setEditingItem(null);
+        setEdit(null);
+      }
     } catch (error) {
-      Alert.alert('記錄不了這一組', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
     } finally {
+      await load();
+      // The sets change the day's burn, so the target in the header is read again too.
+      onStateChanged();
       setBusy(false);
     }
   };
@@ -1032,30 +1086,6 @@ function WorkoutStep({
       rest: String(prescribed.rest_sec),
       note: prescribed.note ?? '',
     });
-  };
-
-  const saveEdit = async (item: WorkoutItem) => {
-    if (!edit) return;
-    const prescribed = item.item;
-    const common = {
-      weight_kg: edit.weight ? Number(edit.weight) : null,
-      rest_sec: Math.max(0, Number(edit.rest) || 0),
-      note: edit.note || null,
-    };
-    const changes = prescribed.duration_sec
-      ? { ...common, duration_sec: Math.max(1, Number(edit.durationMin) || 1) * 60 }
-      : { ...common, sets: Math.max(1, Number(edit.sets) || 1), reps: edit.reps };
-    setBusy(true);
-    try {
-      await api.patch(`/days/${date}/workout/items/${prescribed.id}`, changes);
-      setEditingItem(null);
-      setEdit(null);
-      await load();
-    } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setBusy(false);
-    }
   };
 
   const deleteItem = (item: WorkoutItem) =>
@@ -1120,7 +1150,6 @@ function WorkoutStep({
     );
   }
 
-  const allComplete = workout.items.every((entry) => completedSetCount(entry) >= (entry.item.sets ?? 1));
   const completedExercises = workout.items.filter(
     (entry) => completedSetCount(entry) >= (entry.item.sets ?? 1),
   ).length;
@@ -1139,25 +1168,41 @@ function WorkoutStep({
         footerSafeArea={false}
         footer={
           resolved ? (
-            // Focus mode does not reopen a finished workout, but an extra exercise done
-            // afterwards is added here and logged in the list.
-            <View className="items-center gap-1 pt-2">
-              <Text className={`text-base font-semibold ${anyLogged ? 'text-good' : 'text-muted'}`}>
-                {anyLogged ? '✓ 今天的訓練已完成' : '今天已略過訓練'}
-              </Text>
-              {anyLogged && workout.estimated_burn_kcal ? (
-                <Hint>約消耗 {workout.estimated_burn_kcal} 大卡</Hint>
-              ) : null}
-              <TextAction
-                icon={PlusIcon}
-                label="加入動作"
-                onPress={() => {
-                  setListMode(true);
-                  router.navigate(`/workouts/add-today?date=${date}`);
-                }}
-                className="min-h-[44px] justify-center"
-              />
-            </View>
+            <>
+              {/* An exercise added after finishing is still to do: focus mode picks it up. */}
+              {anyLogged && doneCount < workout.items.length ? (
+                <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
+                  {`繼續訓練 · ${doneCount} / ${workout.items.length}`}
+                </PrimaryButton>
+              ) : (
+                <View className="items-center gap-1 pt-2">
+                  <Text className={`text-base font-semibold ${anyLogged ? 'text-good' : 'text-muted'}`}>
+                    {anyLogged ? '✓ 今天的訓練已完成' : '今天已略過訓練'}
+                  </Text>
+                  {anyLogged && workout.estimated_burn_kcal ? (
+                    <View className="items-center">
+                      <Hint>約多消耗 {workout.estimated_burn_kcal} 大卡</Hint>
+                      <Hint>已扣掉靜止時的消耗，會比跑步機面板顯示的少</Hint>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+              <View className="flex-row items-center justify-center gap-8">
+                <TextAction
+                  icon={PlusIcon}
+                  label="加入動作"
+                  onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
+                  className="min-h-[44px] justify-center"
+                />
+                {anyLogged ? (
+                  <TextAction
+                    label="修改紀錄"
+                    onPress={() => setListMode(true)}
+                    className="min-h-[44px] justify-center"
+                  />
+                ) : null}
+              </View>
+            </>
           ) : (
             <>
               <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
@@ -1206,9 +1251,14 @@ function WorkoutStep({
                       prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
                     }`;
             return (
-              <View
+              // Once something is logged, a row opens the record for fixing.
+              <Pressable
                 key={prescribed.id}
-                className={`min-h-[58px] flex-row items-center justify-between gap-2.5 rounded-card px-4 ${
+                accessibilityRole="button"
+                accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
+                disabled={!(resolved && anyLogged)}
+                onPress={() => setListMode(true)}
+                className={`min-h-[58px] flex-row items-center justify-between gap-2.5 rounded-card px-4 active:opacity-70 ${
                   finished ? 'bg-good-soft' : 'bg-fill'
                 }`}
               >
@@ -1216,7 +1266,7 @@ function WorkoutStep({
                   {index + 1}. {prescribed.exercise_name}
                 </Text>
                 <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -1238,7 +1288,16 @@ function WorkoutStep({
     <Screen
       footerSafeArea={false}
       footer={
-        workoutSkipped ? (
+        dirty ? (
+          <>
+            <PrimaryButton onPress={saveChanges} busy={busy}>
+              {busy ? '儲存中…' : '儲存修改'}
+            </PrimaryButton>
+            <View className="items-center">
+              <TextAction label="放棄修改" disabled={busy} onPress={discardChanges} className="justify-center" />
+            </View>
+          </>
+        ) : workoutSkipped ? (
           <PrimaryButton onPress={complete} busy={busy}>
             仍要完成今日訓練
           </PrimaryButton>
@@ -1254,7 +1313,9 @@ function WorkoutStep({
             )}
             {progress}
           </>
-        ) : allComplete && workout.items.length > 0 ? (
+        ) : anyLogged ? (
+          // Recorded after the fact, the day is done when the user says so, not when every
+          // prescribed set has a row.
           <>
             <PrimaryButton onPress={complete} busy={busy}>
               {busy ? '處理中…' : `完成${word}的訓練，下一步：${after}`}
@@ -1282,7 +1343,7 @@ function WorkoutStep({
             {templateName ?? (workout.items.length ? `${word}的訓練` : `${word}沒有排定訓練`)}
           </Text>
           {workout.items.length > 0 && !workoutSkipped ? (
-            <Hint>點動作名稱可以換動作、編輯或移除。</Hint>
+            <Hint>每組做了幾下、多重，直接填在下面；點動作名稱可以換動作、改目標或移除。</Hint>
           ) : null}
         </View>
 
@@ -1299,9 +1360,6 @@ function WorkoutStep({
               <Card className="gap-3 p-2">
                 {workout.items.map((item, itemIndex) => {
                   const prescribed = item.item;
-                  const setCount = prescribed.sets ?? 1;
-                  const completed = completedSetCount(item);
-                  const ungrouped = prescribed.sets === null;
                   const suggestion = suggestions[prescribed.id];
 
                   return (
@@ -1331,7 +1389,7 @@ function WorkoutStep({
                           <View className="gap-3 rounded-field bg-fill p-3">
                             {prescribed.duration_sec ? (
                               <Field
-                                label="時間"
+                                label="目標時間"
                                 suffix="分鐘"
                                 value={edit.durationMin}
                                 onChangeText={(durationMin) =>
@@ -1342,13 +1400,13 @@ function WorkoutStep({
                             ) : (
                               <View className="flex-row gap-3">
                                 <Field
-                                  label="組數"
+                                  label="目標組數"
                                   value={edit.sets}
                                   onChangeText={(sets) => setEdit((current) => current && { ...current, sets })}
                                   keyboardType="numeric"
                                 />
                                 <Field
-                                  label="次數"
+                                  label="目標次數"
                                   value={edit.reps}
                                   onChangeText={(reps) => setEdit((current) => current && { ...current, reps })}
                                 />
@@ -1375,93 +1433,25 @@ function WorkoutStep({
                               value={edit.note}
                               onChangeText={(note) => setEdit((current) => current && { ...current, note })}
                             />
-                            <View className="flex-row gap-2">
-                              <View className="flex-1">
-                                <PrimaryButton
-                                  tone="plain"
-                                  onPress={() => {
-                                    setEditingItem(null);
-                                    setEdit(null);
-                                  }}
-                                  disabled={busy}
-                                >
-                                  取消
-                                </PrimaryButton>
-                              </View>
-                              <View className="flex-1">
-                                <PrimaryButton
-                                  onPress={() => saveEdit(item)}
-                                  disabled={busy || (!prescribed.duration_sec && !edit.reps)}
-                                >
-                                  儲存
-                                </PrimaryButton>
-                              </View>
-                            </View>
+                            {/* Saved with everything else from the footer; this only closes it. */}
+                            <PrimaryButton
+                              tone="plain"
+                              onPress={() => {
+                                setEditingItem(null);
+                                setEdit(null);
+                              }}
+                              disabled={busy}
+                            >
+                              取消修改目標
+                            </PrimaryButton>
                           </View>
                         ) : null}
 
-                        {prescribed.duration_sec ? (
-                          <Field
-                            label="實際時間"
-                            suffix="分鐘"
-                            value={minutes[prescribed.id] ?? String(Math.round(prescribed.duration_sec / 60))}
-                            onChangeText={(text) =>
-                              setMinutes((current) => ({ ...current, [prescribed.id]: text }))
-                            }
-                            keyboardType="numeric"
-                          />
-                        ) : null}
-
-                        {ungrouped ? (
-                          <PrimaryButton onPress={() => logSet(item, 0)} disabled={busy || completed > 0} tone="plain">
-                            {completed > 0 ? '已完成' : '完成這個動作'}
-                          </PrimaryButton>
-                        ) : (
-                          <View className="flex-row flex-wrap gap-2">
-                            {Array.from({ length: setCount }, (_, setIndex) => {
-                              const done = setIndex < completed;
-                              const final = setIndex === setCount - 1;
-                              const available = setIndex === completed;
-                              return (
-                                <Pressable
-                                  key={setIndex}
-                                  accessibilityRole="button"
-                                  accessibilityState={{ selected: done }}
-                                  disabled={busy || done || !available}
-                                  onPress={() => (final ? setPendingEffort(prescribed.id) : logSet(item, setIndex))}
-                                  className={`min-h-[44px] min-w-[72px] flex-row items-center justify-center gap-1 rounded-field px-3 ${
-                                    done ? 'bg-good-soft' : 'bg-fill'
-                                  } ${busy || !available ? 'opacity-40' : ''}`}
-                                >
-                                  <Text className={`text-base ${done ? 'text-good' : 'text-ink'}`}>
-                                    第 {setIndex + 1} 組
-                                  </Text>
-                                  {done ? <CheckIcon size={16} tint={color.good} /> : null}
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        )}
-
-                        {pendingEffort === prescribed.id ? (
-                          <View className="gap-2">
-                            <Hint>最後一組感覺如何？</Hint>
-                            <View className="flex-row gap-2">
-                              {([
-                                ['easy', '輕鬆'],
-                                ['appropriate', '剛好'],
-                                ['hard', '吃力'],
-                              ] as const).map(([effort, label]) => (
-                                <Chip
-                                  key={effort}
-                                  label={label}
-                                  onPress={() => logSet(item, setCount - 1, effort)}
-                                  tone={effort === 'hard' ? 'warm' : effort === 'easy' ? 'good' : 'primary'}
-                                />
-                              ))}
-                            </View>
-                          </View>
-                        ) : null}
+                        <SetRecordEditor
+                          entry={item}
+                          rows={drafts[prescribed.id] ?? rowsFromLogs(item)}
+                          onChange={(rows) => setDrafts((current) => ({ ...current, [prescribed.id]: rows }))}
+                        />
 
                         {suggestion !== undefined ? (
                           <View className="gap-2 rounded-field bg-primary-soft p-3">
@@ -1480,8 +1470,8 @@ function WorkoutStep({
 
             {workout.estimated_burn_kcal ? (
               <Hint>
-                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡，是依動作強度和時間的粗估；
-                其中一半已加進{word}的熱量目標。
+                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。其中一半已加進
+                {word}的熱量目標。
               </Hint>
             ) : null}
 
@@ -1522,7 +1512,7 @@ function WorkoutStep({
               換動作
             </PrimaryButton>
             <PrimaryButton tone="plain" onPress={() => editExercise(actionItem)} disabled={busy}>
-              編輯
+              改目標
             </PrimaryButton>
             <PrimaryButton
               tone="danger"
@@ -1541,6 +1531,34 @@ function WorkoutStep({
 
 function completedSetCount(item: WorkoutItem) {
   return item.logs.length || item.completed_set_count;
+}
+
+const WHOLE = /^\d+$/;
+// 12, or a range such as 10-12; templates write the range with an en dash too.
+const REPS = /^\d+(\s*[-–~]\s*\d+)?$/;
+
+/** What is wrong with an exercise's edited target, in words, or null when it can be saved. */
+function targetError(entry: WorkoutItem, edit: WorkoutEdit): string | null {
+  if (entry.item.duration_sec) {
+    if (!WHOLE.test(edit.durationMin.trim()) || Number(edit.durationMin) < 1) return '的目標時間要填 1 以上的整數分鐘';
+  } else {
+    if (!WHOLE.test(edit.sets.trim()) || Number(edit.sets) < 1) return '的組數要填 1 以上的整數';
+    if (!REPS.test(edit.reps.trim())) return '的次數要填數字或範圍，例如 12 或 10-12';
+  }
+  if (edit.weight.trim() && !(Number(edit.weight) >= 0)) return '的重量要是數字';
+  if (edit.rest.trim() && !WHOLE.test(edit.rest.trim())) return '的休息要填整數秒';
+  return null;
+}
+
+function targetChanges(entry: WorkoutItem, edit: WorkoutEdit) {
+  const common = {
+    weight_kg: edit.weight.trim() ? Number(edit.weight) : null,
+    rest_sec: Number(edit.rest) || 0,
+    note: edit.note.trim() || null,
+  };
+  return entry.item.duration_sec
+    ? { ...common, duration_sec: Number(edit.durationMin) * 60 }
+    : { ...common, sets: Number(edit.sets), reps: edit.reps.trim() };
 }
 
 function DoneStep({ day }: { day: Today }) {

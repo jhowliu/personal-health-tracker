@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { Alert } from '@/components/alert';
 import { CheckIcon, ChevronIcon, PlusIcon } from '@/components/icons';
 import { ShowMore, usePaged } from '@/components/paging';
 import { Sheet } from '@/components/Sheet';
@@ -106,11 +107,14 @@ export function ExerciseLibrary({
               <View className="min-w-0 flex-1 gap-2">
                 <Text className="text-base font-semibold text-ink">{exercise.name}</Text>
                 <View className="flex-row flex-wrap gap-1.5">
-                  {[categoryLabel(exercise.category_id), bodyLabel(exercise.body_region), equipmentLabel(exercise.equipment)]
-                    .filter(Boolean)
-                    .map((label) => (
-                      <Tag key={label} label={label} />
-                    ))}
+                  {/* A mobility exercise is 活動度 by category and by body region; show it once. */}
+                  {[
+                    ...new Set(
+                      [categoryLabel(exercise.category_id), bodyLabel(exercise.body_region), equipmentLabel(exercise.equipment)].filter(Boolean),
+                    ),
+                  ].map((label) => (
+                    <Tag key={label} label={label} />
+                  ))}
                 </View>
                 {exercise.description ? (
                   <Text className="text-sm text-muted" numberOfLines={2}>
