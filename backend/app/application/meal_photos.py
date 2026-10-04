@@ -23,6 +23,7 @@ from app.domain.meal_photos import (
     RecognizedFood,
     RecognizedItem,
     foods_for_prompt,
+    with_kcal_from_macros,
 )
 from app.domain.models import Food, Nutrients, PlateItem
 
@@ -193,7 +194,11 @@ class MealPhotoService:
                     ),
                     # A pairing keeps the estimate of what was actually seen, so the screen can
                     # fall back to it when the pairing turns out wrong.
-                    estimate=item.estimate if selected is None or paired is not None else None,
+                    estimate=(
+                        with_kcal_from_macros(item.estimate)
+                        if selected is None or paired is not None
+                        else None
+                    ),
                 )
             )
         return tuple(items)

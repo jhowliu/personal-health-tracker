@@ -439,8 +439,9 @@ async def test_photo_pairing_is_only_as_sure_as_the_recognizer_says(
     assert item["food_id"] == await seeded_food_id(with_foods, "pork-collar-cooked")
     # Not 1.0: a forced near miss has to keep asking the user to confirm.
     assert item["match_confidence"] == 0.7
-    # What was actually seen stays available, for when the pairing is wrong.
-    assert item["estimate"]["kcal_per_100g"] == 190
+    # What was actually seen stays available, for when the pairing is wrong; its kcal is
+    # worked out from its macros, 4 x 27 + 9 x 9.
+    assert item["estimate"]["kcal_per_100g"] == 189
 
 
 async def test_photo_pairing_with_a_name_outside_the_library_falls_back_to_search(
@@ -519,11 +520,26 @@ async def test_photo_unmatched_food_returns_an_estimate_for_confirmation(
     assert item["recognition_confidence"] == 0.88
     assert item["estimate"] == {
         "category_id": "fruit",
-        "kcal_per_100g": 50.0,
+        # From the macros, 4 x 1.1 + 9 x 0.2 + 4 x 11, not the recognizer's own 50.
+        "kcal_per_100g": 50.2,
         "protein_per_100g": 1.1,
         "fat_per_100g": 0.2,
         "carb_per_100g": 11.0,
     }
+
+
+async def test_photo_estimate_takes_its_kcal_from_its_macros(
+    with_foods: AsyncClient, monkeypatch
+):
+    # As a real recognition came back: 34 kcal per 100 g, beside 31 g of carbs.
+    udon = EstimatedFood("staple", Nutrients(34, 3.1, 1.0, 30.8))
+    recognizer = PairingRecognizer(Recognition("烏冬麵", 250, 0.8, udon))
+
+    item = (await analyze_with(with_foods, monkeypatch, recognizer))["items"][0]
+
+    # 4 x 3.1 + 9 x 1.0 + 4 x 30.8: the macros are the basis, as on the review screen.
+    assert item["estimate"]["kcal_per_100g"] == 144.6
+    assert item["estimate"]["carb_per_100g"] == 30.8
 
 
 async def test_photo_match_follows_the_decision_layer_not_the_first_search_hit(
