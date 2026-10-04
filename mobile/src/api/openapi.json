@@ -1435,6 +1435,84 @@
         }
       }
     },
+    "/days/{day}/workout/items/{item_id}/sets": {
+      "put": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Replace Sets",
+        "operationId": "replace_sets_days__day__workout_items__item_id__sets_put",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetRecordsIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetLogResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/days/{day}/workout/sets": {
       "put": {
         "tags": [
@@ -4115,6 +4193,19 @@
             "type": "boolean",
             "title": "Workout Skipped",
             "default": false
+          },
+          "trained_sec": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 21600.0,
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trained Sec"
           }
         },
         "type": "object",
@@ -6201,6 +6292,82 @@
           "next_weight_kg"
         ],
         "title": "SetLogResultOut"
+      },
+      "SetRecordIn": {
+        "properties": {
+          "reps_done": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps Done"
+          },
+          "duration_sec": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Sec"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          },
+          "effort": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "easy",
+                  "appropriate",
+                  "hard"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          }
+        },
+        "type": "object",
+        "title": "SetRecordIn"
+      },
+      "SetRecordsIn": {
+        "properties": {
+          "sets": {
+            "items": {
+              "$ref": "#/components/schemas/SetRecordIn"
+            },
+            "type": "array",
+            "maxItems": 30,
+            "title": "Sets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sets"
+        ],
+        "title": "SetRecordsIn",
+        "description": "An exercise's whole record for the day, in order; a set left out is deleted."
       },
       "SwapItemIn": {
         "properties": {

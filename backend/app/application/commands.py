@@ -10,7 +10,7 @@ from enum import Enum
 from typing import Any
 
 from app.domain.models import ActivityLevel, Location, Sex, WorkoutTime
-from app.domain.workout_execution import ReplacementReason
+from app.domain.workout_execution import ReplacementReason, SetEffort
 
 
 class _Unset(Enum):
@@ -52,6 +52,8 @@ class DayAdjustment:
     workout_time: WorkoutTime | None = None
     workout_done: bool = False
     workout_skipped: bool = False
+    # Seconds focus mode clocked in one session; added to what the day already has.
+    trained_sec: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,3 +68,13 @@ class WorkoutItemChange:
     weight_kg: Patch[float | None] = UNSET
     rest_sec: Patch[int | None] = UNSET
     note: Patch[str | None] = UNSET
+
+
+@dataclass(frozen=True, slots=True)
+class SetRecord:
+    """One set as the user says it went, entered after the fact rather than as it happened."""
+
+    reps_done: int | None
+    duration_sec: int | None
+    weight_kg: float | None
+    effort: SetEffort | None

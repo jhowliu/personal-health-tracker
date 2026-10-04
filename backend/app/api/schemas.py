@@ -238,6 +238,8 @@ class DayPatch(BaseModel):
     workout_time: Literal["am", "pm"] | None = None
     workout_done: bool = False
     workout_skipped: bool = False
+    # A focus session's clocked seconds, added to the day's total.
+    trained_sec: int | None = Field(default=None, gt=0, le=6 * 3600)
 
 
 class MealStateIn(BaseModel):
@@ -252,6 +254,19 @@ class SetLogIn(BaseModel):
     duration_sec: int | None = Field(default=None, gt=0)
     weight_kg: float | None = Field(default=None, ge=0)
     effort: Literal["easy", "appropriate", "hard"] | None = None
+
+
+class SetRecordIn(BaseModel):
+    reps_done: int | None = Field(default=None, ge=0)
+    duration_sec: int | None = Field(default=None, gt=0)
+    weight_kg: float | None = Field(default=None, ge=0)
+    effort: Literal["easy", "appropriate", "hard"] | None = None
+
+
+class SetRecordsIn(BaseModel):
+    """An exercise's whole record for the day, in order; a set left out is deleted."""
+
+    sets: list[SetRecordIn] = Field(max_length=30)
 
 
 class SetLogOut(BaseModel):

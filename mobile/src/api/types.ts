@@ -352,6 +352,23 @@ export interface paths {
         patch: operations["update_workout_item_days__day__workout_items__item_id__patch"];
         trace?: never;
     };
+    "/days/{day}/workout/items/{item_id}/sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace Sets */
+        put: operations["replace_sets_days__day__workout_items__item_id__sets_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/days/{day}/workout/sets": {
         parameters: {
             query?: never;
@@ -857,6 +874,8 @@ export interface components {
              * @default false
              */
             workout_skipped: boolean;
+            /** Trained Sec */
+            trained_sec?: number | null;
         };
         /** DayPlanOut */
         DayPlanOut: {
@@ -1473,6 +1492,25 @@ export interface components {
             today: components["schemas"]["TodayOut"];
             /** Next Weight Kg */
             next_weight_kg: number | null;
+        };
+        /** SetRecordIn */
+        SetRecordIn: {
+            /** Reps Done */
+            reps_done?: number | null;
+            /** Duration Sec */
+            duration_sec?: number | null;
+            /** Weight Kg */
+            weight_kg?: number | null;
+            /** Effort */
+            effort?: ("easy" | "appropriate" | "hard") | null;
+        };
+        /**
+         * SetRecordsIn
+         * @description An exercise's whole record for the day, in order; a set left out is deleted.
+         */
+        SetRecordsIn: {
+            /** Sets */
+            sets: components["schemas"]["SetRecordIn"][];
         };
         /** SwapItemIn */
         SwapItemIn: {
@@ -2538,6 +2576,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutExecutionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replace_sets_days__day__workout_items__item_id__sets_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                day: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetRecordsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetLogResultOut"];
                 };
             };
             /** @description Validation Error */

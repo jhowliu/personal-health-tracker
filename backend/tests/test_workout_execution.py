@@ -262,6 +262,66 @@ async def test_set_feedback_returns_a_recommendation_and_workout_logs(with_profi
     assert workout["items"][0]["logs"][0]["effort"] == "easy"
 
 
+async def test_an_exercises_record_is_replaced_whole(with_profile: AsyncClient):
+    original, _, _template = await _workout(with_profile)
+    item_id = (await _day_items(with_profile))[0]["id"]
+    path = f"/days/{DAY}/workout/items/{item_id}/sets"
+
+    written = await with_profile.put(
+        path,
+        json={
+            "sets": [
+                {"reps_done": 12, "weight_kg": 20},
+                {"reps_done": 10, "weight_kg": 22.5},
+                {"reps_done": 8, "weight_kg": 22.5, "effort": "easy"},
+            ]
+        },
+    )
+    assert written.status_code == 200
+    # The last set's weight and effort say where the next session starts.
+    assert written.json()["next_weight_kg"] == 25
+    logs = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]["logs"]
+    assert [(log["set_index"], log["reps_done"], log["weight_kg"]) for log in logs] == [
+        (0, 12, 20),
+        (1, 10, 22.5),
+        (2, 8, 22.5),
+    ]
+    assert {log["exercise_id"] for log in logs} == {original["id"]}
+
+    # A set left out is gone, not kept from before.
+    shorter = await with_profile.put(path, json={"sets": [{"reps_done": 12, "weight_kg": 20}]})
+    assert shorter.json()["next_weight_kg"] is None
+    entry = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]
+    assert [log["reps_done"] for log in entry["logs"]] == [12]
+    assert entry["completed_set_count"] == 1
+
+    cleared = await with_profile.put(path, json={"sets": []})
+    assert cleared.status_code == 200
+    assert (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]["logs"] == []
+
+
+async def test_a_record_needs_what_the_exercise_is_measured_in(with_exercises: AsyncClient):
+    await _profile(with_exercises)
+    workout = await with_exercises.post(
+        f"/days/{DAY}/workout/items",
+        json={"exercise_id": "barbell-back-squat", "sets": 3, "reps": "10"},
+    )
+    item_id = workout.json()["items"][0]["item"]["id"]
+
+    missing_reps = await with_exercises.put(
+        f"/days/{DAY}/workout/items/{item_id}/sets", json={"sets": [{"weight_kg": 40}]}
+    )
+    assert missing_reps.status_code == 422
+
+
+async def test_a_record_for_an_item_not_on_the_day_is_not_found(with_profile: AsyncClient):
+    await _workout(with_profile)
+    response = await with_profile.put(
+        f"/days/{DAY}/workout/items/no-such-item/sets", json={"sets": [{"reps_done": 10}]}
+    )
+    assert response.status_code == 404
+
+
 async def test_session_burn_is_estimated_only_once_sets_are_logged(with_exercises: AsyncClient):
     await _profile(with_exercises)
     template = (
@@ -303,8 +363,12 @@ async def test_session_burn_is_estimated_only_once_sets_are_logged(with_exercise
     )
     assert logged.status_code == 200
 
-    # (5.0 - 1) MET x 56 kg x 1 hour, the whole plan being this one exercise; the resting
-    # MET is already in the day's base target.
+    # No clock yet, so the set is costed at 10 reps x 3 s + 60 s rest:
+    # (5.0 - 1) MET x 56 kg x 90 s. The resting MET is already in the day's base target.
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 6
+
+    # Focus mode clocked the hour: that is the time the set took, rests and all.
+    await with_exercises.patch(f"/days/{DAY}", json={"workout_done": True, "trained_sec": 3600})
     assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 224
 
 
@@ -671,10 +735,116 @@ async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: 
     # Halfway, the plan still stands.
     assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 112
 
-    # Finished with only the squat done: its half hour is what counts now.
+    # Finished with only the squat's one set done, and no clock: the set's own 90 s count,
+    # 4 x 56 x 90 s = 6 kcal, half of it added back.
     await with_exercises.patch(f"/days/{today}", json={"workout_done": True})
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 3
+
+    # Focus mode clocked half an hour for it.
+    await with_exercises.patch(f"/days/{today}", json={"trained_sec": 1800})
     assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 56
 
     # The profile's own targets never include a workout.
     profile = (await with_exercises.get("/users/me/profile")).json()["targets"]
     assert (profile["exercise_kcal"], profile["kcal"]) == (0, 1340)
+
+
+async def _unplanned_day(client: AsyncClient, day: str = DAY) -> tuple[str, str]:
+    """A squat and a treadmill walk added by hand: no template, so no planned minutes."""
+    await _profile(client)
+    for exercise_id, prescription in (
+        ("barbell-back-squat", {"sets": 3, "reps": "10"}),
+        ("incline-treadmill-walk", {"duration_sec": 600}),
+    ):
+        added = await client.post(
+            f"/days/{day}/workout/items", json={"exercise_id": exercise_id, **prescription}
+        )
+        assert added.status_code == 201
+    workout = (await client.get(f"/days/{day}/workout")).json()
+    squat, walk = (entry["item"]["id"] for entry in workout["items"])
+    return squat, walk
+
+
+async def test_counted_sets_burn_without_a_template(with_exercises: AsyncClient):
+    squat, _walk = await _unplanned_day(with_exercises)
+    recorded = await with_exercises.put(
+        f"/days/{DAY}/workout/items/{squat}/sets",
+        json={"sets": [{"reps_done": 10, "weight_kg": 60}] * 3},
+    )
+    assert recorded.status_code == 200
+    # Each set is 10 reps x 3 s + 60 s rest: (5 - 1) x 56 kg x 270 s. It used to be nothing.
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 17
+
+
+async def test_focus_time_goes_to_the_counted_work(with_exercises: AsyncClient):
+    squat, walk = await _unplanned_day(with_exercises)
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{squat}/sets", json={"sets": [{"reps_done": 10}] * 3}
+    )
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+
+    async def burn() -> int:
+        return (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"]
+
+    # Walk: (6 - 1) x 56 x 600 s = 47. Squat alone, unclocked: 4 x 56 x 270 s = 17.
+    assert await burn() == 63
+
+    # 40 clocked minutes, 10 of them the walk's: the squat had the other 30, 112 kcal.
+    await with_exercises.patch(f"/days/{DAY}", json={"workout_done": True, "trained_sec": 2400})
+    assert await burn() == 159
+
+    # A session resumed later adds its own minutes rather than replacing the first.
+    await with_exercises.patch(f"/days/{DAY}", json={"trained_sec": 600})
+    assert await burn() == 196
+
+
+async def test_a_clock_shorter_than_the_sets_never_lowers_the_estimate(
+    with_exercises: AsyncClient,
+):
+    squat, walk = await _unplanned_day(with_exercises)
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{squat}/sets", json={"sets": [{"reps_done": 10}] * 3}
+    )
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+    # A minute on the clock while the walk alone was ten: the walk was done off the clock.
+    await with_exercises.patch(f"/days/{DAY}", json={"trained_sec": 60})
+    assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 63
+
+
+async def test_the_plan_counts_counted_sets_without_a_template(with_exercises: AsyncClient):
+    # Today, not settled yet: the target plans around the whole workout.
+    today = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
+    await _unplanned_day(with_exercises, today)
+    # Walk 47 + squat 3 x 90 s = 17, half of the 64 added back.
+    targets = (await with_exercises.get(f"/days/{today}")).json()["targets"]
+    assert targets["exercise_kcal"] == 32
+
+
+async def test_rewriting_a_record_keeps_when_its_sets_were_logged(with_profile: AsyncClient):
+    original, _, _template = await _workout(with_profile)
+    item_id = (await _day_items(with_profile))[0]["id"]
+    await with_profile.put(
+        f"/days/{DAY}/workout/sets",
+        json={
+            "day_workout_item_id": item_id,
+            "exercise_id": original["id"],
+            "set_index": 0,
+            "reps_done": 10,
+        },
+    )
+    first = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]["logs"][0]
+
+    await with_profile.put(
+        f"/days/{DAY}/workout/items/{item_id}/sets",
+        json={"sets": [{"reps_done": 12}, {"reps_done": 10}]},
+    )
+    logs = (await with_profile.get(f"/days/{DAY}/workout")).json()["items"][0]["logs"]
+    # The fixed set keeps its time; the one added afterwards takes the day's last, so the
+    # edit adds no gap that would read as training time.
+    assert [log["done_at"] for log in logs] == [first["done_at"]] * 2
+    assert [log["reps_done"] for log in logs] == [12, 10]
+

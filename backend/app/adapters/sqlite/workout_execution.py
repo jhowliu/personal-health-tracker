@@ -65,6 +65,7 @@ class SqliteWorkoutExecutionStore:
                    t.id AS template_id, t.category_id AS template_category_id,
                    t.name AS template_name, t.location AS template_location, t.duration_min,
                    t.user_id IS NULL AS template_is_builtin,
+                   d.workout_trained_sec,
                    logs.logs_json
             FROM days d
             LEFT JOIN workout_templates t ON t.id = d.template_id
@@ -100,7 +101,7 @@ class SqliteWorkoutExecutionStore:
                 is_builtin=bool(first["template_is_builtin"]),
                 items=(),
             )
-        return WorkoutExecution(day, template, entries)
+        return WorkoutExecution(day, template, entries, trained_sec=first["workout_trained_sec"])
 
     async def load_visible_exercise(self, user_id: str, exercise_id: str) -> Exercise | None:
         async with self._conn.execute(
@@ -237,6 +238,17 @@ class SqliteWorkoutExecutionStore:
                 to_iso(log.done_at),
             ),
         )
+
+    async def replace_sets(
+        self, user_id: str, day: date, item_id: str, logs: tuple[SetLog, ...]
+    ) -> None:
+        await open_day(self._conn, user_id, day)
+        await self._conn.execute(
+            "DELETE FROM set_logs WHERE user_id = ? AND date = ? AND day_workout_item_id = ?",
+            (user_id, to_day(day), item_id),
+        )
+        for log in logs:
+            await self.log_set(user_id, day, log)
 
     async def exercise_history(
         self, user_id: str, exercise_ids: tuple[str, ...], before: date

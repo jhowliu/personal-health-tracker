@@ -180,6 +180,11 @@ class WorkoutExecutionStore(Protocol):
 
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None: ...
 
+    async def replace_sets(
+        self, user_id: str, day: date, item_id: str, logs: tuple[SetLog, ...]
+    ) -> None:
+        """Make `logs` the item's whole record for the day; a set not among them is deleted."""
+
     async def exercise_history(
         self, user_id: str, exercise_ids: tuple[str, ...], before: date
     ) -> dict[str, ExerciseHistory]:
@@ -203,6 +208,7 @@ class DayStore(Protocol):
         workout_time: str | None = None,
         workout_state: str | None = None,
         workout_state_at: datetime | None = None,
+        trained_sec: int | None = None,
     ) -> None: ...
 
     async def set_meal_state(

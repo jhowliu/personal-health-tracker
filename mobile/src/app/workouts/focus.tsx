@@ -294,7 +294,12 @@ export default function FocusWorkout() {
   const save = async () => {
     setBusy(true);
     try {
-      await api.patch(`/days/${date}`, { workout_done: true });
+      // The clocked time is what costs the counted sets, which carry no minutes of their own.
+      const trainedSec = Math.round(elapsedMs(session, Date.now()) / 1000);
+      await api.patch(`/days/${date}`, {
+        workout_done: true,
+        ...(trainedSec > 0 ? { trained_sec: Math.min(trainedSec, 6 * 3600) } : {}),
+      });
       saved.current = true;
       await clearSession(date);
       router.back();
