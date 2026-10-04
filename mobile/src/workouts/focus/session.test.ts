@@ -16,6 +16,7 @@ import {
   skipRest,
   step,
   summary,
+  upNext,
   type Session,
 } from '@/workouts/focus/session';
 
@@ -121,6 +122,18 @@ describe('starting values', () => {
     const session = fromWorkout(workout([{ id: 'squat', weightKg: null, equipment: 'barbell' }]), T0);
 
     expect(session.exercises[0].weightKg).toBe(0);
+  });
+});
+
+describe('what comes next', () => {
+  it('is the next unfinished exercise, and nothing once the one on screen is the last', () => {
+    const start = fromWorkout(workout([{ id: 'a', sets: 1 }, { id: 'b', sets: 2 }]), T0);
+    expect(upNext(start)).toBe(1);
+
+    // Only b is left: its own last set has nothing after it, rather than b again.
+    const onB = doSets(start, 2);
+    expect(onB.currentIndex).toBe(1);
+    expect(upNext(onB)).toBe(-1);
   });
 });
 

@@ -30,7 +30,6 @@ import {
   isDone,
   isFinished,
   jumpTo,
-  nextIndex,
   pause,
   restLeftSec,
   restore,
@@ -40,6 +39,7 @@ import {
   skipRest,
   step,
   summary,
+  upNext,
   type Effort,
   type FocusExercise,
   type Session,
@@ -330,7 +330,7 @@ export default function FocusWorkout() {
   );
   const setNumber = exercise.kind === 'sets' ? exercise.logs.length + 1 : 1;
   const finalSet = exercise.kind === 'time' || exercise.logs.length === exercise.plannedSets - 1;
-  const after = nextIndex(session.exercises, session.currentIndex);
+  const after = upNext(session);
   const lastOfDay = finalSet && after === -1;
   const finished = resting ? session.exercises.find((candidate) => candidate.itemId === session.rest?.finishedItemId) : undefined;
   const cardioLeftSec =
@@ -644,7 +644,11 @@ function DockButton({ label, onPress }: { label: string; onPress: () => void }) 
 function FeedbackAsk({ exercise, onPick }: { exercise: FocusExercise; onPick: (exercise: FocusExercise, effort: Effort) => void }) {
   return (
     <View className="gap-2 rounded-card bg-surface/70 p-3">
-      <Text className="text-sm text-ink">「{exercise.name}」感覺如何？下次會依這個調整重量。</Text>
+      <Text className="text-sm text-ink">
+        「{exercise.name}」感覺如何？
+        {/* Only a weight has a next step to suggest; bodyweight work just keeps the note. */}
+        {exercise.weightKg !== null ? '下次會依這個調整重量。' : ''}
+      </Text>
       <View className="flex-row gap-2">
         {EFFORTS.map((effort) => (
           <Chip
@@ -690,7 +694,10 @@ function Summary({
         <View className="flex-row gap-2">
           <Stat value={clock(elapsedSec)} label="訓練時間" />
           <Stat value={String(totals.sets)} label="完成組數" />
-          <Stat value={Math.round(totals.volumeKg).toLocaleString('en-US')} label="總量 kg" />
+          {/* Bodyweight and timed work lift nothing; a 0 kg total reads as a mistake. */}
+          {totals.volumeKg > 0 ? (
+            <Stat value={Math.round(totals.volumeKg).toLocaleString('en-US')} label="總量 kg" />
+          ) : null}
         </View>
 
         {session.exercises

@@ -77,19 +77,40 @@ export default function TodayScreen() {
   const date = picked ?? today;
   // A reply for a day the user has already left is dropped.
   const loadVersion = useRef(0);
+  // What the screen showed last, read when a fresh copy of the day arrives.
+  const shown = useRef<{ day: Today | null; viewing: string | null }>({ day: null, viewing: null });
+  useEffect(() => {
+    shown.current = { day, viewing };
+  }, [day, viewing]);
+
+  /**
+   * Show a fresh copy of the day, staying on `step`, unless that step has just been finished
+   * — eaten, skipped, weighed, trained, from this screen or from focus mode. Then it moves on
+   * to what is left, however it was finished. Changing a step already done (a portion, 改回未吃)
+   * stays put.
+   */
+  const settle = useCallback((fresh: Today, step: string | null) => {
+    const before = shown.current.day;
+    const justFinished =
+      step !== null &&
+      before?.date === fresh.date &&
+      before.flow.waiting.includes(step) &&
+      !fresh.flow.waiting.includes(step);
+    setDay(fresh);
+    setViewing(justFinished ? null : step);
+  }, []);
 
   const load = useCallback(async (resetStep = false) => {
     const version = ++loadVersion.current;
     try {
       const fresh = await api.get(`/days/${date}`);
       if (version !== loadVersion.current) return;
-      setDay(fresh);
-      if (resetStep) setViewing(null);
+      settle(fresh, resetStep ? null : shown.current.viewing);
     } catch (error) {
       if (version !== loadVersion.current) return;
       Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
     }
-  }, [date]);
+  }, [date, settle]);
 
   const refreshAt = useCallback(
     async (step: string) => {
@@ -97,14 +118,13 @@ export default function TodayScreen() {
       try {
         const fresh = await api.get(`/days/${date}`);
         if (version !== loadVersion.current) return;
-        setDay(fresh);
-        setViewing(step);
+        settle(fresh, step);
       } catch (error) {
         if (version !== loadVersion.current) return;
         Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
       }
     },
-    [date],
+    [date, settle],
   );
 
   const goTo = (next: string) => {
@@ -628,7 +648,7 @@ function MealStep({
         // Foods added by hand: once they are all in, finishing the meal is the main step.
         <>
           <PrimaryButton icon={CheckIcon} onPress={() => setMealState('eaten')} busy={busy}>
-            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完`}
+            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完，下一步：${stepAfter(day, step)}`}
           </PrimaryButton>
           {total}
           <TextAction

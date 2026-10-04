@@ -101,6 +101,15 @@ export function nextIndex(exercises: FocusExercise[], from: number): number {
   return -1;
 }
 
+/**
+ * The exercise after the one on screen, or -1 when this is the last still to do. nextIndex
+ * wraps round to the current exercise while it is unfinished, which is not a next one.
+ */
+export function upNext(session: Session): number {
+  const next = nextIndex(session.exercises, session.currentIndex);
+  return next === session.currentIndex ? -1 : next;
+}
+
 const firstNumber = (text: string | null | undefined) => {
   const match = text?.match(/\d+/);
   return match ? Number(match[0]) : null;

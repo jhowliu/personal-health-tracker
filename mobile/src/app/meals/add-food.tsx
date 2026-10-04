@@ -5,7 +5,8 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
-import { PlusIcon } from '@/components/icons';
+import { CheckIcon, PlusIcon } from '@/components/icons';
+import { STEP_LABEL } from '@/components/StepIndicator';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { ShowMore, usePaged } from '@/components/paging';
 import { draft } from '@/meals/draft';
@@ -40,12 +41,15 @@ export default function AddFood() {
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
+  // Foods put in on this visit. A meal is several foods, so adding one stays here for the next.
+  const [added, setAdded] = useState<string[]>([]);
   const searchVersion = useRef(0);
 
   const parentRoute =
     destination === 'day'
       ? '/today'
       : ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const);
+  const parentLabel = destination === 'day' ? (slot && STEP_LABEL[slot]) || '今天' : '編輯餐點';
 
   useEffect(() => {
     if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
@@ -93,7 +97,9 @@ export default function AddFood() {
         if (!meal_id || !draft.has(meal_id)) throw new Error('找不到目前餐點草稿，請重新開啟餐點。');
         draft.addItem(meal_id, food, portion);
       }
-      backOrReplace(parentRoute);
+      setAdded((current) => [...current, food.name]);
+      setPicked(null);
+      setAmount('');
     } catch (error) {
       Alert.alert('加入失敗', error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試');
     } finally {
@@ -105,8 +111,8 @@ export default function AddFood() {
     if (picked) void addFood(picked, amountToGrams(picked, Number(amount)) || picked.usual_grams);
   };
 
-  // A food just created from the empty search goes straight in at its usual portion, and the
-  // screen returns to where 加入食物 was opened from; the portion can be changed there.
+  // A food just created from the empty search goes straight in at its usual portion; the
+  // portion can be changed once back where 加入食物 was opened from.
   useFocusEffect(
     useCallback(() => {
       const created = newFoodHandoff.take();
@@ -182,11 +188,23 @@ export default function AddFood() {
               {busy ? '加入中…' : `加入${label ?? '食物'}`}
             </PrimaryButton>
           </>
+        ) : added.length ? (
+          <>
+            <View className="flex-row items-center gap-2">
+              <CheckIcon size={18} tint={color.good} />
+              <Text className="flex-1 text-base text-ink" numberOfLines={2}>
+                已加入 {added.length} 項：{added.join('、')}
+              </Text>
+            </View>
+            <PrimaryButton onPress={() => backOrReplace(parentRoute)} disabled={photoBusy}>
+              {`完成，回到${parentLabel}`}
+            </PrimaryButton>
+          </>
         ) : undefined
       }
     >
       <BackLink
-        label={destination === 'day' ? '今天' : '編輯餐點'}
+        label={parentLabel}
         onPress={() => backOrReplace(parentRoute)}
         disabled={busy || photoBusy}
       />

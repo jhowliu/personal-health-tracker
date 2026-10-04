@@ -154,8 +154,8 @@ export default function EditTemplate() {
         note: null,
       },
     ]);
-    setEditing(items.length);
-    setLibraryOpen(false);
+    // The library stays open with its filters, for the next exercise; the new one is set up
+    // with the defaults and opened for changes only when tapped.
   };
 
   const save = async () => {
@@ -356,14 +356,19 @@ export default function EditTemplate() {
             <TextAction tone="muted" label="收起" onPress={() => setEditing(null)} className="justify-center" />
           </Card>
         ) : (
-          <Pressable
+          // The arrows sit beside the row's button, not inside it: a button in a button is
+          // invalid on web and steals the arrows' taps.
+          <View
             key={`${item.exercise_id}-${index}`}
-            accessibilityRole="button"
-            disabled={isBuiltin}
-            onPress={() => setEditing(index)}
             className="min-h-[44px] flex-row items-center gap-2 rounded-card border border-line bg-surface p-3"
           >
-            <View className="flex-1 gap-0.5">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`編輯${item.exercise_name}`}
+              disabled={isBuiltin}
+              onPress={() => setEditing(index)}
+              className="min-h-[44px] flex-1 justify-center gap-0.5"
+            >
               <Text className="text-base font-semibold text-ink">
                 {index + 1}. {item.exercise_name}
               </Text>
@@ -375,7 +380,7 @@ export default function EditTemplate() {
                     : item.reps}
                 {item.weight_kg ? `,${item.weight_kg} kg` : ''}
               </Text>
-            </View>
+            </Pressable>
             {isBuiltin ? null : (
               <>
                 <Arrow label="上移" onPress={() => move(index, -1)} disabled={index === 0} glyph="↑" />
@@ -387,7 +392,7 @@ export default function EditTemplate() {
                 />
               </>
             )}
-          </Pressable>
+          </View>
         ),
       )}
 
@@ -403,7 +408,12 @@ export default function EditTemplate() {
             {libraryOpen ? '收起動作庫' : '從動作庫加入'}
           </PrimaryButton>
 
-          {libraryOpen ? <ExerciseLibrary onSelect={addFromLibrary} /> : null}
+          {libraryOpen ? (
+            <ExerciseLibrary
+              onSelect={addFromLibrary}
+              addedIds={new Set(items.map((item) => item.exercise_id))}
+            />
+          ) : null}
         </>
       )}
     </Screen>
