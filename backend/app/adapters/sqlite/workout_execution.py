@@ -211,6 +211,21 @@ class SqliteWorkoutExecutionStore:
         )
         return cursor.rowcount == 1
 
+    async def clear(self, user_id: str, day: date) -> None:
+        await open_day(self._conn, user_id, day)
+        await self._ensure_snapshot(user_id, day)
+        await self._conn.execute(
+            "DELETE FROM day_workout_items WHERE user_id = ? AND date = ?",
+            (user_id, to_day(day)),
+        )
+        # Marked as set up, so opening the day again does not take the schedule's template back.
+        await self._conn.execute(
+            "UPDATE days SET template_id = NULL, workout_initialized_at = COALESCE("
+            "workout_initialized_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+            " WHERE user_id = ? AND date = ?",
+            (user_id, to_day(day)),
+        )
+
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None:
         await open_day(self._conn, user_id, day)
         await self._conn.execute(

@@ -81,6 +81,43 @@ async def test_removing_every_scheduled_item_does_not_recreate_the_day(
     assert (await _day_items(with_profile)) == []
 
 
+async def test_a_days_workout_can_be_taken_off_for_that_day_only(with_profile: AsyncClient):
+    _, _, template = await _workout(with_profile)
+    assert len(await _day_items(with_profile)) == 1
+
+    cleared = await with_profile.delete(f"/days/{DAY}/workout")
+    assert cleared.status_code == 204
+
+    # Opening the day again does not bring the scheduled template back.
+    workout = (await with_profile.get(f"/days/{DAY}/workout")).json()
+    assert (workout["template"], workout["items"]) == (None, [])
+    # A rest day now: the flow no longer waits on the workout.
+    day = (await with_profile.get(f"/days/{DAY}")).json()
+    assert "workout" not in day["flow"]["waiting"]
+    # The schedule and the template itself are untouched.
+    schedule = (await with_profile.get("/workout-schedule")).json()
+    assert [entry["template_id"] for entry in schedule] == [template["id"]]
+    assert (await with_profile.get(f"/workout-templates/{template['id']}")).status_code == 200
+
+
+async def test_a_workout_with_a_logged_set_is_not_taken_off(with_profile: AsyncClient):
+    original, _, _template = await _workout(with_profile)
+    item_id = (await _day_items(with_profile))[0]["id"]
+    await with_profile.put(
+        f"/days/{DAY}/workout/sets",
+        json={
+            "day_workout_item_id": item_id,
+            "exercise_id": original["id"],
+            "set_index": 0,
+            "reps_done": 10,
+        },
+    )
+
+    refused = await with_profile.delete(f"/days/{DAY}/workout")
+    assert refused.status_code == 422
+    assert len(await _day_items(with_profile)) == 1
+
+
 async def test_day_can_be_saved_as_an_owned_template_without_modifying_public_source(
     with_profile: AsyncClient,
 ):

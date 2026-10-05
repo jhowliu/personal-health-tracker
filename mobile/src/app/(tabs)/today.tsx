@@ -22,7 +22,7 @@ import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { photoDraft } from '@/meals/photo-draft';
-import { loadSession } from '@/workouts/focus/storage';
+import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color, foodCategoryTone } from '@/theme/tokens';
@@ -1099,16 +1099,44 @@ function WorkoutStep({
     });
   };
 
-  const deleteItem = (item: WorkoutItem) =>
+  // Taking the whole workout off makes the day a rest day, so the flow stops waiting on it.
+  const takeOffWorkout = async () => {
+    setBusy(true);
+    try {
+      await api.delete(`/days/${date}/workout`);
+      await clearSession(date);
+      setSessionStarted(false);
+      setDrafts({});
+      await load();
+      onStateChanged();
+    } catch (error) {
+      Alert.alert('移除不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearWorkout = (name: string) =>
+    Alert.alert(`移除${word}的課表`, `${word}不練「${name}」，會變成休息日。一週排程和課表本身不會改。`, [
+      { text: '取消', style: 'cancel' },
+      { text: '移除', style: 'destructive', onPress: () => void takeOffWorkout() },
+    ]);
+
+  const deleteItem = (item: WorkoutItem) => {
+    // The last exercise takes the day's template with it: an empty workout would still hold
+    // the day's flow waiting on it.
+    const last = workout?.items.length === 1;
     Alert.alert('移除動作', `確定移除「${item.item.exercise_name}」？這只會影響${dayWord(date)}的訓練。`, [
       { text: '取消', style: 'cancel' },
       {
         text: '移除',
         style: 'destructive',
         onPress: async () => {
+          if (last) return takeOffWorkout();
           setBusy(true);
           try {
             await api.delete(`/days/${date}/workout/items/${item.item.id}`);
+            setDrafts(({ [item.item.id]: _removed, ...rest }) => rest);
             await load();
           } catch (error) {
             Alert.alert('移除不了動作', error instanceof ApiError ? error.message : '請稍後再試');
@@ -1118,6 +1146,7 @@ function WorkoutStep({
         },
       },
     ]);
+  };
 
   const skipWorkout = async () => {
     setBusy(true);
@@ -1168,6 +1197,20 @@ function WorkoutStep({
   const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
   // Done rather than skipped: something was logged before the day was closed.
   const finished = resolved && anyLogged;
+  // An exercise with a logged set keeps its record, and one in a running focus session is
+  // the session's to change, so only the others can be taken off.
+  const removable = (entry: WorkoutItem) => entry.logs.length === 0 && !sessionStarted;
+  const clearAction =
+    workout.template && !anyLogged && !sessionStarted ? (
+      <TextAction
+        icon={TrashIcon}
+        tone="danger"
+        label={`移除${word}的課表`}
+        disabled={busy}
+        onPress={() => clearWorkout(workout.template?.name ?? '')}
+        className="min-h-[44px] justify-center self-center"
+      />
+    ) : null;
 
   if (date === todayISO() && workout.items.length > 0 && !workoutSkipped && !listMode) {
     const done = (entry: WorkoutItem) =>
@@ -1262,25 +1305,33 @@ function WorkoutStep({
                       prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
                     }`;
             return (
-              // Once something is logged, a row opens the record for fixing.
-              <Pressable
+              <View
                 key={prescribed.id}
-                accessibilityRole="button"
-                accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
-                disabled={!(resolved && anyLogged)}
-                onPress={() => setListMode(true)}
-                className={`min-h-[58px] flex-row items-center justify-between gap-2.5 rounded-card px-4 active:opacity-70 ${
-                  finished ? 'bg-good-soft' : 'bg-fill'
-                }`}
+                className={`min-h-[58px] flex-row items-center rounded-card ${finished ? 'bg-good-soft' : 'bg-fill'}`}
               >
-                <Text className="flex-1 text-base font-semibold text-ink">
-                  {index + 1}. {prescribed.exercise_name}
-                </Text>
-                <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
-              </Pressable>
+                {/* Once something is logged, a row opens the record for fixing. */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
+                  disabled={!(resolved && anyLogged)}
+                  onPress={() => setListMode(true)}
+                  className={`min-h-[58px] flex-1 flex-row items-center justify-between gap-2.5 pl-4 active:opacity-70 ${
+                    removable(entry) ? '' : 'pr-4'
+                  }`}
+                >
+                  <Text className="flex-1 text-base font-semibold text-ink">
+                    {index + 1}. {prescribed.exercise_name}
+                  </Text>
+                  <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
+                </Pressable>
+                {removable(entry) ? (
+                  <RemoveExerciseButton name={prescribed.exercise_name} disabled={busy} onPress={() => deleteItem(entry)} />
+                ) : null}
+              </View>
             );
           })}
         </View>
+        {clearAction}
       </Screen>
     );
   }
@@ -1375,20 +1426,29 @@ function WorkoutStep({
 
                   return (
                     <View key={prescribed.id} className="overflow-hidden rounded-card bg-fill">
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
-                        accessibilityState={{ disabled: busy }}
-                        disabled={busy}
-                        onPress={() => setActionItem(item)}
-                        className="min-h-[52px] flex-row items-center gap-3 px-3 py-2 active:opacity-70"
-                      >
-                        <Text className="flex-1 text-base font-semibold text-ink">
-                          {itemIndex + 1}. {prescribed.exercise_name}
-                        </Text>
-                        <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
-                        <ChevronIcon direction="right" size={16} tint={color.muted} />
-                      </Pressable>
+                      <View className="flex-row items-center">
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
+                          accessibilityState={{ disabled: busy }}
+                          disabled={busy}
+                          onPress={() => setActionItem(item)}
+                          className="min-h-[52px] flex-1 flex-row items-center gap-3 py-2 pl-3 pr-2 active:opacity-70"
+                        >
+                          <Text className="flex-1 text-base font-semibold text-ink">
+                            {itemIndex + 1}. {prescribed.exercise_name}
+                          </Text>
+                          <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
+                          <ChevronIcon direction="right" size={16} tint={color.muted} />
+                        </Pressable>
+                        {removable(item) ? (
+                          <RemoveExerciseButton
+                            name={prescribed.exercise_name}
+                            disabled={busy}
+                            onPress={() => deleteItem(item)}
+                          />
+                        ) : null}
+                      </View>
 
                       <View className="gap-3 bg-surface px-3 py-3">
                         {prescribed.replaced_exercise_name ? (
@@ -1503,6 +1563,7 @@ function WorkoutStep({
                 />
               ) : null}
             </View>
+            {clearAction}
           </>
         )}
       </View>
@@ -1537,6 +1598,29 @@ function WorkoutStep({
         ) : null}
       </Sheet>
     </Screen>
+  );
+}
+
+function RemoveExerciseButton({
+  name,
+  disabled,
+  onPress,
+}: {
+  name: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`移除${name}`}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className="h-11 w-11 items-center justify-center active:opacity-60"
+    >
+      <CloseIcon size={18} tint={color.muted} />
+    </Pressable>
   );
 }
 

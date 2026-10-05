@@ -66,6 +66,11 @@ async def read_workout(
     return WorkoutExecutionOut.of(await service.view(user_id, day))
 
 
+@router.delete("/{day}/workout", status_code=204)
+async def clear_workout(day: date, user_id: CurrentUserId, service: WorkoutExecution) -> None:
+    await service.clear(user_id, day)
+
+
 @router.post("/{day}/workout/save-as-template", response_model=TemplateOut, status_code=201)
 async def save_day_as_template(
     day: date, payload: SaveDayTemplateIn, user_id: CurrentUserId, service: WorkoutExecution
