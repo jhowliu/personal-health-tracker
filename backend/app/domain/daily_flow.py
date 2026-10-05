@@ -24,15 +24,20 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
     steps = _step_order(facts.workout_time)
 
     completed: set[FlowStep] = set()
+    skipped: set[FlowStep] = set()
     if facts.body_logged:
         completed.add(FlowStep.BODY)
     if facts.workout_done_at is not None or facts.workout_skipped_at is not None:
         completed.add(FlowStep.WORKOUT)
+    if facts.workout_done_at is None and facts.workout_skipped_at is not None:
+        skipped.add(FlowStep.WORKOUT)
     for slot in facts.slots:
         if (
             slot.eaten_at is not None or slot.skipped_at is not None
         ) and slot.meal_time in _MEAL_STEP:
             completed.add(_MEAL_STEP[slot.meal_time])
+            if slot.eaten_at is None:
+                skipped.add(_MEAL_STEP[slot.meal_time])
 
     # A rest day's workout step is there to open, never to wait on.
     waiting = tuple(
@@ -60,4 +65,5 @@ def resolve_flow(facts: DayFacts) -> DayFlow:
             fat_g=round(eaten.fat_g, 1),
             carb_g=round(eaten.carb_g, 1),
         ),
+        skipped=frozenset(skipped),
     )

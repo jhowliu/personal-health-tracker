@@ -161,6 +161,16 @@ class WorkoutExecutionService:
         if not await self._store.delete_item(user_id, day, item_id):
             raise NotFound("找不到今天排定的動作")
 
+    async def clear(self, user_id: str, day: date) -> None:
+        """Take the day's workout off it, for this day only: the schedule and the template stay.
+
+        Refused once any set is logged, since the record would go with it.
+        """
+        workout = await self._store.load(user_id, day)
+        if any(entry.logs for entry in workout.items):
+            raise ValidationFailed("已經有訓練紀錄，不能移除整份課表")
+        await self._store.clear(user_id, day)
+
     async def log_set(
         self,
         user_id: str,

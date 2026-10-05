@@ -5,6 +5,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from app.domain.models import Food, Nutrients
+from app.domain.nutrition import KCAL_PER_G_CARB, KCAL_PER_G_FAT, KCAL_PER_G_PROTEIN
 
 # Each name costs the recognizer prompt about 8 tokens; this keeps a big library near 1.2k.
 PROMPT_FOOD_LIMIT = 150
@@ -32,6 +33,27 @@ class MealPhoto:
 class EstimatedFood:
     category_id: str
     per_100g: Nutrients
+
+
+def with_kcal_from_macros(estimate: EstimatedFood | None) -> EstimatedFood | None:
+    """The estimate with its kcal per 100 g worked out from its protein, fat and carbs.
+
+    The recognizer's own kcal figure does not always agree with its own macros (烏冬麵 came
+    back at 34 kcal per 100 g beside 31 g of carbs), and the review screen already works kcal
+    out this way once a macro is edited. The macros are the basis.
+    """
+    if estimate is None:
+        return None
+    per_100g = estimate.per_100g
+    kcal = (
+        per_100g.protein_g * KCAL_PER_G_PROTEIN
+        + per_100g.fat_g * KCAL_PER_G_FAT
+        + per_100g.carb_g * KCAL_PER_G_CARB
+    )
+    return EstimatedFood(
+        estimate.category_id,
+        Nutrients(round(kcal, 1), per_100g.protein_g, per_100g.fat_g, per_100g.carb_g),
+    )
 
 
 @dataclass(frozen=True, slots=True)

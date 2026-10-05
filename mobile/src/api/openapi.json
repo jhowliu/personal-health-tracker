@@ -1158,6 +1158,56 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "days"
+        ],
+        "summary": "Clear Workout",
+        "operationId": "clear_workout_days__day__workout_delete",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Day"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/days/{day}/workout/save-as-template": {
@@ -4155,6 +4205,13 @@
           },
           "eaten": {
             "$ref": "#/components/schemas/NutrientsOut"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped"
           }
         },
         "type": "object",
@@ -4163,7 +4220,8 @@
           "completed",
           "waiting",
           "current",
-          "eaten"
+          "eaten",
+          "skipped"
         ],
         "title": "DayFlowOut"
       },
@@ -4746,6 +4804,10 @@
             "type": "string",
             "title": "Id"
           },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
           "food_id": {
             "anyOf": [
               {
@@ -4797,6 +4859,7 @@
         "type": "object",
         "required": [
           "id",
+          "name",
           "food_id",
           "custom_name",
           "grams",
@@ -6622,7 +6685,8 @@
           "reps": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "pattern": "^\\d+(\\s*[-–~]\\s*\\d+)?$"
               },
               {
                 "type": "null"
@@ -7073,7 +7137,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "minLength": 1
+                "pattern": "^\\d+(\\s*[-–~]\\s*\\d+)?$"
               },
               {
                 "type": "null"
@@ -7176,7 +7240,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "minLength": 1
+                "pattern": "^\\d+(\\s*[-–~]\\s*\\d+)?$"
               },
               {
                 "type": "null"

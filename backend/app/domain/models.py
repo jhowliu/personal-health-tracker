@@ -183,6 +183,8 @@ class DayFlow:
     waiting: tuple[FlowStep, ...]
     current: FlowStep
     eaten: Nutrients
+    # Completed steps that were skipped rather than done, so the track can say which.
+    skipped: frozenset[FlowStep] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

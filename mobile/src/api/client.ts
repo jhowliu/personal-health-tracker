@@ -8,6 +8,7 @@
  * Token storage is injected via setTokenStore, so tests can swap in an in-memory one.
  */
 import type { paths } from './types';
+import { errorMessage } from '@/api/errors';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -141,8 +142,7 @@ async function fail(response: Response): Promise<never> {
   let detail = `請求失敗（${response.status}）`;
   try {
     const body = await response.json();
-    if (typeof body?.detail === 'string') detail = body.detail;
-    else if (Array.isArray(body?.detail)) detail = body.detail[0]?.msg ?? detail;
+    detail = errorMessage(body?.detail, response.status);
   } catch {
     // Response was not JSON — keep the default message
   }

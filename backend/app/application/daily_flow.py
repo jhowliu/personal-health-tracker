@@ -42,13 +42,9 @@ class DailyFlowService:
         today = self._clock.today(profile.timezone)
         on = day or today
         facts = await self._days.load_facts(user_id, on)
-        settled = (
-            on < today
-            or facts.workout_done_at is not None
-            or facts.workout_skipped_at is not None
-        )
+        finished = on < today or facts.workout_done_at is not None
         workout = await self._workouts.load(user_id, on)
-        exercise = burn_for_targets(workout, profile.weight_kg, settled=settled)
+        exercise = burn_for_targets(workout, profile.weight_kg, finished=finished)
         return TodayView(
             date=on,
             flow=resolve_flow(facts),

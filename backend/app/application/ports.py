@@ -178,6 +178,9 @@ class WorkoutExecutionStore(Protocol):
 
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool: ...
 
+    async def clear(self, user_id: str, day: date) -> None:
+        """Take the day's workout off it, template and exercises, so the schedule stays off."""
+
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None: ...
 
     async def replace_sets(

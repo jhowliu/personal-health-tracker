@@ -29,7 +29,8 @@ async def open_day(conn: aiosqlite.Connection, user_id: str, day: date) -> None:
         if await cursor.fetchone() is None:
             raise NotFound("還沒有建立個人資料")
 
-    # The schedule may have been set after the day was opened, so backfill on every call.
+    # The schedule may have been set after the day was opened, so backfill on every call,
+    # until the day's workout is set up: copied, built by hand, or taken off the day.
     await conn.execute(
         """
         UPDATE days SET template_id = (
@@ -37,6 +38,7 @@ async def open_day(conn: aiosqlite.Connection, user_id: str, day: date) -> None:
             WHERE ws.user_id = days.user_id AND ws.weekday = ?
         )
         WHERE user_id = ? AND date = ? AND template_id IS NULL
+          AND workout_initialized_at IS NULL
         """,
         (day.weekday(), user_id, to_day(day)),
     )

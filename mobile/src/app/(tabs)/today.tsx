@@ -16,13 +16,13 @@ import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
 import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
-import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, PlusIcon, TrashIcon } from '@/components/icons';
+import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, CloseIcon, PlusIcon, TrashIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
-import { Card, Empty, Field, Hint, PrimaryButton, Screen, TextAction, Title } from '@/components/ui';
+import { Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { photoDraft } from '@/meals/photo-draft';
-import { loadSession } from '@/workouts/focus/storage';
+import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color, foodCategoryTone } from '@/theme/tokens';
@@ -185,7 +185,7 @@ export default function TodayScreen() {
     return (
       <Screen key={day.date} footerSafeArea={false}>
         {header}
-        <DoneStep day={day} />
+        <DoneStep day={day} onChanged={() => load()} />
       </Screen>
     );
   }
@@ -197,6 +197,7 @@ export default function TodayScreen() {
         date={day.date}
         after={stepAfter(day, 'workout')}
         resolved={day.flow.completed.includes('workout')}
+        burnAdded={day.targets.exercise_kcal > 0}
         onDone={() => load(true)}
         onStateChanged={() => refreshAt('workout')}
       />
@@ -268,10 +269,17 @@ function TodayHeader({
       {isToday ? null : (
         <TextAction label="回到今天" onPress={onToday} className="min-h-[44px] justify-center self-center" />
       )}
-      <DaySummary eaten={day.flow.eaten} targets={day.targets} />
+      <DaySummary
+        eaten={day.flow.eaten}
+        targets={day.targets}
+        onAddSnack={() =>
+          router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } })
+        }
+      />
       <StepIndicator
         steps={day.flow.steps}
         completed={day.flow.completed}
+        skipped={day.flow.skipped}
         current={step}
         next={day.flow.current}
         onSelect={onSelect}
@@ -962,6 +970,7 @@ function WorkoutStep({
   date,
   after,
   resolved,
+  burnAdded,
   onDone,
   onStateChanged,
 }: {
@@ -970,6 +979,8 @@ function WorkoutStep({
   after: string;
   /** The workout step is already done (or skipped) for this date. */
   resolved: boolean;
+  /** The day's target already counts this workout, which it does only once it is done. */
+  burnAdded: boolean;
   onDone: () => void;
   onStateChanged: () => void;
 }) {
@@ -1088,16 +1099,44 @@ function WorkoutStep({
     });
   };
 
-  const deleteItem = (item: WorkoutItem) =>
+  // Taking the whole workout off makes the day a rest day, so the flow stops waiting on it.
+  const takeOffWorkout = async () => {
+    setBusy(true);
+    try {
+      await api.delete(`/days/${date}/workout`);
+      await clearSession(date);
+      setSessionStarted(false);
+      setDrafts({});
+      await load();
+      onStateChanged();
+    } catch (error) {
+      Alert.alert('移除不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearWorkout = (name: string) =>
+    Alert.alert(`移除${word}的課表`, `${word}不練「${name}」，會變成休息日。一週排程和課表本身不會改。`, [
+      { text: '取消', style: 'cancel' },
+      { text: '移除', style: 'destructive', onPress: () => void takeOffWorkout() },
+    ]);
+
+  const deleteItem = (item: WorkoutItem) => {
+    // The last exercise takes the day's template with it: an empty workout would still hold
+    // the day's flow waiting on it.
+    const last = workout?.items.length === 1;
     Alert.alert('移除動作', `確定移除「${item.item.exercise_name}」？這只會影響${dayWord(date)}的訓練。`, [
       { text: '取消', style: 'cancel' },
       {
         text: '移除',
         style: 'destructive',
         onPress: async () => {
+          if (last) return takeOffWorkout();
           setBusy(true);
           try {
             await api.delete(`/days/${date}/workout/items/${item.item.id}`);
+            setDrafts(({ [item.item.id]: _removed, ...rest }) => rest);
             await load();
           } catch (error) {
             Alert.alert('移除不了動作', error instanceof ApiError ? error.message : '請稍後再試');
@@ -1107,6 +1146,7 @@ function WorkoutStep({
         },
       },
     ]);
+  };
 
   const skipWorkout = async () => {
     setBusy(true);
@@ -1157,6 +1197,20 @@ function WorkoutStep({
   const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
   // Done rather than skipped: something was logged before the day was closed.
   const finished = resolved && anyLogged;
+  // An exercise with a logged set keeps its record, and one in a running focus session is
+  // the session's to change, so only the others can be taken off.
+  const removable = (entry: WorkoutItem) => entry.logs.length === 0 && !sessionStarted;
+  const clearAction =
+    workout.template && !anyLogged && !sessionStarted ? (
+      <TextAction
+        icon={TrashIcon}
+        tone="danger"
+        label={`移除${word}的課表`}
+        disabled={busy}
+        onPress={() => clearWorkout(workout.template?.name ?? '')}
+        className="min-h-[44px] justify-center self-center"
+      />
+    ) : null;
 
   if (date === todayISO() && workout.items.length > 0 && !workoutSkipped && !listMode) {
     const done = (entry: WorkoutItem) =>
@@ -1251,25 +1305,33 @@ function WorkoutStep({
                       prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
                     }`;
             return (
-              // Once something is logged, a row opens the record for fixing.
-              <Pressable
+              <View
                 key={prescribed.id}
-                accessibilityRole="button"
-                accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
-                disabled={!(resolved && anyLogged)}
-                onPress={() => setListMode(true)}
-                className={`min-h-[58px] flex-row items-center justify-between gap-2.5 rounded-card px-4 active:opacity-70 ${
-                  finished ? 'bg-good-soft' : 'bg-fill'
-                }`}
+                className={`min-h-[58px] flex-row items-center rounded-card ${finished ? 'bg-good-soft' : 'bg-fill'}`}
               >
-                <Text className="flex-1 text-base font-semibold text-ink">
-                  {index + 1}. {prescribed.exercise_name}
-                </Text>
-                <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
-              </Pressable>
+                {/* Once something is logged, a row opens the record for fixing. */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
+                  disabled={!(resolved && anyLogged)}
+                  onPress={() => setListMode(true)}
+                  className={`min-h-[58px] flex-1 flex-row items-center justify-between gap-2.5 pl-4 active:opacity-70 ${
+                    removable(entry) ? '' : 'pr-4'
+                  }`}
+                >
+                  <Text className="flex-1 text-base font-semibold text-ink">
+                    {index + 1}. {prescribed.exercise_name}
+                  </Text>
+                  <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
+                </Pressable>
+                {removable(entry) ? (
+                  <RemoveExerciseButton name={prescribed.exercise_name} disabled={busy} onPress={() => deleteItem(entry)} />
+                ) : null}
+              </View>
             );
           })}
         </View>
+        {clearAction}
       </Screen>
     );
   }
@@ -1364,20 +1426,29 @@ function WorkoutStep({
 
                   return (
                     <View key={prescribed.id} className="overflow-hidden rounded-card bg-fill">
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
-                        accessibilityState={{ disabled: busy }}
-                        disabled={busy}
-                        onPress={() => setActionItem(item)}
-                        className="min-h-[52px] flex-row items-center gap-3 px-3 py-2 active:opacity-70"
-                      >
-                        <Text className="flex-1 text-base font-semibold text-ink">
-                          {itemIndex + 1}. {prescribed.exercise_name}
-                        </Text>
-                        <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
-                        <ChevronIcon direction="right" size={16} tint={color.muted} />
-                      </Pressable>
+                      <View className="flex-row items-center">
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
+                          accessibilityState={{ disabled: busy }}
+                          disabled={busy}
+                          onPress={() => setActionItem(item)}
+                          className="min-h-[52px] flex-1 flex-row items-center gap-3 py-2 pl-3 pr-2 active:opacity-70"
+                        >
+                          <Text className="flex-1 text-base font-semibold text-ink">
+                            {itemIndex + 1}. {prescribed.exercise_name}
+                          </Text>
+                          <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
+                          <ChevronIcon direction="right" size={16} tint={color.muted} />
+                        </Pressable>
+                        {removable(item) ? (
+                          <RemoveExerciseButton
+                            name={prescribed.exercise_name}
+                            disabled={busy}
+                            onPress={() => deleteItem(item)}
+                          />
+                        ) : null}
+                      </View>
 
                       <View className="gap-3 bg-surface px-3 py-3">
                         {prescribed.replaced_exercise_name ? (
@@ -1470,8 +1541,8 @@ function WorkoutStep({
 
             {workout.estimated_burn_kcal ? (
               <Hint>
-                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。其中一半已加進
-                {word}的熱量目標。
+                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。
+                {burnAdded ? `其中一半已加進${word}的熱量目標。` : `標記完成後，其中一半會加進${word}的熱量目標。`}
               </Hint>
             ) : null}
 
@@ -1492,6 +1563,7 @@ function WorkoutStep({
                 />
               ) : null}
             </View>
+            {clearAction}
           </>
         )}
       </View>
@@ -1529,6 +1601,29 @@ function WorkoutStep({
   );
 }
 
+function RemoveExerciseButton({
+  name,
+  disabled,
+  onPress,
+}: {
+  name: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`移除${name}`}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className="h-11 w-11 items-center justify-center active:opacity-60"
+    >
+      <CloseIcon size={18} tint={color.muted} />
+    </Pressable>
+  );
+}
+
 function completedSetCount(item: WorkoutItem) {
   return item.logs.length || item.completed_set_count;
 }
@@ -1561,8 +1656,52 @@ function targetChanges(entry: WorkoutItem, edit: WorkoutEdit) {
     : { ...common, sets: Number(edit.sets), reps: edit.reps.trim() };
 }
 
-function DoneStep({ day }: { day: Today }) {
-  const remaining = day.targets.kcal - day.flow.eaten.kcal;
+// Below this share of the target, a finished day reads as too little rather than room to spare:
+// in a deficit already, undereating costs muscle and comes back as hunger the next day.
+const UNDER_EATING_SHARE = 0.7;
+
+function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
+  const [extras, setExtras] = useState<Schema<'ExtraItemOut'>[] | null>(null);
+  const target = day.targets.kcal;
+  const eaten = Math.round(day.flow.eaten.kcal);
+  const remaining = target - eaten;
+  const share = target ? eaten / target : 1;
+  const proteinShort = Math.round(day.targets.protein_g - day.flow.eaten.protein_g);
+
+  const loadExtras = useCallback(async () => {
+    try {
+      setExtras(((await api.get(`/days/${day.date}/plan`)) as Schema<'DayPlanOut'>).extras);
+    } catch {
+      setExtras([]);
+    }
+  }, [day.date]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadExtras();
+    }, [loadExtras]),
+  );
+
+  const removeExtra = (item: Schema<'ExtraItemOut'>) =>
+    Alert.alert('移除點心', `確定移除「${item.name}」？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '移除',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/days/${day.date}/meals/extras/items/${item.id}`);
+            await loadExtras();
+            onChanged();
+          } catch (error) {
+            Alert.alert('移除不了', error instanceof ApiError ? error.message : '請稍後再試');
+          }
+        },
+      },
+    ]);
+
+  const addSnack = () =>
+    router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } });
 
   return (
     <View className="flex-1 gap-4">
@@ -1570,17 +1709,51 @@ function DoneStep({ day }: { day: Today }) {
 
       <Card className="gap-3">
         <Text className="font-display text-4xl font-bold text-ink">
-          {Math.round(day.flow.eaten.kcal).toLocaleString()}{' '}
-          <Text className="text-base font-normal text-muted">
-            / {day.targets.kcal.toLocaleString()} 大卡
-          </Text>
+          {eaten.toLocaleString()}{' '}
+          <Text className="text-base font-normal text-muted">/ {target.toLocaleString()} 大卡</Text>
         </Text>
-        <Text className={`text-base ${remaining >= 0 ? 'text-good' : 'text-warm'}`}>
-          {remaining >= 0
-            ? `還有 ${Math.round(remaining)} 大卡的空間`
-            : `超過 ${Math.round(-remaining)} 大卡`}
-        </Text>
+        {remaining < 0 ? (
+          <Text className="text-base text-warm">超過 {(-remaining).toLocaleString()} 大卡</Text>
+        ) : share < UNDER_EATING_SHARE ? (
+          <View className="gap-1">
+            <Text className="text-base font-semibold text-warm">只吃了目標的 {Math.round(share * 100)}%</Text>
+            <Hint>
+              吃太少容易流失肌肉，隔天也更容易餓。
+              {proteinShort > 0 ? `可以補一份蛋白質，還差 ${proteinShort} g。` : ''}
+            </Hint>
+          </View>
+        ) : (
+          <Text className="text-base text-good">還有 {remaining.toLocaleString()} 大卡的空間</Text>
+        )}
         {day.streak > 0 ? <Hint>連續 {day.streak} 天完成流程。</Hint> : null}
+      </Card>
+
+      <Card className="gap-2">
+        <SectionHeading
+          action={<TextAction icon={PlusIcon} label="補記點心" onPress={addSnack} className="min-h-[44px] justify-center" />}
+        >
+          點心
+        </SectionHeading>
+        {extras === null ? null : extras.length ? (
+          extras.map((item) => (
+            <View key={item.id} className="min-h-[44px] flex-row items-center gap-2">
+              <Text className="flex-1 text-base text-ink" numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text className="text-sm text-muted">{Math.round(item.nutrients.kcal)} 大卡</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`移除${item.name}`}
+                onPress={() => removeExtra(item)}
+                className="h-11 w-11 items-center justify-center active:opacity-60"
+              >
+                <CloseIcon size={18} tint={color.muted} />
+              </Pressable>
+            </View>
+          ))
+        ) : (
+          <Hint>三餐以外吃的東西記在這裡，記下就算吃了。</Hint>
+        )}
       </Card>
 
       <Hint>想改哪一步，點上面的進度列回去。</Hint>

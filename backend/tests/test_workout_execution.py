@@ -81,6 +81,43 @@ async def test_removing_every_scheduled_item_does_not_recreate_the_day(
     assert (await _day_items(with_profile)) == []
 
 
+async def test_a_days_workout_can_be_taken_off_for_that_day_only(with_profile: AsyncClient):
+    _, _, template = await _workout(with_profile)
+    assert len(await _day_items(with_profile)) == 1
+
+    cleared = await with_profile.delete(f"/days/{DAY}/workout")
+    assert cleared.status_code == 204
+
+    # Opening the day again does not bring the scheduled template back.
+    workout = (await with_profile.get(f"/days/{DAY}/workout")).json()
+    assert (workout["template"], workout["items"]) == (None, [])
+    # A rest day now: the flow no longer waits on the workout.
+    day = (await with_profile.get(f"/days/{DAY}")).json()
+    assert "workout" not in day["flow"]["waiting"]
+    # The schedule and the template itself are untouched.
+    schedule = (await with_profile.get("/workout-schedule")).json()
+    assert [entry["template_id"] for entry in schedule] == [template["id"]]
+    assert (await with_profile.get(f"/workout-templates/{template['id']}")).status_code == 200
+
+
+async def test_a_workout_with_a_logged_set_is_not_taken_off(with_profile: AsyncClient):
+    original, _, _template = await _workout(with_profile)
+    item_id = (await _day_items(with_profile))[0]["id"]
+    await with_profile.put(
+        f"/days/{DAY}/workout/sets",
+        json={
+            "day_workout_item_id": item_id,
+            "exercise_id": original["id"],
+            "set_index": 0,
+            "reps_done": 10,
+        },
+    )
+
+    refused = await with_profile.delete(f"/days/{DAY}/workout")
+    assert refused.status_code == 422
+    assert len(await _day_items(with_profile)) == 1
+
+
 async def test_day_can_be_saved_as_an_owned_template_without_modifying_public_source(
     with_profile: AsyncClient,
 ):
@@ -698,7 +735,7 @@ async def test_day_items_say_which_equipment_the_exercise_uses(with_profile: Asy
     assert items[0]["equipment"] == "bodyweight"
 
 
-async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: AsyncClient):
+async def test_todays_target_counts_the_workout_once_it_is_done(with_exercises: AsyncClient):
     await _profile(with_exercises)
     today = datetime.now(ZoneInfo("Asia/Taipei")).date()
     template = (
@@ -721,9 +758,9 @@ async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: 
         json=[{"weekday": today.weekday(), "location": "home", "template_id": template["id"]}],
     )
 
-    # Before training: the whole plan, (5 - 1) MET x 56 kg x 1 h = 224, half added back.
-    planned = (await with_exercises.get(f"/days/{today}")).json()["targets"]
-    assert (planned["base_kcal"], planned["exercise_kcal"], planned["kcal"]) == (1340, 112, 1452)
+    # Before training the planned hour adds nothing yet.
+    before = (await with_exercises.get(f"/days/{today}")).json()["targets"]
+    assert (before["base_kcal"], before["exercise_kcal"], before["kcal"]) == (1340, 0, 1340)
 
     squat = (await with_exercises.get(f"/days/{today}/workout")).json()["items"][0]["item"]
     await with_exercises.put(
@@ -734,8 +771,8 @@ async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: 
             "set_index": 0,
         },
     )
-    # Halfway, the plan still stands.
-    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 112
+    # Nor does a set logged halfway through.
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 0
 
     # Finished with only the squat's one set done, and no clock: the set's own 90 s count,
     # 4 x 56 x 90 s = 6 kcal, half of it added back.
@@ -817,13 +854,24 @@ async def test_a_clock_shorter_than_the_sets_never_lowers_the_estimate(
     assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 63
 
 
-async def test_the_plan_counts_counted_sets_without_a_template(with_exercises: AsyncClient):
-    # Today, not settled yet: the target plans around the whole workout.
+async def test_a_skipped_workout_adds_nothing_today(with_exercises: AsyncClient):
     today = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
-    await _unplanned_day(with_exercises, today)
-    # Walk 47 + squat 3 x 90 s = 17, half of the 64 added back.
-    targets = (await with_exercises.get(f"/days/{today}")).json()["targets"]
-    assert targets["exercise_kcal"] == 32
+    _squat, walk = await _unplanned_day(with_exercises, today)
+    await with_exercises.put(
+        f"/days/{today}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+    await with_exercises.patch(f"/days/{today}", json={"workout_skipped": True})
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 0
+
+
+async def test_a_past_day_counts_what_was_logged(with_exercises: AsyncClient):
+    # The day is over, so its record stands whether or not it was marked done.
+    _squat, walk = await _unplanned_day(with_exercises)
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+    # Walk: (6 - 1) x 56 kg x 600 s = 47, half of it added back.
+    assert (await with_exercises.get(f"/days/{DAY}")).json()["targets"]["exercise_kcal"] == 24
 
 
 async def test_rewriting_a_record_keeps_when_its_sets_were_logged(with_profile: AsyncClient):
@@ -900,4 +948,28 @@ async def test_an_impossible_speed_or_incline_is_rejected(with_exercises: AsyncC
             json={"sets": [{"duration_sec": 600, **bad}]},
         )
         assert response.status_code == 422, bad
+
+
+async def test_reps_are_a_number_or_a_range(with_exercises: AsyncClient):
+    await _profile(with_exercises)
+    for reps, status in (("12", 201), ("10-12", 201), ("10–12", 201), ("abc", 422), ("10次", 422)):
+        response = await with_exercises.post(
+            f"/days/{DAY}/workout/items",
+            json={"exercise_id": "barbell-back-squat", "sets": 3, "reps": reps},
+        )
+        assert response.status_code == status, reps
+    item_id = (await _day_items(with_exercises))[0]["id"]
+    patched = await with_exercises.patch(
+        f"/days/{DAY}/workout/items/{item_id}", json={"reps": "abc"}
+    )
+    assert patched.status_code == 422
+    template = await with_exercises.post(
+        "/workout-templates",
+        json={
+            "category_id": "strength",
+            "name": "壞次數",
+            "items": [{"exercise_id": "barbell-back-squat", "sets": 3, "reps": "abc"}],
+        },
+    )
+    assert template.status_code == 422
 
