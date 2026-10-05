@@ -32,7 +32,8 @@ _ALTERNATIVE_LIMIT = 3
 # Foods logged this recently go to the front of the names the recognizer is shown.
 _RECENT_WINDOW = timedelta(days=60)
 # An ANALYZING claim older than this was abandoned (the server died mid-call) and can be
-# retried. Well past the recognizer's 30 s timeout, so a live analysis is never taken over.
+# retried. Well past the recognizer's longest wait (the photo download and two 40 s attempts),
+# so a live analysis is never taken over.
 _ANALYSIS_LEASE = timedelta(minutes=2)
 
 

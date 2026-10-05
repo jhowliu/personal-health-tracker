@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,11 @@ class Settings(BaseSettings):
     # Use this hostname in presigned URLs when MinIO is private to the API network.
     s3_public_endpoint: str = ""
 
+    # Who reads meal photos. Either works with the same prompt; "openai" is the way back.
+    photo_recognizer: Literal["anthropic", "openai"] = "anthropic"
+    anthropic_api_key: str = ""
+    anthropic_photo_model: str = "claude-opus-5-5"
+    anthropic_photo_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
     jev_api_key: str = ""

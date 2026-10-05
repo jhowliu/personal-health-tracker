@@ -6,6 +6,7 @@ from typing import Annotated
 import aiosqlite
 from fastapi import Depends, Header, HTTPException, status
 
+from app.adapters.ai.claude import ClaudeImageRecognizer
 from app.adapters.ai.jev import JevDecisionEngine
 from app.adapters.ai.openai import OpenAIImageRecognizer
 from app.adapters.auth.identities import OidcIdentityVerifier
@@ -93,8 +94,12 @@ def decision_engine() -> JevDecisionEngine:
 
 
 @lru_cache(maxsize=1)
-def image_recognizer() -> OpenAIImageRecognizer:
-    return OpenAIImageRecognizer(settings.openai_api_key, settings.openai_model)
+def image_recognizer() -> ClaudeImageRecognizer | OpenAIImageRecognizer:
+    if settings.photo_recognizer == "openai":
+        return OpenAIImageRecognizer(settings.openai_api_key, settings.openai_model)
+    return ClaudeImageRecognizer(
+        settings.anthropic_api_key, settings.anthropic_photo_model, settings.anthropic_photo_effort
+    )
 
 
 DbConn = Annotated[aiosqlite.Connection, Depends(db_dep)]
