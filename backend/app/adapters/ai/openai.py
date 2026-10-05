@@ -1,36 +1,14 @@
 """OpenAI implementations of image recognition and bounded decisions."""
 
 import json
-from typing import Literal
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from app.adapters.ai.meal_photo import USER_TEXT, MealPhotoOutput, instructions, to_recognitions
 from app.domain.decisions import DecisionRequest, DecisionResult
 from app.domain.errors import ServiceUnavailable
-from app.domain.meal_photos import EstimatedFood, Recognition
-from app.domain.models import Nutrients
-
-
-class _RecognizedImageItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    label: str = Field(min_length=1, max_length=120)
-    library_name: str | None = Field(max_length=120)
-    library_confidence: float = Field(ge=0, le=1)
-    grams: float = Field(gt=0, le=5000)
-    confidence: float = Field(ge=0, le=1)
-    category_id: Literal["staple", "protein", "vegetable", "fruit", "fat_sauce"]
-    kcal_per_100g: float = Field(ge=0, le=1000)
-    protein_per_100g: float = Field(ge=0, le=100)
-    fat_per_100g: float = Field(ge=0, le=100)
-    carb_per_100g: float = Field(ge=0, le=100)
-
-
-class _ImageOutput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    items: list[_RecognizedImageItem] = Field(max_length=20)
+from app.domain.meal_photos import Recognition
 
 
 class _DecisionOutput(BaseModel):
@@ -108,55 +86,19 @@ class OpenAIImageRecognizer(OpenAIDecisionEngine):
     async def recognize(
         self, image_url: str, known_foods: tuple[str, ...]
     ) -> tuple[Recognition, ...]:
-        library = "\n".join(f"- {name}" for name in known_foods) or "(none)"
         output = await self._structured(
             "meal_photo",
-            _ImageOutput,
+            MealPhotoOutput,
             [
-                {
-                    "role": "system",
-                    "content": (
-                        "Identify visible food items. For each one:\n"
-                        "- label: a short food name for what it looks like (a name such as "
-                        "豬肉片 or 糙米飯, not a description), in Traditional Chinese as commonly "
-                        "used in Taiwan.\n"
-                        "- library_name: the user's food below that is the same food, copied "
-                        "exactly as written; null when none of them is. A similar food is not "
-                        "the same food: pork belly is not pork collar, white rice is not brown "
-                        "rice.\n"
-                        "- library_confidence: how sure you are that library_name is the same "
-                        "food; 0 when it is null.\n"
-                        "Estimate edible grams conservatively. Also estimate the closest allowed "
-                        "category and macronutrients per 100g.\n"
-                        f"User's foods:\n{library}"
-                    ),
-                },
+                {"role": "system", "content": instructions(known_foods)},
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": "Return each visible food as JSON."},
+                        {"type": "text", "text": USER_TEXT},
                         {"type": "image_url", "image_url": {"url": image_url}},
                     ],
                 },
             ],
         )
-        assert isinstance(output, _ImageOutput)
-        return tuple(
-            Recognition(
-                item.label,
-                item.grams,
-                item.confidence,
-                EstimatedFood(
-                    item.category_id,
-                    Nutrients(
-                        item.kcal_per_100g,
-                        item.protein_per_100g,
-                        item.fat_per_100g,
-                        item.carb_per_100g,
-                    ),
-                ),
-                item.library_name,
-                item.library_confidence if item.library_name else 0.0,
-            )
-            for item in output.items
-        )
+        assert isinstance(output, MealPhotoOutput)
+        return to_recognitions(output)

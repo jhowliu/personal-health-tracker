@@ -12,6 +12,7 @@ from seeds.foods import seed as seed_foods
 
 @pytest.fixture(autouse=True)
 def isolate_ai_settings(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "anthropic_api_key", "")
     monkeypatch.setattr(settings, "openai_api_key", "")
     monkeypatch.setattr(settings, "jev_api_key", "")
 

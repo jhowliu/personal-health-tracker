@@ -5,8 +5,9 @@ Spec: `spec.pdf` · Wireframes: `wireframe.pdf` · Domain terms: [`CONTEXT.md`](
 
 - **P1** Accounts, daily targets, body tracking, workouts, daily flow
 - **P2** Food catalog, meals, substitution, auto-plan
-- **P3** Meal-photo recognition (OpenAI), workout swaps. Without `OPENAI_API_KEY` those endpoints
-  answer "not configured"; nothing is made up.
+- **P3** Meal-photo recognition (Claude by default, OpenAI with `PHOTO_RECOGNIZER=openai`), workout
+  swaps. Without the chosen service's API key those endpoints answer "not configured"; nothing is
+  made up.
 
 ## Architecture
 
