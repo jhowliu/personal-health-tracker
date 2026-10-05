@@ -25,6 +25,8 @@ import {
   adjustRest,
   awaitingFeedback,
   completeCurrent,
+  currentWarmup,
+  finishedWarmups,
   elapsedMs,
   fromWorkout,
   isDone,
@@ -37,6 +39,7 @@ import {
   setFeedback,
   settleRest,
   skipRest,
+  skipWarmup,
   step,
   summary,
   upNext,
@@ -191,7 +194,11 @@ export default function FocusWorkout() {
 
   const restBody = (next: Session) => {
     const coming = next.exercises[next.currentIndex];
-    return next.rest?.nextIsNewExercise ? `下一個：${coming.name}` : `開始第 ${coming.logs.length + 1} 組`;
+    if (next.rest?.nextIsNewExercise) return `下一個：${coming.name}`;
+    const warm = currentWarmup(coming);
+    return warm
+      ? `熱身第 ${warm.number} 組：${kg(warm.set.weightKg)} kg × ${warm.set.reps}`
+      : `開始第 ${coming.logs.length + 1} 組`;
   };
 
   const complete = async () => {
@@ -199,23 +206,26 @@ export default function FocusWorkout() {
     if (busy || at - lastTap.current < DOUBLE_TAP_MS) return;
     lastTap.current = at;
     const { session: next, log, finished } = completeCurrent(session, at);
-    setBusy(true);
-    try {
-      await putSet({
-        day_workout_item_id: log.itemId,
-        exercise_id: log.exerciseId,
-        set_index: log.setIndex,
-        reps_done: log.reps,
-        duration_sec: log.durationSec,
-        weight_kg: log.weightKg,
-        speed_kmh: log.speedKmh,
-        incline_pct: log.inclinePct,
-      });
-    } catch (error) {
-      Alert.alert('這組沒有記錄到', error instanceof ApiError ? error.message : '請確認網路後再按一次。');
-      return;
-    } finally {
-      setBusy(false);
+    // A warm-up set is only counted on the phone; a working set goes to the server first.
+    if (log) {
+      setBusy(true);
+      try {
+        await putSet({
+          day_workout_item_id: log.itemId,
+          exercise_id: log.exerciseId,
+          set_index: log.setIndex,
+          reps_done: log.reps,
+          duration_sec: log.durationSec,
+          weight_kg: log.weightKg,
+          speed_kmh: log.speedKmh,
+          incline_pct: log.inclinePct,
+        });
+      } catch (error) {
+        Alert.alert('這組沒有記錄到', error instanceof ApiError ? error.message : '請確認網路後再按一次。');
+        return;
+      } finally {
+        setBusy(false);
+      }
     }
     setCardio({ since: null, spentMs: 0 });
     if (finished) {
@@ -238,6 +248,11 @@ export default function FocusWorkout() {
   const endRest = () => {
     void cancelRestAlarm(date);
     setSession(skipRest(session));
+  };
+
+  const endWarmup = () => {
+    void cancelRestAlarm(date);
+    setSession(skipWarmup(session));
   };
 
   // The sheet closes before navigating, so it is not still open on the way back.
@@ -329,7 +344,9 @@ export default function FocusWorkout() {
     isDone(candidate) ? ('done' as const) : index === session.currentIndex ? ('current' as const) : ('todo' as const),
   );
   const setNumber = exercise.kind === 'sets' ? exercise.logs.length + 1 : 1;
-  const finalSet = exercise.kind === 'time' || exercise.logs.length === exercise.plannedSets - 1;
+  const warmup = currentWarmup(exercise);
+  const warmedUp = finishedWarmups(exercise);
+  const finalSet = !warmup && (exercise.kind === 'time' || exercise.logs.length === exercise.plannedSets - 1);
   const after = upNext(session);
   const lastOfDay = finalSet && after === -1;
   const finished = resting ? session.exercises.find((candidate) => candidate.itemId === session.rest?.finishedItemId) : undefined;
@@ -378,7 +395,11 @@ export default function FocusWorkout() {
         ) : null}
         {resting ? (
           <Text className="text-sm font-bold text-primary">
-            {session.rest?.nextIsNewExercise ? '下一個動作' : `下一組 · 第 ${setNumber} / ${exercise.plannedSets} 組`}
+            {session.rest?.nextIsNewExercise
+              ? '下一個動作'
+              : warmup
+                ? `下一組 · 熱身 ${warmup.number} / ${warmup.total}`
+                : `下一組 · 第 ${setNumber} / ${exercise.plannedSets} 組`}
           </Text>
         ) : null}
         <Text className="text-[30px] font-bold leading-tight text-ink">{exercise.name}</Text>
@@ -412,6 +433,22 @@ export default function FocusWorkout() {
                 {cardio.since !== null ? '暫停' : cardio.spentMs > 0 ? '繼續計時' : '開始計時'}
               </Text>
             </Pressable>
+          </View>
+        ) : warmup ? (
+          // Warm-up sets are fixed by the working weight below; only the working set has steppers.
+          <View className="gap-0.5 pb-1.5 pt-4">
+            <View className="flex-row items-baseline gap-1.5">
+              <Text className="text-[52px] font-extrabold text-warm" style={tabular}>
+                熱身 {warmup.number}
+              </Text>
+              <Text className="text-[17px] text-muted">/ {warmup.total} 組</Text>
+            </View>
+            <Text className="text-[26px] font-bold text-ink" style={tabular}>
+              {kg(warmup.set.weightKg)} kg × {warmup.set.reps} 下
+            </Text>
+            <Text className="text-[13px] text-muted">
+              依正式組 {kg(exercise.weightKg ?? 0)} kg 計算，改下面的重量會跟著變
+            </Text>
           </View>
         ) : (
           <View className="flex-row items-center justify-between pb-1.5 pt-4">
@@ -462,20 +499,32 @@ export default function FocusWorkout() {
           <>
             {exercise.weightKg !== null ? (
               <Stepper
-                label="重量"
+                label={warmup ? '正式組重量' : '重量'}
                 value={kg(exercise.weightKg)}
                 unit="kg"
                 onStep={(direction) => setSession(step(session, 'weight', direction))}
               />
             ) : null}
             <Stepper
-              label="次數"
+              label={warmup ? '正式組次數' : '次數'}
               value={String(exercise.reps)}
               unit="下"
               onStep={(direction) => setSession(step(session, 'reps', direction))}
             />
           </>
         )}
+
+        {warmedUp.length ? (
+          <View className="mt-2.5 flex-row flex-wrap gap-1.5">
+            {warmedUp.map((set, index) => (
+              <View key={index} className="rounded-full bg-warm-soft px-2.5 py-1.5">
+                <Text className="text-[13px] font-semibold text-warm" style={tabular}>
+                  ✓ 熱身 {kg(set.weightKg)} × {set.reps}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {exercise.kind === 'sets' && exercise.logs.length ? (
           <View className="mt-2.5 flex-row flex-wrap gap-1.5">
@@ -523,13 +572,24 @@ export default function FocusWorkout() {
               <Text className="text-[19px] font-bold text-white">
                 {busy
                   ? '記錄中…'
-                  : exercise.kind === 'time'
-                    ? '完成這個動作'
-                    : lastOfDay
-                      ? '完成最後一組'
-                      : `完成第 ${setNumber} 組`}
+                  : warmup
+                    ? `完成熱身第 ${warmup.number} 組`
+                    : exercise.kind === 'time'
+                      ? '完成這個動作'
+                      : lastOfDay
+                        ? '完成最後一組'
+                        : `完成第 ${setNumber} 組`}
               </Text>
             </Pressable>
+            {warmup ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={endWarmup}
+                className="min-h-[44px] items-center justify-center"
+              >
+                <Text className="text-base font-semibold text-primary">略過熱身，直接做正式組</Text>
+              </Pressable>
+            ) : null}
           </>
         )}
       </View>

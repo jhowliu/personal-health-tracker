@@ -16,6 +16,16 @@ export type Effort = 'easy' | 'appropriate' | 'hard';
 
 /** Rest is fixed (spec §10); the user nudges it in 30-second steps while resting. */
 export const REST_SEC = 90;
+/** Between two warm-up sets, which are light; the rest into the first working set is REST_SEC. */
+export const WARMUP_REST_SEC = 60;
+/** A working weight below this needs no warming up to. */
+export const WARMUP_MIN_KG = 10;
+/** The warm-up ramp: a share of the working weight, for this many reps. */
+const WARMUP_STEPS = [
+  { share: 0.5, reps: 8 },
+  { share: 0.7, reps: 5 },
+  { share: 0.85, reps: 3 },
+] as const;
 export const REST_STEP_SEC = 30;
 export const WEIGHT_STEP_KG = 2.5;
 /** A treadmill's speed and incline start here when first touched, and move this much. */
@@ -24,6 +34,7 @@ export const SPEED_STEP_KMH = 0.5;
 export const INCLINE_STEP_PCT = 1;
 
 export type SetRecord = { weightKg: number | null; reps: number };
+export type WarmupSet = { weightKg: number; reps: number };
 
 export type FocusExercise = {
   itemId: string;
@@ -54,6 +65,12 @@ export type FocusExercise = {
   suggestedWeightKg: number | null;
   /** How the whole exercise felt, asked once it is done. */
   feedback: Effort | null;
+  /**
+   * Warm-up sets done before the first working set. They are a guide on the phone only, never
+   * logged: the clock already counts their time, and they would skew the set count and volume.
+   */
+  warmupsDone: number;
+  warmupSkipped: boolean;
 };
 
 export type Rest = {
@@ -74,6 +91,38 @@ export type Session = {
   exercises: FocusExercise[];
   rest: Rest | null;
 };
+
+/**
+ * The warm-up sets leading to `workingKg`: half, seven tenths and most of it, rounded down to
+ * the 2.5 kg a plate changes by. None for bodyweight work or a working weight under 10 kg.
+ */
+export function warmupPlan(workingKg: number | null): WarmupSet[] {
+  if (workingKg === null || workingKg < WARMUP_MIN_KG) return [];
+  const sets: WarmupSet[] = [];
+  for (const { share, reps } of WARMUP_STEPS) {
+    const weightKg = Math.floor((workingKg * share) / WEIGHT_STEP_KG) * WEIGHT_STEP_KG;
+    // A light working weight rounds two steps to the same plate; keep the first.
+    if (weightKg <= 0 || weightKg >= workingKg || sets.some((set) => set.weightKg === weightKg)) continue;
+    sets.push({ weightKg, reps });
+  }
+  return sets;
+}
+
+/**
+ * The warm-up set due now, while an exercise has no working set yet: worked out from the
+ * working weight on the stepper, so changing it changes the ramp. Null once warmed up,
+ * skipped, or for anything without a weight to warm up to.
+ */
+export function currentWarmup(exercise: FocusExercise): { set: WarmupSet; number: number; total: number } | null {
+  if (exercise.kind !== 'sets' || exercise.logs.length > 0 || exercise.warmupSkipped) return null;
+  const plan = warmupPlan(exercise.weightKg);
+  const set = plan[exercise.warmupsDone];
+  return set ? { set, number: exercise.warmupsDone + 1, total: plan.length } : null;
+}
+
+/** The warm-up sets an exercise has already done, for their chips. */
+export const finishedWarmups = (exercise: FocusExercise) =>
+  exercise.logs.length > 0 || exercise.warmupSkipped ? [] : warmupPlan(exercise.weightKg).slice(0, exercise.warmupsDone);
 
 /** What a completed set means for the server: one log to PUT. */
 export type SetToLog = {
@@ -150,6 +199,8 @@ export function fromWorkout(workout: Workout, now: number): Session {
         : null,
       suggestedWeightKg: suggested_weight_kg ?? null,
       feedback: null,
+      warmupsDone: 0,
+      warmupSkipped: false,
     } satisfies FocusExercise;
   });
   const first = exercises.findIndex((exercise) => !isDone(exercise));
@@ -184,6 +235,8 @@ export function restore(stored: Session, fresh: Session): Session {
           speedKmh: before.speedKmh ?? exercise.speedKmh,
           inclinePct: before.inclinePct ?? exercise.inclinePct,
           feedback: before.feedback,
+          warmupsDone: before.warmupsDone ?? 0,
+          warmupSkipped: before.warmupSkipped ?? false,
         }
       : exercise;
   });
@@ -202,14 +255,25 @@ const replaceAt = (exercises: FocusExercise[], index: number, exercise: FocusExe
 /**
  * The main button: log the current set (or the timed exercise) and move on. Rests follow a
  * set when another set, or another strength exercise, comes next; never after the last set
- * of the day, and never after cardio (spec §5).
+ * of the day, and never after cardio (spec §5). A warm-up set is counted on the phone and
+ * logs nothing; a short rest follows it, and the full one leads into the first working set.
  */
 export function completeCurrent(
   session: Session,
   now: number,
-): { session: Session; log: SetToLog; finished: boolean } {
+): { session: Session; log: SetToLog | null; finished: boolean } {
   const index = session.currentIndex;
   const exercise = session.exercises[index];
+  const warmup = currentWarmup(exercise);
+  if (warmup) {
+    const updated = { ...exercise, warmupsDone: exercise.warmupsDone + 1 };
+    const restSec = warmup.number < warmup.total ? WARMUP_REST_SEC : REST_SEC;
+    return {
+      session: { ...session, exercises: replaceAt(session.exercises, index, updated), rest: startRest(now, false, null, restSec) },
+      log: null,
+      finished: false,
+    };
+  }
   const log: SetToLog =
     exercise.kind === 'time'
       ? {
@@ -259,12 +323,28 @@ export function completeCurrent(
   };
 }
 
-const startRest = (now: number, nextIsNewExercise: boolean, finishedItemId: string | null): Rest => ({
-  endsAt: now + REST_SEC * 1000,
-  totalSec: REST_SEC,
+const startRest = (
+  now: number,
+  nextIsNewExercise: boolean,
+  finishedItemId: string | null,
+  restSec = REST_SEC,
+): Rest => ({
+  endsAt: now + restSec * 1000,
+  totalSec: restSec,
   nextIsNewExercise,
   finishedItemId,
 });
+
+/** 略過熱身: straight to the working sets of the exercise on screen. */
+export function skipWarmup(session: Session): Session {
+  const index = session.currentIndex;
+  const exercise = session.exercises[index];
+  return {
+    ...session,
+    exercises: replaceAt(session.exercises, index, { ...exercise, warmupSkipped: true }),
+    rest: null,
+  };
+}
 
 /** −30 / +30 seconds. Taking off more than is left ends the rest. */
 export function adjustRest(session: Session, deltaSec: number, now: number): Session {

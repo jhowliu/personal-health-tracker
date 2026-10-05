@@ -1,11 +1,14 @@
 import type { Schema } from '@/api/client';
 import {
   REST_SEC,
+  WARMUP_REST_SEC,
   adjustRest,
   awaitingFeedback,
   completeCurrent,
+  currentWarmup,
   elapsedMs,
-  fromWorkout,
+  finishedWarmups,
+  fromWorkout as startSession,
   jumpTo,
   pause,
   restLeftSec,
@@ -14,9 +17,11 @@ import {
   setFeedback,
   settleRest,
   skipRest,
+  skipWarmup,
   step,
   summary,
   upNext,
+  warmupPlan,
   type Session,
 } from '@/workouts/focus/session';
 
@@ -74,6 +79,15 @@ function workout(items: ItemSpec[]): Workout {
     })),
   } as unknown as Workout;
 }
+
+/**
+ * Most tests here are about working sets, so their sessions start with the warm-ups already
+ * skipped; the warm-up tests at the end use startSession itself.
+ */
+const fromWorkout = (planned: Workout, now: number): Session => {
+  const session = startSession(planned, now);
+  return { ...session, exercises: session.exercises.map((exercise) => ({ ...exercise, warmupSkipped: true })) };
+};
 
 /** Complete the current set `times` times, skipping each rest, and return the session. */
 function doSets(session: Session, times: number, now = T0): Session {
@@ -316,4 +330,84 @@ it('picks up exercises added or swapped while focus mode was away', () => {
   expect(restored.exercises[0].weightKg).toBe(40);
   expect(restored.exercises[1].weightKg).toBe(60);
   expect(restored.exercises[2].weightKg).toBe(20);
+});
+
+describe('warming up', () => {
+  it('ramps to the working weight in 2.5 kg steps, and only for a weight worth warming up to', () => {
+    expect(warmupPlan(60)).toEqual([
+      { weightKg: 30, reps: 8 },
+      { weightKg: 40, reps: 5 },
+      { weightKg: 50, reps: 3 },
+    ]);
+    // 70% of 10 kg rounds down to the same 5 kg as half of it, so it is left out.
+    expect(warmupPlan(10)).toEqual([
+      { weightKg: 5, reps: 8 },
+      { weightKg: 7.5, reps: 3 },
+    ]);
+    expect(warmupPlan(7.5)).toEqual([]);
+    expect(warmupPlan(0)).toEqual([]);
+    expect(warmupPlan(null)).toEqual([]);
+  });
+
+  it('comes before the first working set, logs nothing, and rests into the working sets', () => {
+    let session = startSession(workout([{ id: 'squat', weightKg: 60, sets: 2 }]), T0);
+    expect(currentWarmup(session.exercises[0])).toMatchObject({ number: 1, total: 3, set: { weightKg: 30, reps: 8 } });
+
+    for (const number of [1, 2]) {
+      const result = completeCurrent(session, T0);
+      expect(result.log).toBeNull();
+      expect(result.session.rest).toMatchObject({ totalSec: WARMUP_REST_SEC, nextIsNewExercise: false });
+      session = skipRest(result.session);
+      expect(currentWarmup(session.exercises[0])?.number).toBe(number + 1);
+    }
+
+    // The last warm-up leads into the first working set, with the full rest.
+    const lastWarmup = completeCurrent(session, T0);
+    expect(lastWarmup.log).toBeNull();
+    expect(lastWarmup.session.rest?.totalSec).toBe(REST_SEC);
+    session = skipRest(lastWarmup.session);
+    expect(currentWarmup(session.exercises[0])).toBeNull();
+    expect(finishedWarmups(session.exercises[0])).toHaveLength(3);
+
+    const working = completeCurrent(session, T0);
+    expect(working.log).toMatchObject({ setIndex: 0, weightKg: 60 });
+    expect(working.session.exercises[0].logs).toHaveLength(1);
+    expect(summary(working.session).sets).toBe(1);
+  });
+
+  it('follows the working weight on the stepper', () => {
+    const session = step(startSession(workout([{ id: 'squat', weightKg: 60 }]), T0), 'weight', -1);
+    expect(currentWarmup(session.exercises[0])?.set).toEqual({ weightKg: 27.5, reps: 8 });
+  });
+
+  it('is left out for bodyweight, timed or light work, and once a working set is logged', () => {
+    const session = startSession(
+      workout([
+        { id: 'push-up', weightKg: null, equipment: 'bodyweight' },
+        { id: 'run', durationSec: 600, reps: null, weightKg: null, equipment: null },
+        { id: 'curl', weightKg: 7.5, equipment: 'dumbbell' },
+        { id: 'squat', weightKg: 60, logs: [{ weight_kg: 60, reps_done: 8 }] },
+      ]),
+      T0,
+    );
+
+    expect(session.exercises.map(currentWarmup)).toEqual([null, null, null, null]);
+  });
+
+  it('can be skipped straight to the working sets', () => {
+    const resting = completeCurrent(startSession(workout([{ id: 'squat', weightKg: 60 }]), T0), T0).session;
+    const skipped = skipWarmup(resting);
+
+    expect(skipped.rest).toBeNull();
+    expect(currentWarmup(skipped.exercises[0])).toBeNull();
+    expect(completeCurrent(skipped, T0).log).toMatchObject({ setIndex: 0, weightKg: 60 });
+  });
+
+  it('keeps its progress when focus mode comes back', () => {
+    const planned = workout([{ id: 'squat', weightKg: 60 }]);
+    const stored = skipRest(completeCurrent(startSession(planned, T0), T0).session);
+    const restored = restore(stored, startSession(planned, T0 + sec(300)));
+
+    expect(currentWarmup(restored.exercises[0])?.number).toBe(2);
+  });
 });
