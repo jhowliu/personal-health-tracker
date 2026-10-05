@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
 
 import { Alert } from '@/components/alert';
 import { CameraIcon } from '@/components/icons';
@@ -20,6 +20,8 @@ export default function MealPhotoCapture() {
   }>();
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Busy covers choosing the source too; only once a photo is picked is it being recognized.
+  const analyzing = busy && preview !== null;
   const parentRoute = destination === 'meal'
     ? ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const)
     : destination === 'day'
@@ -40,6 +42,7 @@ export default function MealPhotoCapture() {
   }, [date, destination, meal_id, slot]);
 
   const choose = async () => {
+    setPreview(null);
     setBusy(true);
     try {
       const analysis = await pickAndAnalyzeMealPhoto(setPreview);
@@ -59,8 +62,8 @@ export default function MealPhotoCapture() {
   return (
     <Screen
       footer={
-        <PrimaryButton onPress={choose} busy={busy}>
-          {busy ? '辨識中…' : '選擇餐點照片'}
+        <PrimaryButton onPress={choose} disabled={busy} busy={analyzing}>
+          {analyzing ? '辨識中…' : '選擇餐點照片'}
         </PrimaryButton>
       }
     >
@@ -70,14 +73,24 @@ export default function MealPhotoCapture() {
       {preview ? (
         <Image source={{ uri: preview }} className="h-64 w-full rounded-card bg-fill" resizeMode="cover" />
       ) : (
-        <Card className="items-center gap-2 py-10">
-          <CameraIcon size={40} />
-          <Text className="text-base font-semibold text-ink">尚未選擇照片</Text>
+        // The empty frame is where the photo goes, so tapping it picks one, like the button below.
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="選擇餐點照片"
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
+          onPress={choose}
+          className="items-center gap-2 rounded-card border-2 border-dashed border-line bg-surface px-4 py-10 active:opacity-70"
+        >
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-soft">
+            <CameraIcon size={32} />
+          </View>
+          <Text className="text-base font-semibold text-primary">點這裡拍照或選照片</Text>
           <Hint>不會自動儲存成餐點，確認後才會加入。</Hint>
-        </Card>
+        </Pressable>
       )}
 
-      {busy ? (
+      {analyzing ? (
         <Card className="flex-row items-center gap-3">
           <ActivityIndicator color={color.primary} />
           <View className="flex-1 gap-0.5">
