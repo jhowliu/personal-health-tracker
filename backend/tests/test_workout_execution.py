@@ -698,7 +698,7 @@ async def test_day_items_say_which_equipment_the_exercise_uses(with_profile: Asy
     assert items[0]["equipment"] == "bodyweight"
 
 
-async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: AsyncClient):
+async def test_todays_target_counts_the_workout_once_it_is_done(with_exercises: AsyncClient):
     await _profile(with_exercises)
     today = datetime.now(ZoneInfo("Asia/Taipei")).date()
     template = (
@@ -721,9 +721,9 @@ async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: 
         json=[{"weekday": today.weekday(), "location": "home", "template_id": template["id"]}],
     )
 
-    # Before training: the whole plan, (5 - 1) MET x 56 kg x 1 h = 224, half added back.
-    planned = (await with_exercises.get(f"/days/{today}")).json()["targets"]
-    assert (planned["base_kcal"], planned["exercise_kcal"], planned["kcal"]) == (1340, 112, 1452)
+    # Before training the planned hour adds nothing yet.
+    before = (await with_exercises.get(f"/days/{today}")).json()["targets"]
+    assert (before["base_kcal"], before["exercise_kcal"], before["kcal"]) == (1340, 0, 1340)
 
     squat = (await with_exercises.get(f"/days/{today}/workout")).json()["items"][0]["item"]
     await with_exercises.put(
@@ -734,8 +734,8 @@ async def test_todays_target_counts_the_plan_then_what_was_done(with_exercises: 
             "set_index": 0,
         },
     )
-    # Halfway, the plan still stands.
-    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 112
+    # Nor does a set logged halfway through.
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 0
 
     # Finished with only the squat's one set done, and no clock: the set's own 90 s count,
     # 4 x 56 x 90 s = 6 kcal, half of it added back.
@@ -817,13 +817,24 @@ async def test_a_clock_shorter_than_the_sets_never_lowers_the_estimate(
     assert (await with_exercises.get(f"/days/{DAY}/workout")).json()["estimated_burn_kcal"] == 63
 
 
-async def test_the_plan_counts_counted_sets_without_a_template(with_exercises: AsyncClient):
-    # Today, not settled yet: the target plans around the whole workout.
+async def test_a_skipped_workout_adds_nothing_today(with_exercises: AsyncClient):
     today = datetime.now(ZoneInfo("Asia/Taipei")).date().isoformat()
-    await _unplanned_day(with_exercises, today)
-    # Walk 47 + squat 3 x 90 s = 17, half of the 64 added back.
-    targets = (await with_exercises.get(f"/days/{today}")).json()["targets"]
-    assert targets["exercise_kcal"] == 32
+    _squat, walk = await _unplanned_day(with_exercises, today)
+    await with_exercises.put(
+        f"/days/{today}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+    await with_exercises.patch(f"/days/{today}", json={"workout_skipped": True})
+    assert (await with_exercises.get(f"/days/{today}")).json()["targets"]["exercise_kcal"] == 0
+
+
+async def test_a_past_day_counts_what_was_logged(with_exercises: AsyncClient):
+    # The day is over, so its record stands whether or not it was marked done.
+    _squat, walk = await _unplanned_day(with_exercises)
+    await with_exercises.put(
+        f"/days/{DAY}/workout/items/{walk}/sets", json={"sets": [{"duration_sec": 600}]}
+    )
+    # Walk: (6 - 1) x 56 kg x 600 s = 47, half of it added back.
+    assert (await with_exercises.get(f"/days/{DAY}")).json()["targets"]["exercise_kcal"] == 24
 
 
 async def test_rewriting_a_record_keeps_when_its_sets_were_logged(with_profile: AsyncClient):

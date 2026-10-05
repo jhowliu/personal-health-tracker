@@ -175,35 +175,16 @@ def estimate_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | N
     return _burn(costed, kcal)
 
 
-def planned_burn_kcal(execution: WorkoutExecution, weight_kg: float) -> int | None:
-    """The same estimate for the whole workout as prescribed, before any of it is done.
-
-    A template's planned minutes, where it gives them, are shared over every exercise in it;
-    without them each counted exercise is costed set by set from its prescription.
-    """
-    planned_min = execution.template.duration_min if execution.template else None
-    share = planned_min * 60 / len(execution.items) if planned_min else None
-
-    def kcal(entry: WorkoutExecutionItem) -> float:
-        seconds = _seconds_prescribed(entry) or share or _prescribed_set_seconds(entry)
-        return _net_kcal(entry.item.met, weight_kg, seconds)
-
-    return _burn([entry for entry in execution.items if entry.item.met], kcal)
-
-
 def burn_for_targets(
-    execution: WorkoutExecution, weight_kg: float, *, settled: bool
+    execution: WorkoutExecution, weight_kg: float, *, finished: bool
 ) -> int:
-    """The workout burn the day's calorie target should count.
+    """The workout burn the day's calorie target should count: what was logged, and only
+    once the workout is finished — marked done, or on a day already past.
 
-    Once the day is settled — the workout marked done or skipped, or the day in the past —
-    only what was logged counts. Before that the plan does, so the extra food is there to
-    plan around in the morning; sets logged beyond the plan are never undercounted.
+    Until then nothing counts, not the plan nor the sets logged so far, so the target never
+    hands out food for training that has not happened yet.
     """
-    logged = estimate_burn_kcal(execution, weight_kg) or 0
-    if settled:
-        return logged
-    return max(logged, planned_burn_kcal(execution, weight_kg) or 0)
+    return (estimate_burn_kcal(execution, weight_kg) or 0) if finished else 0
 
 
 def treadmill_met(speed_kmh: float, incline_pct: float | None) -> float:
@@ -263,11 +244,6 @@ def _seconds_spent(entry: WorkoutExecutionItem) -> float:
     return float(prescribed * len(entry.logs)) if prescribed else 0.0
 
 
-def _seconds_prescribed(entry: WorkoutExecutionItem) -> float:
-    prescribed = entry.item.duration_sec
-    return float(prescribed * (entry.item.sets or 1)) if prescribed else 0.0
-
-
 def _prescribed_reps(entry: WorkoutExecutionItem) -> int:
     match = re.search(r"\d+", entry.item.reps or "")
     return int(match.group()) if match else DEFAULT_REPS
@@ -281,11 +257,6 @@ def _set_seconds(entry: WorkoutExecutionItem) -> float:
             for log in entry.logs
         )
     )
-
-
-def _prescribed_set_seconds(entry: WorkoutExecutionItem) -> float:
-    per_set = _prescribed_reps(entry) * SECONDS_PER_REP + entry.item.rest_sec
-    return float(per_set * (entry.item.sets or 1))
 
 
 def recommend_next_weight(weight_kg: float | None, effort: SetEffort | None) -> float | None:

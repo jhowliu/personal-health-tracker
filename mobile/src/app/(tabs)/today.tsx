@@ -197,6 +197,7 @@ export default function TodayScreen() {
         date={day.date}
         after={stepAfter(day, 'workout')}
         resolved={day.flow.completed.includes('workout')}
+        burnAdded={day.targets.exercise_kcal > 0}
         onDone={() => load(true)}
         onStateChanged={() => refreshAt('workout')}
       />
@@ -271,8 +272,6 @@ function TodayHeader({
       <DaySummary
         eaten={day.flow.eaten}
         targets={day.targets}
-        // Until the workout is done or skipped, today's target counts the plan's burn.
-        burnPlanned={isToday && !day.flow.completed.includes('workout')}
         onAddSnack={() =>
           router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } })
         }
@@ -971,6 +970,7 @@ function WorkoutStep({
   date,
   after,
   resolved,
+  burnAdded,
   onDone,
   onStateChanged,
 }: {
@@ -979,6 +979,8 @@ function WorkoutStep({
   after: string;
   /** The workout step is already done (or skipped) for this date. */
   resolved: boolean;
+  /** The day's target already counts this workout, which it does only once it is done. */
+  burnAdded: boolean;
   onDone: () => void;
   onStateChanged: () => void;
 }) {
@@ -1479,8 +1481,8 @@ function WorkoutStep({
 
             {workout.estimated_burn_kcal ? (
               <Hint>
-                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。其中一半已加進
-                {word}的熱量目標。
+                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。
+                {burnAdded ? `其中一半已加進${word}的熱量目標。` : `標記完成後，其中一半會加進${word}的熱量目標。`}
               </Hint>
             ) : null}
 

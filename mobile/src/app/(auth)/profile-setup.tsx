@@ -236,7 +236,7 @@ function TargetPreview({ targets }: { targets: Targets | null }) {
 
       <Hint>
         基礎代謝 {targets.bmr.toLocaleString()} 大卡，不運動的一天約消耗 {targets.tdee.toLocaleString()} 大卡。
-        有訓練的日子，會再加回訓練消耗的一半。
+        訓練標記完成後，會再加回訓練消耗的一半。
       </Hint>
     </Card>
   );

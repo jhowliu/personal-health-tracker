@@ -88,13 +88,10 @@ function MacroColumn({
 export function DaySummary({
   eaten,
   targets,
-  burnPlanned = false,
   onAddSnack,
 }: {
   eaten: Nutrients;
   targets: Targets;
-  /** The workout is still ahead, so what it adds back is the plan's, not what was done. */
-  burnPlanned?: boolean;
   onAddSnack?: () => void;
 }) {
   const [open, setOpen] = useState(expanded);
@@ -102,7 +99,7 @@ export function DaySummary({
   const remaining = targets.kcal - kcal;
   const over = remaining < 0;
   const added = targets.exercise_kcal;
-  const addedLabel = burnPlanned ? '預計加回' : '訓練加回';
+  const addedLabel = '訓練加回';
 
   const toggle = () => {
     expanded = !open;
