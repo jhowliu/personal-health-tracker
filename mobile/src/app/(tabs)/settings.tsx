@@ -7,6 +7,7 @@ import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
 import { TimezoneRow } from '@/components/TimezoneRow';
 import { Card, PrimaryButton, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { todayISO } from '@/dates';
 import { syncWeighInReminder } from '@/notifications/reminder';
 
 const SEX_OPTIONS = [
@@ -20,6 +21,11 @@ const ACTIVITY_OPTIONS = [
   { value: 'active' as const, label: '粗重勞力' },
 ];
 const DEFICIT_OPTIONS = ([10, 12, 15, 20] as const).map((value) => ({ value, label: `少吃 ${value}%` }));
+// Where the workout sits in the day's flow: after breakfast, or between lunch and dinner.
+const WORKOUT_TIME_OPTIONS = [
+  { value: 'am' as const, label: '早上練（早餐後）' },
+  { value: 'pm' as const, label: '晚上練（晚餐前）' },
+];
 
 export default function SettingsScreen() {
   const { profile, signOut, reload } = useSession();
@@ -52,6 +58,18 @@ export default function SettingsScreen() {
   };
 
   const saveTimezone = (timezone: string) => patchProfile({ timezone });
+
+  // A day takes the profile's workout time when it is first opened, so today is moved along
+  // with it; otherwise the change would only show tomorrow. Earlier days keep theirs.
+  const saveWorkoutTime = async (workout_time: 'am' | 'pm') => {
+    try {
+      await api.patch('/users/me/profile', { workout_time });
+      await api.patch(`/days/${todayISO()}`, { workout_time });
+      await reload();
+    } catch (error) {
+      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+    }
+  };
 
   const confirmDelete = () =>
     Alert.alert('刪除帳號', '所有紀錄會一起刪掉，無法復原。', [
@@ -138,7 +156,12 @@ export default function SettingsScreen() {
       <SectionHeading>偏好</SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="訓練時間預設" value={me.workout_time === 'am' ? '早餐後' : '晚餐前'} />
+          <ChoiceRow
+            label="訓練時段"
+            value={me.workout_time}
+            options={WORKOUT_TIME_OPTIONS}
+            onSave={saveWorkoutTime}
+          />
           <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
           <TimezoneRow value={me.timezone} onSave={saveTimezone} />
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
