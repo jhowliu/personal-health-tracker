@@ -124,6 +124,25 @@ async def test_new_day_starts_at_the_weigh_in_step(with_profile: AsyncClient):
     assert day["targets"]["kcal"] == 1340
 
 
+async def test_workout_time_moves_the_workout_step(with_profile: AsyncClient):
+    """What the settings screen relies on: the profile sets days still to come, and an
+    already opened day moves only when it is changed itself."""
+    evening = ["body", "breakfast", "lunch", "workout", "dinner"]
+    morning = ["body", "breakfast", "workout", "lunch", "dinner"]
+    assert (await with_profile.get(f"/days/{TODAY}")).json()["flow"]["steps"] == evening
+
+    patched = await with_profile.patch("/users/me/profile", json={"workout_time": "am"})
+    assert patched.status_code == 200
+    assert patched.json()["profile"]["workout_time"] == "am"
+    # Opened before the change, today keeps the time it copied...
+    assert (await with_profile.get(f"/days/{TODAY}")).json()["flow"]["steps"] == evening
+    # ...until it is moved too.
+    moved = await with_profile.patch(f"/days/{TODAY}", json={"workout_time": "am"})
+    assert moved.json()["flow"]["steps"] == morning
+    # A day opened afterwards starts from the profile.
+    assert (await with_profile.get("/days/2026-09-23")).json()["flow"]["steps"] == morning
+
+
 async def test_flow_advances_as_the_day_is_logged(with_profile: AsyncClient):
     await with_profile.get(f"/days/{TODAY}")
     await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1})
