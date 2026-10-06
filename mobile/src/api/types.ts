@@ -294,8 +294,7 @@ export interface paths {
         get: operations["read_workout_days__day__workout_get"];
         put?: never;
         post?: never;
-        /** Clear Workout */
-        delete: operations["clear_workout_days__day__workout_delete"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2454,37 +2453,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkoutExecutionOut"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    clear_workout_days__day__workout_delete: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string | null;
-            };
-            path: {
-                day: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

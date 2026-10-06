@@ -205,26 +205,17 @@ class SqliteWorkoutExecutionStore:
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool:
         await open_day(self._conn, user_id, day)
         await self._ensure_snapshot(user_id, day)
+        # The sets go with the exercise. Left behind, the foreign key would only null their
+        # item, and earlier-day history would still read them as done.
+        await self._conn.execute(
+            "DELETE FROM set_logs WHERE user_id = ? AND date = ? AND day_workout_item_id = ?",
+            (user_id, to_day(day), item_id),
+        )
         cursor = await self._conn.execute(
             "DELETE FROM day_workout_items WHERE id = ? AND user_id = ? AND date = ?",
             (item_id, user_id, to_day(day)),
         )
         return cursor.rowcount == 1
-
-    async def clear(self, user_id: str, day: date) -> None:
-        await open_day(self._conn, user_id, day)
-        await self._ensure_snapshot(user_id, day)
-        await self._conn.execute(
-            "DELETE FROM day_workout_items WHERE user_id = ? AND date = ?",
-            (user_id, to_day(day)),
-        )
-        # Marked as set up, so opening the day again does not take the schedule's template back.
-        await self._conn.execute(
-            "UPDATE days SET template_id = NULL, workout_initialized_at = COALESCE("
-            "workout_initialized_at, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
-            " WHERE user_id = ? AND date = ?",
-            (user_id, to_day(day)),
-        )
 
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None:
         await open_day(self._conn, user_id, day)
