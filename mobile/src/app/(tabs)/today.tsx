@@ -26,10 +26,10 @@ import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color, foodCategoryTone } from '@/theme/tokens';
-import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
-import { formatPrescription } from '@/workouts/prescription';
 import { rowsFromLogs, toRecords, type RecordRow } from '@/workouts/record';
-import { SetRecordEditor } from '@/workouts/SetRecordEditor';
+import { dayFooter } from '@/workouts/day-footer';
+import { targetChanges, targetError, targetFromItem, type TargetEdit } from '@/workouts/target';
+import { isItemDone, WorkoutItemRow } from '@/workouts/WorkoutItemRow';
 
 type Today = Schema<'TodayOut'>;
 type PlannedMealItem = {
@@ -54,7 +54,6 @@ type DayPlan = Omit<Schema<'DayPlanOut'>, 'meals'> & { meals: PlannedMeal[] };
 type WorkoutItem = Schema<'WorkoutExecutionItemOut'>;
 type Workout = Schema<'WorkoutExecutionOut'>;
 type SetLogResult = { next_weight_kg: number | null };
-type WorkoutEdit = { sets: string; reps: string; durationMin: string; weight: string; rest: string; note: string };
 
 const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
@@ -197,6 +196,7 @@ export default function TodayScreen() {
         date={day.date}
         after={stepAfter(day, 'workout')}
         resolved={day.flow.completed.includes('workout')}
+        skipped={day.flow.skipped.includes('workout')}
         burnAdded={day.targets.exercise_kcal > 0}
         onDone={() => load(true)}
         onStateChanged={() => refreshAt('workout')}
@@ -970,6 +970,7 @@ function WorkoutStep({
   date,
   after,
   resolved,
+  skipped,
   burnAdded,
   onDone,
   onStateChanged,
@@ -979,6 +980,8 @@ function WorkoutStep({
   after: string;
   /** The workout step is already done (or skipped) for this date. */
   resolved: boolean;
+  /** Skipped, and not done since. */
+  skipped: boolean;
   /** The day's target already counts this workout, which it does only once it is done. */
   burnAdded: boolean;
   onDone: () => void;
@@ -986,16 +989,13 @@ function WorkoutStep({
 }) {
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [busy, setBusy] = useState(false);
-  const [editingItem, setEditingItem] = useState<string | null>(null);
-  const [edit, setEdit] = useState<WorkoutEdit | null>(null);
-  const [workoutSkipped, setWorkoutSkipped] = useState(false);
-  const [suggestions, setSuggestions] = useState<Record<string, number>>({});
-  // Sets typed in but not saved yet, per item; an item without an entry shows what is logged.
+  // Several exercises can be open at once, so a whole day can be typed in top to bottom.
+  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  // Typed in and not saved yet, per item: the target fields, and the sets. An item without an
+  // entry shows what the server has.
+  const [targets, setTargets] = useState<Record<string, TargetEdit>>({});
   const [drafts, setDrafts] = useState<Record<string, RecordRow[]>>({});
-  const [actionItem, setActionItem] = useState<WorkoutItem | null>(null);
-  // Focus mode is for doing today's workout. Recording it afterwards — 直接記錄, another day,
-  // or fixing what was logged — is the list below, where each exercise's sets are typed in.
-  const [listMode, setListMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<Record<string, number>>({});
   const [sessionStarted, setSessionStarted] = useState(false);
   const word = dayWord(date);
 
@@ -1014,34 +1014,49 @@ function WorkoutStep({
     }, [load, date]),
   );
 
-  // One save for everything changed here — the sets typed in and a target open for editing —
-  // so the footer never offers a way out that drops them.
-  const dirty = Object.keys(drafts).length > 0 || editingItem !== null;
+  // One save for everything typed in, so the footer never offers a way out that drops it.
+  const dirty = Object.keys(drafts).length > 0 || Object.keys(targets).length > 0;
+
+  const forget = (itemId: string) => {
+    setDrafts(({ [itemId]: _rows, ...rest }) => rest);
+    setTargets(({ [itemId]: _target, ...rest }) => rest);
+  };
+
+  const toggle = (itemId: string) =>
+    setOpen((current) => {
+      const next = new Set(current);
+      if (!next.delete(itemId)) next.add(itemId);
+      return next;
+    });
 
   const discardChanges = () => {
     setDrafts({});
-    setEditingItem(null);
-    setEdit(null);
+    setTargets({});
   };
 
   const saveChanges = async () => {
     if (!workout) return;
     const records: { entry: WorkoutItem; sets: Schema<'SetRecordIn'>[] }[] = [];
+    const changes: { entry: WorkoutItem; edit: TargetEdit }[] = [];
     for (const entry of workout.items) {
       const rows = drafts[entry.item.id];
-      if (!rows) continue;
-      const result = toRecords(entry, rows);
-      if ('error' in result) {
-        Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${result.error}。`);
-        return;
+      if (rows) {
+        const result = toRecords(entry, rows);
+        if ('error' in result) {
+          Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${result.error}。`);
+          return;
+        }
+        records.push({ entry, sets: result.sets });
       }
-      records.push({ entry, sets: result.sets });
-    }
-    const editing = workout.items.find((entry) => entry.item.id === editingItem);
-    const problem = editing && edit ? targetError(editing, edit) : null;
-    if (editing && problem) {
-      Alert.alert('還不能儲存', `「${editing.item.exercise_name}」${problem}。`);
-      return;
+      const edit = targets[entry.item.id];
+      if (edit) {
+        const problem = targetError(entry, edit);
+        if (problem) {
+          Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${problem}。`);
+          return;
+        }
+        changes.push({ entry, edit });
+      }
     }
 
     setBusy(true);
@@ -1059,10 +1074,10 @@ function WorkoutStep({
         // Dropped one by one, so a failure further down does not send these twice.
         setDrafts(({ [itemId]: _saved, ...rest }) => rest);
       }
-      if (editing && edit) {
-        await api.patch(`/days/${date}/workout/items/${editing.item.id}`, targetChanges(editing, edit));
-        setEditingItem(null);
-        setEdit(null);
+      for (const { entry, edit } of changes) {
+        const itemId = entry.item.id;
+        await api.patch(`/days/${date}/workout/items/${itemId}`, targetChanges(entry, edit));
+        setTargets(({ [itemId]: _saved, ...rest }) => rest);
       }
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
@@ -1078,6 +1093,8 @@ function WorkoutStep({
     setBusy(true);
     try {
       await api.patch(`/days/${date}`, { workout_done: true });
+      // Finished here rather than at focus mode's summary: a session left on the phone is done with.
+      await clearSession(date);
       onDone();
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
@@ -1086,58 +1103,28 @@ function WorkoutStep({
     }
   };
 
-  const startEdit = (item: WorkoutItem) => {
-    const prescribed = item.item;
-    setEditingItem(prescribed.id);
-    setEdit({
-      sets: String(prescribed.sets ?? ''),
-      reps: prescribed.reps ?? '',
-      durationMin: prescribed.duration_sec ? String(Math.round(prescribed.duration_sec / 60)) : '',
-      weight: prescribed.weight_kg === null ? '' : String(prescribed.weight_kg),
-      rest: String(prescribed.rest_sec),
-      note: prescribed.note ?? '',
-    });
-  };
-
-  // Taking the whole workout off makes the day a rest day, so the flow stops waiting on it.
-  const takeOffWorkout = async () => {
-    setBusy(true);
-    try {
-      await api.delete(`/days/${date}/workout`);
-      await clearSession(date);
-      setSessionStarted(false);
-      setDrafts({});
-      await load();
-      onStateChanged();
-    } catch (error) {
-      Alert.alert('移除不了課表', error instanceof ApiError ? error.message : '請稍後再試');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const clearWorkout = (name: string) =>
-    Alert.alert(`移除${word}的課表`, `${word}不練「${name}」，會變成休息日。一週排程和課表本身不會改。`, [
-      { text: '取消', style: 'cancel' },
-      { text: '移除', style: 'destructive', onPress: () => void takeOffWorkout() },
-    ]);
-
-  const deleteItem = (item: WorkoutItem) => {
-    // The last exercise takes the day's template with it: an empty workout would still hold
-    // the day's flow waiting on it.
-    const last = workout?.items.length === 1;
-    Alert.alert('移除動作', `確定移除「${item.item.exercise_name}」？這只會影響${dayWord(date)}的訓練。`, [
+  // Any exercise can go, logged or not; asking every time keeps the ✕ meaning one thing.
+  const deleteItem = (entry: WorkoutItem) => {
+    const name = entry.item.exercise_name;
+    const logged = entry.logs.length;
+    const message = !logged
+      ? `確定移除「${name}」？這只會影響${word}的訓練。`
+      : entry.item.duration_sec
+        ? `確定移除「${name}」？已記錄的時間也會一起刪除。`
+        : `確定移除「${name}」？已記錄的 ${logged} 組也會一起刪除。`;
+    Alert.alert('移除動作', message, [
       { text: '取消', style: 'cancel' },
       {
         text: '移除',
         style: 'destructive',
         onPress: async () => {
-          if (last) return takeOffWorkout();
           setBusy(true);
           try {
-            await api.delete(`/days/${date}/workout/items/${item.item.id}`);
-            setDrafts(({ [item.item.id]: _removed, ...rest }) => rest);
+            await api.delete(`/days/${date}/workout/items/${entry.item.id}`);
+            forget(entry.item.id);
             await load();
+            // Its sets leave the day's burn, and with it the target.
+            onStateChanged();
           } catch (error) {
             Alert.alert('移除不了動作', error instanceof ApiError ? error.message : '請稍後再試');
           } finally {
@@ -1152,7 +1139,6 @@ function WorkoutStep({
     setBusy(true);
     try {
       await api.patch(`/days/${date}`, { workout_skipped: true });
-      setWorkoutSkipped(true);
       onStateChanged();
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
@@ -1161,22 +1147,12 @@ function WorkoutStep({
     }
   };
 
-  // The sheet opens from an exercise's title; each choice closes it before acting.
-  const replaceExercise = (item: WorkoutItem) => {
-    setActionItem(null);
+  // What was typed for the old exercise does not carry over to the one replacing it.
+  const replaceExercise = (entry: WorkoutItem) => {
+    forget(entry.item.id);
     router.navigate(
-      `/workouts/replace-today?date=${date}&item_id=${item.item.id}&exercise_id=${item.item.exercise_id}&name=${encodeURIComponent(item.item.exercise_name)}`,
+      `/workouts/replace-today?date=${date}&item_id=${entry.item.id}&exercise_id=${entry.item.exercise_id}&name=${encodeURIComponent(entry.item.exercise_name)}`,
     );
-  };
-
-  const editExercise = (item: WorkoutItem) => {
-    setActionItem(null);
-    startEdit(item);
-  };
-
-  const removeExercise = (item: WorkoutItem) => {
-    setActionItem(null);
-    deleteItem(item);
   };
 
   if (!workout) {
@@ -1190,470 +1166,153 @@ function WorkoutStep({
     );
   }
 
-  const completedExercises = workout.items.filter(
-    (entry) => completedSetCount(entry) >= (entry.item.sets ?? 1),
-  ).length;
+  const total = workout.items.length;
+  const finished = workout.items.filter(isItemDone).length;
+  const footer = dayFooter({
+    today: date === todayISO(),
+    total,
+    finished,
+    planned: workout.template !== null || total > 0,
+    logged: workout.items.some((entry) => entry.logs.length > 0),
+    session: sessionStarted,
+    done: resolved && !skipped,
+    skipped,
+    dirty,
+  });
   const templateName = workout.template?.name;
-  const anyLogged = workout.items.some((entry) => entry.logs.length > 0);
-  // Done rather than skipped: something was logged before the day was closed.
-  const finished = resolved && anyLogged;
-  // An exercise with a logged set keeps its record, and one in a running focus session is
-  // the session's to change, so only the others can be taken off.
-  const removable = (entry: WorkoutItem) => entry.logs.length === 0 && !sessionStarted;
-  const clearAction =
-    workout.template && !anyLogged && !sessionStarted ? (
-      <TextAction
-        icon={TrashIcon}
-        tone="danger"
-        label={`移除${word}的課表`}
-        disabled={busy}
-        onPress={() => clearWorkout(workout.template?.name ?? '')}
-        className="min-h-[44px] justify-center self-center"
-      />
-    ) : null;
 
-  if (date === todayISO() && workout.items.length > 0 && !workoutSkipped && !listMode) {
-    const done = (entry: WorkoutItem) =>
-      entry.item.duration_sec ? entry.logs.length > 0 : completedSetCount(entry) >= (entry.item.sets ?? 1);
-    const doneCount = workout.items.filter(done).length;
-    const underway = sessionStarted || anyLogged;
-    return (
-      <Screen
-        footerSafeArea={false}
-        footer={
-          resolved ? (
-            <>
-              {/* An exercise added after finishing is still to do: focus mode picks it up. */}
-              {anyLogged && doneCount < workout.items.length ? (
-                <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
-                  {`繼續訓練 · ${doneCount} / ${workout.items.length}`}
-                </PrimaryButton>
-              ) : (
-                <View className="items-center gap-1 pt-2">
-                  <Text className={`text-base font-semibold ${anyLogged ? 'text-good' : 'text-muted'}`}>
-                    {anyLogged ? '✓ 今天的訓練已完成' : '今天已略過訓練'}
-                  </Text>
-                  {anyLogged && workout.estimated_burn_kcal ? (
-                    <View className="items-center">
-                      <Hint>約多消耗 {workout.estimated_burn_kcal} 大卡</Hint>
-                      <Hint>已扣掉靜止時的消耗，會比跑步機面板顯示的少</Hint>
-                    </View>
-                  ) : null}
-                </View>
-              )}
-              <View className="flex-row items-center justify-center gap-8">
-                <TextAction
-                  icon={PlusIcon}
-                  label="加入動作"
-                  onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
-                  className="min-h-[44px] justify-center"
-                />
-                {anyLogged ? (
-                  <TextAction
-                    label="修改紀錄"
-                    onPress={() => setListMode(true)}
-                    className="min-h-[44px] justify-center"
-                  />
-                ) : null}
-              </View>
-            </>
-          ) : (
-            <>
-              <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
-                {underway ? `繼續訓練 · ${doneCount} / ${workout.items.length}` : '開始訓練'}
-              </PrimaryButton>
-              <View className="flex-row items-center justify-center gap-8">
-                <TextAction
-                  label="直接記錄，不用計時"
-                  disabled={busy}
-                  onPress={() => setListMode(true)}
-                  className="min-h-[44px] justify-center"
-                />
-                <TextAction
-                  label="略過訓練"
-                  disabled={busy}
-                  onPress={skipWorkout}
-                  className="min-h-[44px] justify-center"
-                />
-              </View>
-            </>
-          )
-        }
-      >
-        {header}
-        <View className="gap-1">
-          <Hint>今天的訓練</Hint>
-          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-            {templateName ?? '今天的訓練'}
-          </Text>
-          <Hint>
-            {workout.items.length} 個動作
-            {workout.template?.duration_min ? ` · 約 ${workout.template.duration_min} 分鐘` : ''}
-          </Hint>
-        </View>
-        <View className="gap-2.5">
-          {workout.items.map((entry, index) => {
-            const prescribed = entry.item;
-            const finished = done(entry);
-            const status = finished
-              ? '✓ 完成'
-              : prescribed.duration_sec
-                ? `${Math.round(prescribed.duration_sec / 60)} 分鐘`
-                : entry.logs.length
-                  ? `${entry.logs.length} / ${prescribed.sets ?? 1} 組`
-                  : `${prescribed.sets ?? 1} 組${prescribed.reps ? ` × ${prescribed.reps}` : ''}${
-                      prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
-                    }`;
-            return (
-              <View
-                key={prescribed.id}
-                className={`min-h-[58px] flex-row items-center rounded-card ${finished ? 'bg-good-soft' : 'bg-fill'}`}
-              >
-                {/* Once something is logged, a row opens the record for fixing. */}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`修改${prescribed.exercise_name}的紀錄`}
-                  disabled={!(resolved && anyLogged)}
-                  onPress={() => setListMode(true)}
-                  className={`min-h-[58px] flex-1 flex-row items-center justify-between gap-2.5 pl-4 active:opacity-70 ${
-                    removable(entry) ? '' : 'pr-4'
-                  }`}
-                >
-                  <Text className="flex-1 text-base font-semibold text-ink">
-                    {index + 1}. {prescribed.exercise_name}
-                  </Text>
-                  <Text className={`text-sm ${finished ? 'font-semibold text-good' : 'text-muted'}`}>{status}</Text>
-                </Pressable>
-                {removable(entry) ? (
-                  <RemoveExerciseButton name={prescribed.exercise_name} disabled={busy} onPress={() => deleteItem(entry)} />
-                ) : null}
-              </View>
-            );
-          })}
-        </View>
-        {clearAction}
-      </Screen>
-    );
-  }
-
-  // Pinned under the main button, like the meal total, so progress stays in view.
-  const progress = (
-    <View className="flex-row items-baseline justify-between px-1">
-      <Text className="text-sm text-muted">完成進度</Text>
-      <Text className="text-lg font-bold text-ink">
-        {completedExercises} / {workout.items.length} 個動作
-      </Text>
-    </View>
-  );
-
-  return (
-    <Screen
-      footerSafeArea={false}
-      footer={
-        dirty ? (
+  const footerView = (() => {
+    switch (footer.kind) {
+      case 'save':
+        return (
           <>
             <PrimaryButton onPress={saveChanges} busy={busy}>
               {busy ? '儲存中…' : '儲存修改'}
             </PrimaryButton>
             <View className="items-center">
-              <TextAction label="放棄修改" disabled={busy} onPress={discardChanges} className="justify-center" />
+              <TextAction label="放棄修改" disabled={busy} onPress={discardChanges} className="min-h-[44px] justify-center" />
             </View>
           </>
-        ) : workoutSkipped ? (
-          <PrimaryButton onPress={complete} busy={busy}>
-            仍要完成今日訓練
-          </PrimaryButton>
-        ) : finished ? (
-          // Already done: logging an added exercise keeps it done, so neither 完成 nor 略過 applies.
+        );
+      case 'train':
+        return (
           <>
-            {date === todayISO() ? (
-              <PrimaryButton onPress={() => setListMode(false)} disabled={busy}>
-                完成修改
-              </PrimaryButton>
-            ) : (
-              <Text className="text-center text-base font-semibold text-good">✓ {word}的訓練已完成</Text>
-            )}
-            {progress}
-          </>
-        ) : anyLogged ? (
-          // Recorded after the fact, the day is done when the user says so, not when every
-          // prescribed set has a row.
-          <>
-            <PrimaryButton onPress={complete} busy={busy}>
-              {busy ? '處理中…' : `完成${word}的訓練，下一步：${after}`}
+            <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
+              {footer.resume ? `繼續訓練 · ${finished} / ${total}` : '開始訓練'}
             </PrimaryButton>
-            {progress}
+            {footer.then ? (
+              <View className="items-center">
+                <TextAction
+                  label={footer.then === 'complete' ? `完成${word}的訓練` : '略過訓練'}
+                  disabled={busy}
+                  onPress={footer.then === 'complete' ? complete : skipWorkout}
+                  className="min-h-[44px] justify-center"
+                />
+              </View>
+            ) : null}
           </>
-        ) : workout.items.length === 0 ? null /* A rest day: nothing to finish or skip yet. */ : (
-          <>
-            {progress}
-            <TextAction
-              label={`${word}略過訓練`}
-              disabled={busy}
-              onPress={skipWorkout}
-              className="justify-center"
-            />
-          </>
-        )
-      }
-    >
+        );
+      case 'complete':
+        return (
+          <PrimaryButton onPress={complete} busy={busy}>
+            {busy ? '處理中…' : `完成${word}的訓練，下一步：${after}`}
+          </PrimaryButton>
+        );
+      case 'skip':
+        return (
+          <View className="items-center">
+            <TextAction label={`${word}略過訓練`} disabled={busy} onPress={skipWorkout} className="min-h-[44px] justify-center" />
+          </View>
+        );
+      case 'done':
+        return <Text className="pt-2 text-center text-base font-semibold text-good">✓ {word}的訓練已完成</Text>;
+      case 'skipped':
+        return <Text className="pt-2 text-center text-base font-semibold text-muted">{word}已略過訓練</Text>;
+      case 'none':
+        return null;
+    }
+  })();
+
+  return (
+    <Screen footerSafeArea={false} footer={footerView}>
       {header}
       <View className="gap-4">
         <View className="gap-1">
-          <Hint>{word}的訓練</Hint>
+          <View className="flex-row items-center gap-2">
+            <Hint>{word}的訓練</Hint>
+            {skipped ? (
+              <Text className="rounded-full bg-warm-soft px-2 py-0.5 text-xs font-semibold text-warm">已略過</Text>
+            ) : null}
+          </View>
           <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-            {templateName ?? (workout.items.length ? `${word}的訓練` : `${word}沒有排定訓練`)}
+            {templateName ?? (total ? `${word}的訓練` : `${word}沒有排定訓練`)}
           </Text>
-          {workout.items.length > 0 && !workoutSkipped ? (
-            <Hint>每組做了幾下、多重，直接填在下面；點動作名稱可以換動作、改目標或移除。</Hint>
+          {total > 0 ? (
+            <Hint>
+              {total} 個動作
+              {workout.template?.duration_min ? ` · 約 ${workout.template.duration_min} 分鐘` : ''}
+              {' · 點動作可以改目標或補記組數'}
+            </Hint>
           ) : null}
         </View>
 
-        {workoutSkipped ? (
-          <Card className="gap-3 bg-fill">
-            <View className="gap-1">
-              <Text className="text-base font-semibold text-ink">{word}已略過訓練</Text>
-              <Hint>略過已儲存。若後來完成了訓練，可直接標記完成。</Hint>
-            </View>
-          </Card>
-        ) : (
-          <>
-            {workout.items.length > 0 ? (
-              <Card className="gap-3 p-2">
-                {workout.items.map((item, itemIndex) => {
-                  const prescribed = item.item;
-                  const suggestion = suggestions[prescribed.id];
-
-                  return (
-                    <View key={prescribed.id} className="overflow-hidden rounded-card bg-fill">
-                      <View className="flex-row items-center">
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`開啟${prescribed.exercise_name}操作`}
-                          accessibilityState={{ disabled: busy }}
-                          disabled={busy}
-                          onPress={() => setActionItem(item)}
-                          className="min-h-[52px] flex-1 flex-row items-center gap-3 py-2 pl-3 pr-2 active:opacity-70"
-                        >
-                          <Text className="flex-1 text-base font-semibold text-ink">
-                            {itemIndex + 1}. {prescribed.exercise_name}
-                          </Text>
-                          <Text className="text-sm text-muted">{formatPrescription(prescribed)}</Text>
-                          <ChevronIcon direction="right" size={16} tint={color.muted} />
-                        </Pressable>
-                        {removable(item) ? (
-                          <RemoveExerciseButton
-                            name={prescribed.exercise_name}
-                            disabled={busy}
-                            onPress={() => deleteItem(item)}
-                          />
-                        ) : null}
-                      </View>
-
-                      <View className="gap-3 bg-surface px-3 py-3">
-                        {prescribed.replaced_exercise_name ? (
-                          <Hint>{word}已替換原本的 {prescribed.replaced_exercise_name}</Hint>
-                        ) : null}
-                        {prescribed.note ? <Hint>{prescribed.note}</Hint> : null}
-
-                        {editingItem === prescribed.id && edit ? (
-                          <View className="gap-3 rounded-field bg-fill p-3">
-                            {prescribed.duration_sec ? (
-                              <Field
-                                label="目標時間"
-                                suffix="分鐘"
-                                value={edit.durationMin}
-                                onChangeText={(durationMin) =>
-                                  setEdit((current) => current && { ...current, durationMin })
-                                }
-                                keyboardType="numeric"
-                              />
-                            ) : (
-                              <View className="flex-row gap-3">
-                                <Field
-                                  label="目標組數"
-                                  value={edit.sets}
-                                  onChangeText={(sets) => setEdit((current) => current && { ...current, sets })}
-                                  keyboardType="numeric"
-                                />
-                                <Field
-                                  label="目標次數"
-                                  value={edit.reps}
-                                  onChangeText={(reps) => setEdit((current) => current && { ...current, reps })}
-                                />
-                              </View>
-                            )}
-                            <View className="flex-row gap-3">
-                              <Field
-                                label="重量"
-                                suffix="kg"
-                                value={edit.weight}
-                                onChangeText={(weight) => setEdit((current) => current && { ...current, weight })}
-                                keyboardType="decimal-pad"
-                              />
-                              <Field
-                                label="休息"
-                                suffix="秒"
-                                value={edit.rest}
-                                onChangeText={(rest) => setEdit((current) => current && { ...current, rest })}
-                                keyboardType="numeric"
-                              />
-                            </View>
-                            <Field
-                              label="做法說明"
-                              value={edit.note}
-                              onChangeText={(note) => setEdit((current) => current && { ...current, note })}
-                            />
-                            {/* Saved with everything else from the footer; this only closes it. */}
-                            <PrimaryButton
-                              tone="plain"
-                              onPress={() => {
-                                setEditingItem(null);
-                                setEdit(null);
-                              }}
-                              disabled={busy}
-                            >
-                              取消修改目標
-                            </PrimaryButton>
-                          </View>
-                        ) : null}
-
-                        <SetRecordEditor
-                          entry={item}
-                          rows={drafts[prescribed.id] ?? rowsFromLogs(item)}
-                          onChange={(rows) => setDrafts((current) => ({ ...current, [prescribed.id]: rows }))}
-                        />
-
-                        {suggestion !== undefined ? (
-                          <View className="gap-2 rounded-field bg-primary-soft p-3">
-                            {/* The next session reads this back from the logged effort; nothing to save. */}
-                            <Text className="text-base text-ink">下次會從 {suggestion} kg 開始</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-                  );
-                })}
-              </Card>
-            ) : (
-              <Hint>{word}沒有安排訓練。</Hint>
-            )}
-
-            {workout.estimated_burn_kcal ? (
-              <Hint>
-                {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。
-                {burnAdded ? `其中一半已加進${word}的熱量目標。` : `標記完成後，其中一半會加進${word}的熱量目標。`}
-              </Hint>
-            ) : null}
-
-            <View className="flex-row items-center justify-center gap-8">
-              <TextAction
-                icon={PlusIcon}
-                label="加入動作"
-                disabled={busy}
-                onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
-                className="min-h-[44px] justify-center"
+        <View className="gap-2.5">
+          {workout.items.map((entry, index) => {
+            const itemId = entry.item.id;
+            return (
+              <WorkoutItemRow
+                key={itemId}
+                entry={entry}
+                index={index}
+                open={open.has(itemId)}
+                onToggle={() => toggle(itemId)}
+                target={targets[itemId] ?? targetFromItem(entry)}
+                onTargetChange={(target) => setTargets((current) => ({ ...current, [itemId]: target }))}
+                rows={drafts[itemId] ?? rowsFromLogs(entry)}
+                onRowsChange={(rows) => setDrafts((current) => ({ ...current, [itemId]: rows }))}
+                edited={itemId in targets || itemId in drafts}
+                suggestion={suggestions[itemId]}
+                busy={busy}
+                word={word}
+                onReplace={() => replaceExercise(entry)}
+                onRemove={() => deleteItem(entry)}
               />
-              {workout.items.length > 0 ? (
-                <TextAction
-                  label="另存為我的課表"
-                  disabled={busy}
-                  onPress={() => router.navigate({ pathname: '/workouts/save-today', params: { date } })}
-                  className="min-h-[44px] justify-center"
-                />
-              ) : null}
-            </View>
-            {clearAction}
-          </>
-        )}
-      </View>
+            );
+          })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
+            onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
+            className={`min-h-[52px] flex-row items-center justify-center gap-2 rounded-card border-2 border-dashed border-line ${
+              busy ? 'opacity-40' : 'active:opacity-70'
+            }`}
+          >
+            <PlusIcon size={18} tint={color.primary} />
+            <Text className="text-base font-semibold text-primary">加入動作</Text>
+          </Pressable>
+        </View>
 
-      <Sheet
-        visible={actionItem !== null}
-        title={actionItem?.item.exercise_name ?? '動作'}
-        onClose={() => setActionItem(null)}
-      >
-        {actionItem ? (
-          <>
-            <ExerciseFigure
-              exerciseId={actionItem.item.exercise_id}
-              name={actionItem.item.exercise_name}
-              mode="pair"
-            />
-            <PrimaryButton tone="plain" onPress={() => replaceExercise(actionItem)} disabled={busy}>
-              換動作
-            </PrimaryButton>
-            <PrimaryButton tone="plain" onPress={() => editExercise(actionItem)} disabled={busy}>
-              改目標
-            </PrimaryButton>
-            <PrimaryButton
-              tone="danger"
-              icon={TrashIcon}
-              onPress={() => removeExercise(actionItem)}
-              disabled={busy}
-            >
-              移除這個動作
-            </PrimaryButton>
-          </>
+        {workout.estimated_burn_kcal ? (
+          <Hint>
+            {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。
+            {burnAdded ? `其中一半已加進${word}的熱量目標。` : `標記完成後，其中一半會加進${word}的熱量目標。`}
+          </Hint>
         ) : null}
-      </Sheet>
+
+        {total > 0 ? (
+          <View className="items-center">
+            <TextAction
+              label="另存為我的課表"
+              disabled={busy}
+              onPress={() => router.navigate({ pathname: '/workouts/save-today', params: { date } })}
+              className="min-h-[44px] justify-center"
+            />
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
-}
-
-function RemoveExerciseButton({
-  name,
-  disabled,
-  onPress,
-}: {
-  name: string;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`移除${name}`}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      className="h-11 w-11 items-center justify-center active:opacity-60"
-    >
-      <CloseIcon size={18} tint={color.muted} />
-    </Pressable>
-  );
-}
-
-function completedSetCount(item: WorkoutItem) {
-  return item.logs.length || item.completed_set_count;
-}
-
-const WHOLE = /^\d+$/;
-// 12, or a range such as 10-12; templates write the range with an en dash too.
-const REPS = /^\d+(\s*[-–~]\s*\d+)?$/;
-
-/** What is wrong with an exercise's edited target, in words, or null when it can be saved. */
-function targetError(entry: WorkoutItem, edit: WorkoutEdit): string | null {
-  if (entry.item.duration_sec) {
-    if (!WHOLE.test(edit.durationMin.trim()) || Number(edit.durationMin) < 1) return '的目標時間要填 1 以上的整數分鐘';
-  } else {
-    if (!WHOLE.test(edit.sets.trim()) || Number(edit.sets) < 1) return '的組數要填 1 以上的整數';
-    if (!REPS.test(edit.reps.trim())) return '的次數要填數字或範圍，例如 12 或 10-12';
-  }
-  if (edit.weight.trim() && !(Number(edit.weight) >= 0)) return '的重量要是數字';
-  if (edit.rest.trim() && !WHOLE.test(edit.rest.trim())) return '的休息要填整數秒';
-  return null;
-}
-
-function targetChanges(entry: WorkoutItem, edit: WorkoutEdit) {
-  const common = {
-    weight_kg: edit.weight.trim() ? Number(edit.weight) : null,
-    rest_sec: Number(edit.rest) || 0,
-    note: edit.note.trim() || null,
-  };
-  return entry.item.duration_sec
-    ? { ...common, duration_sec: Number(edit.durationMin) * 60 }
-    : { ...common, sets: Number(edit.sets), reps: edit.reps.trim() };
 }
 
 // Below this share of the target, a finished day reads as too little rather than room to spare:

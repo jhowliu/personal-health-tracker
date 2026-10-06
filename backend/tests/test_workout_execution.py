@@ -79,28 +79,12 @@ async def test_removing_every_scheduled_item_does_not_recreate_the_day(
     assert again.json()["template"]["id"] == template["id"]
     assert again.json()["items"] == []
     assert (await _day_items(with_profile)) == []
-
-
-async def test_a_days_workout_can_be_taken_off_for_that_day_only(with_profile: AsyncClient):
-    _, _, template = await _workout(with_profile)
-    assert len(await _day_items(with_profile)) == 1
-
-    cleared = await with_profile.delete(f"/days/{DAY}/workout")
-    assert cleared.status_code == 204
-
-    # Opening the day again does not bring the scheduled template back.
-    workout = (await with_profile.get(f"/days/{DAY}/workout")).json()
-    assert (workout["template"], workout["items"]) == (None, [])
-    # A rest day now: the flow no longer waits on the workout.
+    # Not a rest day: not training is said with 略過, so the flow still waits on it.
     day = (await with_profile.get(f"/days/{DAY}")).json()
-    assert "workout" not in day["flow"]["waiting"]
-    # The schedule and the template itself are untouched.
-    schedule = (await with_profile.get("/workout-schedule")).json()
-    assert [entry["template_id"] for entry in schedule] == [template["id"]]
-    assert (await with_profile.get(f"/workout-templates/{template['id']}")).status_code == 200
+    assert "workout" in day["flow"]["waiting"]
 
 
-async def test_a_workout_with_a_logged_set_is_not_taken_off(with_profile: AsyncClient):
+async def test_a_logged_exercise_is_removed_with_its_sets(with_profile: AsyncClient):
     original, _, _template = await _workout(with_profile)
     item_id = (await _day_items(with_profile))[0]["id"]
     await with_profile.put(
@@ -110,11 +94,29 @@ async def test_a_workout_with_a_logged_set_is_not_taken_off(with_profile: AsyncC
             "exercise_id": original["id"],
             "set_index": 0,
             "reps_done": 10,
+            "weight_kg": 20,
         },
     )
+    next_week = "2026-09-29"  # the same weekday, so the same template
 
-    refused = await with_profile.delete(f"/days/{DAY}/workout")
-    assert refused.status_code == 422
+    async def last_set_next_week():
+        workout = (await with_profile.get(f"/days/{next_week}/workout")).json()
+        return workout["items"][0]["last_set"]
+
+    assert (await last_set_next_week()) is not None
+
+    removed = await with_profile.delete(f"/days/{DAY}/workout/items/{item_id}")
+    assert removed.status_code == 204
+    assert (await _day_items(with_profile)) == []
+    # The sets are gone too: later days no longer start from them.
+    assert (await last_set_next_week()) is None
+
+
+async def test_the_workout_itself_cannot_be_taken_off_the_day(with_profile: AsyncClient):
+    await _workout(with_profile)
+    # Not training is 略過; there is no separate way to clear the day.
+    response = await with_profile.delete(f"/days/{DAY}/workout")
+    assert response.status_code == 405
     assert len(await _day_items(with_profile)) == 1
 
 

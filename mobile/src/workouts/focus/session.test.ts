@@ -332,6 +332,20 @@ it('picks up exercises added or swapped while focus mode was away', () => {
   expect(restored.exercises[2].weightKg).toBe(20);
 });
 
+it('stays on the same exercise when one before it is removed while paused', () => {
+  const stored = { ...fromWorkout(workout([{ id: 'a' }, { id: 'b' }, { id: 'c' }]), T0), currentIndex: 1 };
+  const restored = restore(stored, fromWorkout(workout([{ id: 'b' }, { id: 'c' }]), T0));
+
+  expect(restored.exercises[restored.currentIndex].itemId).toBe('b');
+});
+
+it('moves on to what came next when the current exercise is removed while paused', () => {
+  const stored = { ...fromWorkout(workout([{ id: 'a' }, { id: 'b' }, { id: 'c' }]), T0), currentIndex: 1 };
+  const restored = restore(stored, fromWorkout(workout([{ id: 'a' }, { id: 'c' }]), T0));
+
+  expect(restored.exercises[restored.currentIndex].itemId).toBe('c');
+});
+
 describe('warming up', () => {
   it('ramps to the working weight in 2.5 kg steps, and only for a weight worth warming up to', () => {
     expect(warmupPlan(60)).toEqual([

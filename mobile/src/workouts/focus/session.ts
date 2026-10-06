@@ -218,8 +218,8 @@ export function fromWorkout(workout: Workout, now: number): Session {
 /**
  * A stored session brought up to date with the server's logs, which win: sets logged from
  * another screen count, and a set the phone never managed to send does not. Exercises added
- * meanwhile join in; one swapped for another (same item, new exercise) starts afresh rather
- * than keeping the old exercise's weight.
+ * meanwhile join in and removed ones drop out; one swapped for another (same item, new
+ * exercise) starts afresh rather than keeping the old exercise's weight.
  */
 export function restore(stored: Session, fresh: Session): Session {
   const kept = new Map(stored.exercises.map((exercise) => [exercise.itemId, exercise]));
@@ -240,7 +240,12 @@ export function restore(stored: Session, fresh: Session): Session {
         }
       : exercise;
   });
-  const merged = { ...stored, exercises, currentIndex: Math.min(stored.currentIndex, exercises.length - 1) };
+  // Followed by item rather than position: removing an exercise before the current one moves the
+  // rest up. When the current one itself is gone, its old place holds what came next.
+  const currentId = stored.exercises[stored.currentIndex]?.itemId;
+  const found = exercises.findIndex((exercise) => exercise.itemId === currentId);
+  const currentIndex = found !== -1 ? found : Math.min(stored.currentIndex, exercises.length - 1);
+  const merged = { ...stored, exercises, currentIndex };
   const current = merged.exercises[merged.currentIndex];
   if (current && isDone(current)) {
     const next = nextIndex(merged.exercises, merged.currentIndex);
