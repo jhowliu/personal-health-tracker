@@ -77,6 +77,7 @@ async def test_exercise_catalog_can_filter_and_search_translated_builtins(
     )
     assert filtered.status_code == 200
     assert {exercise["id"] for exercise in filtered.json()} == {
+        "hip-abduction-machine",
         "hip-adduction-machine",
         "leg-extension-machine",
         "leg-press-machine",
