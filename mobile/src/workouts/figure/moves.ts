@@ -41,6 +41,15 @@ function hinge(): Move {
   };
 }
 
+/** Hips back with the bell between the legs, then standing tall with it floated to the chest. */
+function swing(): Move {
+  const props: Prop[] = [{ kind: 'plate', at: 'hand', r: 5.5 }];
+  return {
+    start: { torso: 60, head: -30, arm: [-15, -15], leg: [25, -10], props },
+    end: { torso: 0, arm: [90, 90], leg: [0, 0], props },
+  };
+}
+
 function bridge(bar: boolean): Move {
   const props: Prop[] = bar
     ? [{ kind: 'bench' }, { kind: 'plate', at: 'hip', r: 7 }]
@@ -162,11 +171,54 @@ function hipFlexorStretch(): Move {
   };
 }
 
-function bandPullApart(): Move {
-  const props: Prop[] = [{ kind: 'band' }];
+/**
+ * Arms sweep between together in front and out to the sides, seen from the front: a fly
+ * closes them, a reverse fly or a band pull-apart opens them. Seated on a machine, the knees
+ * come apart so the seat shows.
+ */
+function fly(opening: boolean, { seated = false, props = [] as Prop[] } = {}): Move {
+  const base = {
+    view: 'front' as const,
+    torso: 0,
+    leg: (seated ? [22, 2] : [4, 4]) as Limb,
+    props: seated ? [...props, { kind: 'seat' } as Prop] : props,
+  };
+  const together: Pose = { ...base, arm: [40, -70] };
+  const apart: Pose = { ...base, arm: [90, 90] };
+  return opening ? { start: together, end: apart } : { start: apart, end: together };
+}
+
+/** The rope comes from arm's length to beside the face, elbows high and wide. */
+function facePull(): Move {
+  const base = { view: 'front' as const, torso: 0, leg: [4, 4] as Limb };
   return {
-    start: { view: 'front', torso: 0, arm: [40, -70], leg: [4, 4], props },
-    end: { view: 'front', torso: 0, arm: [90, 90], leg: [4, 4], props },
+    start: { ...base, arm: [40, -70] },
+    end: { ...base, arm: [90, 170] },
+  };
+}
+
+/** Seated with the legs pushed apart against the pads, or squeezed back together. */
+function hipAbduction(reverse: boolean): Move {
+  const base = { view: 'front' as const, torso: 0, arm: [20, 20] as Limb, props: [{ kind: 'seat' }] as Prop[] };
+  const together: Pose = { ...base, leg: [4, 4] };
+  const apart: Pose = { ...base, leg: [38, 22] };
+  return reverse ? { start: apart, end: together } : { start: together, end: apart };
+}
+
+/** A handle pressed straight out from the chest and held against the cable's pull. */
+function pallofPress(): Move {
+  return {
+    start: { ...STAND, arm: [20, 150] },
+    end: { ...STAND, arm: [90, 90] },
+  };
+}
+
+/** Kneeling with the rope by the head, curling the trunk down toward the floor. */
+function cableCrunch(): Move {
+  const leg: Limb = [0, -88];
+  return {
+    start: { torso: 10, head: 0, arm: [150, 20], leg },
+    end: { torso: 65, spine: 35, head: 15, arm: [110, -10], leg },
   };
 }
 
@@ -234,6 +286,7 @@ const BY_ID: Record<string, () => Move> = {
   'barbell-deadlift': hinge,
   'kettlebell-deadlift': hinge,
   'kettlebell-romanian-deadlift': hinge,
+  'kettlebell-swing': swing,
   'barbell-hip-thrust': () => bridge(true),
   'dumbbell-goblet-squat': () => squat('dumbbell'),
   'dumbbell-reverse-lunge': () => lunge('dumbbell'),
@@ -242,6 +295,8 @@ const BY_ID: Record<string, () => Move> = {
   'leg-extension-machine': () => legExtension(false),
   'seated-leg-curl-machine': () => legExtension(true),
   'standing-calf-raise-machine': calfRaise,
+  'hip-adduction-machine': () => hipAbduction(true),
+  'hip-abduction-machine': () => hipAbduction(false),
   'bodyweight-squat': () => squat('none'),
   'bodyweight-walking-lunge': () => lunge('none'),
   'glute-bridge': () => bridge(false),
@@ -258,6 +313,13 @@ const BY_ID: Record<string, () => Move> = {
   'wide-grip-seated-cable-row': seatedRow,
   'close-grip-seated-cable-row': seatedRow,
   'chest-press-machine': () => bench('none'),
+  'shoulder-press-machine': () => overheadPress('none'),
+  'pec-deck-machine': () => fly(false, { seated: true }),
+  'reverse-pec-deck-machine': () => fly(true, { seated: true }),
+  'cable-fly': () => fly(false),
+  'cable-face-pull': facePull,
+  'cable-crunch': cableCrunch,
+  'cable-pallof-press': pallofPress,
   'push-up': pushUp,
   'pull-up': pullUp,
   dip: pushUp,
@@ -266,7 +328,7 @@ const BY_ID: Record<string, () => Move> = {
   'worlds-greatest-stretch': hipFlexorStretch,
   'hip-flexor-stretch': hipFlexorStretch,
   'thoracic-rotation': thoracicRotation,
-  'band-pull-apart': bandPullApart,
+  'band-pull-apart': () => fly(true, { props: [{ kind: 'band' }] }),
   'shoulder-circles': shoulderCircles,
   'incline-treadmill-walk': () => run(),
   'cycling-stationary': cycle,
@@ -286,6 +348,7 @@ const BY_ID: Record<string, () => Move> = {
 const BY_NAME: [RegExp, () => Move][] = [
   [/高腳杯|深蹲/, () => squat('none')],
   [/硬舉|早安式/, hinge],
+  [/擺盪/, swing],
   [/弓箭步|分腿蹲|登階/, () => lunge('none')],
   [/臀推|臀橋/, () => bridge(false)],
   [/臥推|胸推|夾胸/, () => bench('none')],

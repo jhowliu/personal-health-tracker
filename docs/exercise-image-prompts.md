@@ -2,6 +2,8 @@
 
 給 AI 生圖工具(例如 ChatGPT)用的提示詞。每個區塊都是完整的,整段複製貼上就能用。
 
+器械補充的 9 個新動作(含 5fps 動畫的中間圖)在 [exercise-image-prompts-gym-batch.md](exercise-image-prompts-gym-batch.md)。
+
 ## 規格
 
 | 項目 | 建議 |

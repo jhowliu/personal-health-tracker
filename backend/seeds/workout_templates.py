@@ -1,4 +1,5 @@
-"""Seed the global, read-only workout templates: beginner full-body and push/pull/legs."""
+"""Seed the global, read-only workout templates: beginner full-body, push/pull/legs, a glute
+day and a posture day."""
 
 import asyncio
 import sys
@@ -21,6 +22,8 @@ class SeedTemplate:
     id: str
     name: str
     items: tuple[SeedItem, ...]
+    duration_min: int = 60
+    location: str = "gym"
 
 
 TEMPLATES = (
@@ -119,6 +122,60 @@ TEMPLATES = (
             SeedItem("leg-day-no-barbell-5", "seated-leg-curl-machine", 3, "12", 60),
         ),
     ),
+    # Glutes: swings wake the hips up while fresh, then the heavy thrust and hinge, then
+    # single-leg work and the abductors.
+    SeedTemplate(
+        "glute-day",
+        "練臀日（健身房）",
+        (
+            SeedItem("glute-day-1", "kettlebell-swing", 3, "15", 60),
+            SeedItem("glute-day-2", "barbell-hip-thrust", 4, "8", 120),
+            SeedItem("glute-day-3", "barbell-romanian-deadlift", 3, "8", 120),
+            SeedItem("glute-day-4", "dumbbell-bulgarian-split-squat", 3, "10", 90),
+            SeedItem("glute-day-5", "hip-abduction-machine", 3, "15", 60),
+        ),
+    ),
+    # Rounded shoulders and upper back: loosen the thoracic spine, then strengthen the rear
+    # delts and the muscles that pull the shoulder blades back.
+    SeedTemplate(
+        "posture-day",
+        "圓肩駝背改善（健身房）",
+        (
+            SeedItem("posture-day-1", "cat-cow", 2, "10", 30),
+            SeedItem("posture-day-2", "thoracic-rotation", 2, "10", 30),
+            SeedItem("posture-day-3", "band-pull-apart", 3, "15", 45),
+            SeedItem("posture-day-4", "cable-face-pull", 3, "15", 60),
+            SeedItem("posture-day-5", "reverse-pec-deck-machine", 3, "12", 60),
+            SeedItem("posture-day-6", "wide-grip-seated-cable-row", 3, "12", 90),
+        ),
+        duration_min=45,
+    ),
+    # The same two days with nothing but the body: no barbell, machine, cable or band.
+    SeedTemplate(
+        "glute-day-bodyweight",
+        "練臀日（徒手）",
+        (
+            SeedItem("glute-day-bodyweight-1", "hip-flexor-stretch", 2, "10", 30),
+            SeedItem("glute-day-bodyweight-2", "glute-bridge", 4, "20", 45),
+            SeedItem("glute-day-bodyweight-3", "bodyweight-walking-lunge", 3, "12", 60),
+            SeedItem("glute-day-bodyweight-4", "bodyweight-squat", 3, "20", 60),
+        ),
+        duration_min=30,
+        location="home",
+    ),
+    SeedTemplate(
+        "posture-day-bodyweight",
+        "圓肩駝背改善（徒手）",
+        (
+            SeedItem("posture-day-bodyweight-1", "cat-cow", 2, "10", 30),
+            SeedItem("posture-day-bodyweight-2", "thoracic-rotation", 2, "10", 30),
+            SeedItem("posture-day-bodyweight-3", "worlds-greatest-stretch", 2, "6", 30),
+            SeedItem("posture-day-bodyweight-4", "shoulder-circles", 2, "10", 30),
+            SeedItem("posture-day-bodyweight-5", "inverted-row", 3, "10", 90),
+        ),
+        duration_min=30,
+        location="home",
+    ),
 )
 
 
@@ -128,7 +185,7 @@ async def seed() -> int:
             """
             INSERT INTO workout_templates (
                 id, user_id, category_id, name, location, duration_min, archived_at
-            ) VALUES (?, NULL, 'strength', ?, 'gym', 60, NULL)
+            ) VALUES (?, NULL, 'strength', ?, ?, ?, NULL)
             ON CONFLICT (id) DO UPDATE SET
                 category_id = excluded.category_id,
                 name = excluded.name,
@@ -138,7 +195,10 @@ async def seed() -> int:
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             WHERE workout_templates.user_id IS NULL
             """,
-            [(template.id, template.name) for template in TEMPLATES],
+            [
+                (template.id, template.name, template.location, template.duration_min)
+                for template in TEMPLATES
+            ],
         )
         template_ids = tuple(template.id for template in TEMPLATES)
         placeholders = ", ".join("?" for _ in template_ids)
