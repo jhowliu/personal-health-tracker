@@ -15,17 +15,17 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
-import { FoodCategoryIcon } from '@/components/FoodCategoryIcon';
-import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, CloseIcon, PlusIcon, TrashIcon } from '@/components/icons';
+import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
-import { Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
+import { AddRow, Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
+import { FoodGroup, FoodItem } from '@/meals/FoodGroup';
 import { photoDraft } from '@/meals/photo-draft';
 import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
-import { color, foodCategoryTone } from '@/theme/tokens';
+import { color } from '@/theme/tokens';
 import { rowsFromLogs, toRecords, type RecordRow } from '@/workouts/record';
 import { dayFooter } from '@/workouts/day-footer';
 import { targetChanges, targetError, targetFromItem, type TargetEdit } from '@/workouts/target';
@@ -417,7 +417,6 @@ function MealStep({
   const [photoBusy, setPhotoBusy] = useState(false);
   const [portionItem, setPortionItem] = useState<PlannedMealItem | null>(null);
   const [portion, setPortion] = useState('');
-  const [actionItem, setActionItem] = useState<PlannedMealItem | null>(null);
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
@@ -521,17 +520,9 @@ function MealStep({
   const replaceItem = (item: PlannedMealItem) => {
     const food = item.food;
     if (!food || item.grams === null) return;
-    setActionItem(null);
-    requestAnimationFrame(() =>
-      router.navigate(
-        `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${food.id}&grams=${item.grams}`,
-      ),
+    router.navigate(
+      `/meals/swap-today?date=${day.date}&slot=${step}&item=${item.id}&food=${food.id}&grams=${item.grams}`,
     );
-  };
-
-  const requestRemoveItem = (item: PlannedMealItem) => {
-    setActionItem(null);
-    requestAnimationFrame(() => removeItem(item));
   };
 
   const setMealState = async (state: 'eaten' | 'skipped' | 'planned') => {
@@ -687,7 +678,6 @@ function MealStep({
             {word}的{STEP_LABEL[step]}
           </Text>
         )}
-        <Hint>點食物列可以替換或移除，點份量可以調整。</Hint>
       </View>
 
       {meal.skipped ? (
@@ -697,81 +687,42 @@ function MealStep({
         </Card>
       ) : (
         <>
-          <Card className="gap-3 p-2">
-            {/* Whole-meal actions live on the list they act on, so the footer only finishes the meal. */}
-            <View className="flex-row items-center justify-between px-2">
-              {meal.items.some((item) => item.food) ? (
-                <TextAction
-                  label="存成我的餐點"
-                  disabled={busy}
-                  onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
-                  className="min-h-[44px] justify-center"
-                />
-              ) : (
-                <View />
-              )}
+          {/* The list, a dashed row to add to it, then saving the meal as a whole, like the
+              workout list, so the footer only finishes the meal. */}
+          <View className="gap-2.5">
+            <Card className="gap-3 p-2">
+              {groupPlanItems(meal.items).map((group) => (
+                <FoodGroup key={group.category} category={group.category} label={group.label}>
+                  {group.items.map((item) => {
+                    // Only a food from the library has a portion to edit or a swap to offer.
+                    const canEditGrams = item.food !== null && item.grams !== null;
+                    return (
+                      <FoodItem
+                        key={item.id}
+                        name={item.food?.name ?? item.custom_name ?? '未命名食物'}
+                        amount={formatPlanAmount(item)}
+                        busy={busy}
+                        onReplace={canEditGrams ? () => replaceItem(item) : undefined}
+                        onAmount={canEditGrams ? () => editPortion(item) : undefined}
+                        onRemove={() => removeItem(item)}
+                      />
+                    );
+                  })}
+                </FoodGroup>
+              ))}
+            </Card>
+            <AddRow label="加入食物" disabled={busy} onPress={() => setAdding(true)} />
+          </View>
+          {meal.items.some((item) => item.food) ? (
+            <View className="items-center">
               <TextAction
-                icon={PlusIcon}
-                label="加入"
+                label="存成我的餐點"
                 disabled={busy}
-                onPress={() => setAdding(true)}
+                onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
                 className="min-h-[44px] justify-center"
               />
             </View>
-            {groupPlanItems(meal.items).map((group) => (
-              <View
-                key={group.category}
-                className="overflow-hidden rounded-card"
-                style={{ backgroundColor: foodCategoryTone(group.category).soft }}
-              >
-                <View className="min-h-[52px] flex-row items-center gap-3 px-3 py-2">
-                  <FoodCategoryIcon category={group.category} size="sm" solid />
-                  <Text className="flex-1 text-lg font-semibold text-ink">{group.label}</Text>
-                  <Text className="text-base text-muted">{group.items.length} 項</Text>
-                </View>
-
-                <View className="bg-surface">
-                  {group.items.map((item, itemIndex) => {
-                    const food = item.food;
-                    const itemName = food?.name ?? item.custom_name ?? '未命名食物';
-                    const canEditGrams = food !== null && item.grams !== null;
-                    return (
-                      <View key={item.id}>
-                        {itemIndex > 0 ? <View className="mx-3 h-px bg-line" /> : null}
-                        <View className="min-h-[60px] flex-row items-center gap-2 px-3 py-2">
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={`開啟${itemName}操作`}
-                            accessibilityState={{ disabled: busy }}
-                            disabled={busy}
-                            onPress={() => setActionItem(item)}
-                            className="min-h-[44px] flex-1 justify-center active:opacity-60"
-                          >
-                            <Text className="text-base font-semibold text-ink">{itemName}</Text>
-                          </Pressable>
-                          {canEditGrams ? (
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={`調整${itemName}份量，目前${formatPlanAmount(item)}`}
-                              disabled={busy}
-                              onPress={() => editPortion(item)}
-                              className="min-h-[44px] flex-row items-center justify-center gap-1 rounded-full bg-fill px-3 active:opacity-70"
-                            >
-                              <Text className="text-base font-semibold text-ink">{formatPlanAmount(item)}</Text>
-                              <ChevronIcon direction="down" size={14} tint={color.muted} />
-                            </Pressable>
-                          ) : null}
-                          <View aria-hidden className="h-11 w-6 items-center justify-center">
-                            <ChevronIcon direction="right" size={18} tint={color.muted} />
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            ))}
-          </Card>
+          ) : null}
         </>
       )}
 
@@ -786,27 +737,6 @@ function MealStep({
         onSave={savePortion}
       />
 
-      <Sheet
-        visible={actionItem !== null}
-        title={actionItem?.food?.name ?? actionItem?.custom_name ?? '食物操作'}
-        onClose={() => setActionItem(null)}
-      >
-        {actionItem?.food && actionItem.grams !== null ? (
-          <PrimaryButton tone="plain" onPress={() => replaceItem(actionItem)} disabled={busy}>
-            替換食物
-          </PrimaryButton>
-        ) : null}
-        {actionItem ? (
-          <PrimaryButton
-            tone="danger"
-            icon={TrashIcon}
-            onPress={() => requestRemoveItem(actionItem)}
-            disabled={busy}
-          >
-            移除這項食物
-          </PrimaryButton>
-        ) : null}
-      </Sheet>
       {addSheet}
     </Screen>
   );
@@ -1279,18 +1209,11 @@ function WorkoutStep({
               />
             );
           })}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: busy }}
+          <AddRow
+            label="加入動作"
             disabled={busy}
             onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
-            className={`min-h-[52px] flex-row items-center justify-center gap-2 rounded-card border-2 border-dashed border-line ${
-              busy ? 'opacity-40' : 'active:opacity-70'
-            }`}
-          >
-            <PlusIcon size={18} tint={color.primary} />
-            <Text className="text-base font-semibold text-primary">加入動作</Text>
-          </Pressable>
+          />
         </View>
 
         {workout.estimated_burn_kcal ? (
