@@ -1,14 +1,16 @@
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams, useNavigation, type Href } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
-import { CameraIcon, CloseIcon, PlusIcon } from '@/components/icons';
-import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
+import { CameraIcon, PlusIcon } from '@/components/icons';
+import { Sheet } from '@/components/Sheet';
+import { AddRow, BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
-import { amountToGrams, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
+import { FoodGroup, FoodItem } from '@/meals/FoodGroup';
+import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -23,14 +25,6 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 const CATEGORY_ORDER = ['staple', 'protein', 'vegetable', 'fruit', 'fat_sauce'];
-
-const SWAP_NOTE: Record<string, string> = {
-  staple: '依碳水換算，份量隨目標自動調整',
-  protein: '依蛋白質換算',
-  vegetable: '依熱量換算',
-  fruit: '依碳水換算',
-  fat_sauce: '依熱量換算',
-};
 
 const SLOTS = [
   { id: 'breakfast', label: '早餐' },
@@ -47,6 +41,8 @@ export default function EditMeal() {
 
   const [busy, setBusy] = useState(false);
   const [totals, setTotals] = useState<Nutrients | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -128,6 +124,11 @@ export default function EditMeal() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const addFrom = (path: Href) => {
+    setAdding(false);
+    requestAnimationFrame(() => router.navigate(path));
   };
 
   const remove = () =>
@@ -217,44 +218,44 @@ export default function EditMeal() {
 
       <Text className="font-display text-xl font-bold text-ink">組成</Text>
 
-      {grouped.length ? (
-        <Card className="px-4 py-0">
-          <Rows>
+      {/* Drawn like the today list: a block per category, then one dashed row to add. */}
+      <View className="gap-2.5">
+        {grouped.length ? (
+          <Card className="gap-3 p-2">
             {grouped.map((group) => (
-              <View key={group.category} className="gap-2 py-3">
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-1 flex-row items-center gap-2">
-                    <Chip label={CATEGORY_LABEL[group.category]} tone="primary" />
-                    <Text className="flex-1 text-xs text-muted">{SWAP_NOTE[group.category]}</Text>
-                  </View>
-                  <TextAction
-                    icon={PlusIcon}
-                    label={CATEGORY_LABEL[group.category]}
-                    onPress={() => router.navigate(`/meals/add-food?category=${group.category}&meal_id=${id}`)}
-                    className="min-h-[44px] pl-2"
-                  />
-                </View>
-
+              <FoodGroup
+                key={group.category}
+                category={group.category}
+                label={CATEGORY_LABEL[group.category] ?? group.category}
+              >
                 {group.items.map((item) => (
-                  <ItemRow key={item.key} item={item} draftKey={id} />
+                  <ItemRow
+                    key={item.key}
+                    item={item}
+                    draftKey={id}
+                    open={editing === item.key}
+                    onToggle={() => setEditing((current) => (current === item.key ? null : item.key))}
+                  />
                 ))}
-              </View>
+              </FoodGroup>
             ))}
-          </Rows>
-        </Card>
-      ) : null}
+          </Card>
+        ) : null}
+        <AddRow label="加入食物" onPress={() => setAdding(true)} />
+      </View>
 
-       <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => router.navigate(`/meals/add-food?meal_id=${id}`)}>
-        加入食物
-      </PrimaryButton>
-
-       <PrimaryButton
-        tone="plain"
-        icon={CameraIcon}
-        onPress={() => router.navigate(`/meals/photo?destination=meal&meal_id=${id}`)}
-      >
-        用照片加入食物
-      </PrimaryButton>
+      <Sheet visible={adding} title="加入食物" onClose={() => setAdding(false)}>
+        <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => addFrom(`/meals/add-food?meal_id=${id}`)}>
+          從食物庫加入
+        </PrimaryButton>
+        <PrimaryButton
+          tone="plain"
+          icon={CameraIcon}
+          onPress={() => addFrom(`/meals/photo?destination=meal&meal_id=${id}`)}
+        >
+          用照片加入
+        </PrimaryButton>
+      </Sheet>
 
       {isNew ? null : (
         <PrimaryButton tone="danger" onPress={remove}>
@@ -265,7 +266,17 @@ export default function EditMeal() {
   );
 }
 
-function ItemRow({ item, draftKey }: { item: DraftItem; draftKey: string }) {
+function ItemRow({
+  item,
+  draftKey,
+  open,
+  onToggle,
+}: {
+  item: DraftItem;
+  draftKey: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   const unit = portionUnit(item.food);
   const display = readableAmount(gramsToAmount(item.food, item.grams));
 
@@ -278,36 +289,20 @@ function ItemRow({ item, draftKey }: { item: DraftItem; draftKey: string }) {
   const kcal = Math.round((item.food.per_100g.kcal * item.grams) / 100);
 
   return (
-    <View className="gap-1">
-      <View className="flex-row items-baseline justify-between">
-        <Text className="flex-1 text-base font-semibold text-ink">{item.food.name}</Text>
-        <Text className="text-sm text-muted">{kcal} 大卡</Text>
-      </View>
-
-      <View className="flex-row items-center gap-2">
-        <View className="flex-1">
-          <Field value={display} onChangeText={onChange} suffix={unit.label} keyboardType="decimal-pad" />
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            router.navigate(
-              `/meals/substitute?meal_id=${draftKey}&key=${item.key}&food=${item.food.id}&grams=${item.grams}`,
-            )
-          }
-          className="min-h-[44px] justify-center rounded-field bg-fill px-4"
-        >
-          <Text className="text-base text-ink">替換</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`移除${item.food.name}`}
-          onPress={() => draft.removeItem(draftKey, item.key)}
-          className="h-11 w-11 items-center justify-center"
-        >
-          <CloseIcon size={18} tint={color.muted} />
-        </Pressable>
-      </View>
-    </View>
+    <FoodItem
+      name={item.food.name}
+      amount={formatPortion(item.food, item.grams)}
+      open={open}
+      onReplace={() =>
+        router.navigate(
+          `/meals/substitute?meal_id=${draftKey}&key=${item.key}&food=${item.food.id}&grams=${item.grams}`,
+        )
+      }
+      onAmount={onToggle}
+      onRemove={() => draft.removeItem(draftKey, item.key)}
+    >
+      <Field label="份量" value={display} onChangeText={onChange} suffix={unit.label} keyboardType="decimal-pad" />
+      <Text className="text-sm text-muted">{kcal} 大卡</Text>
+    </FoodItem>
   );
 }

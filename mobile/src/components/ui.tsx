@@ -27,7 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/AppModal';
 import { FrameHostContext } from '@/components/frame-host';
-import { ChevronIcon } from '@/components/icons';
+import { ChevronIcon, PlusIcon } from '@/components/icons';
 import { color } from '@/theme/tokens';
 
 /**
@@ -277,6 +277,24 @@ export function TextAction({
     >
       {Icon ? <Icon size={16} tint={tint} /> : null}
       <Text className={`text-base ${text}`}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** The dashed "＋ 加入…" row that ends a list the person can add to: a workout, a meal. */
+export function AddRow({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
+      disabled={disabled}
+      onPress={onPress}
+      className={`min-h-[52px] flex-row items-center justify-center gap-2 rounded-card border-2 border-dashed border-line ${
+        disabled ? 'opacity-40' : 'active:opacity-70'
+      }`}
+    >
+      <PlusIcon size={18} tint={color.primary} />
+      <Text className="text-base font-semibold text-primary">{label}</Text>
     </Pressable>
   );
 }
