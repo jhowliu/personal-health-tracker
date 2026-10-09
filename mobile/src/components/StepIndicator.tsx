@@ -2,9 +2,10 @@
  * The progress track at the top of today's flow. Every step can be tapped: the order is a
  * suggestion, and a workout done after breakfast should not wait for lunch to be logged.
  */
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { CheckIcon } from '@/components/icons';
+import { CheckIcon, DumbbellIcon, ScaleIcon, UtensilsIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { color } from '@/theme/tokens';
 
 export const STEP_LABEL: Record<string, string> = {
@@ -16,46 +17,49 @@ export const STEP_LABEL: Record<string, string> = {
   done: '完成',
 };
 
+const STEP_ICON: Record<string, typeof CheckIcon> = {
+  body: ScaleIcon,
+  breakfast: UtensilsIcon,
+  lunch: UtensilsIcon,
+  workout: DumbbellIcon,
+  dinner: UtensilsIcon,
+};
+
 /**
- * One dot on the track. State is never colour alone: a check for done, a dash for skipped, a
- * ring for the step on screen, a dark outline for the next open step, a plain grey disc for
- * the rest.
+ * One circle on the track. State is never colour alone: a check for done, a dash for skipped,
+ * the step's own icon while it is still open, and a berry outline with a soft ring for the
+ * step on screen.
  */
 function StepNode({
+  step,
   done,
   skipped,
   viewing,
-  next,
 }: {
+  step: string;
   done: boolean;
   skipped: boolean;
   viewing: boolean;
-  next: boolean;
 }) {
-  const disc = skipped
-    ? 'border border-line bg-fill'
-    : done
-    ? 'bg-good'
-    : viewing
-      ? 'bg-primary'
-      : next
-        ? 'border-2 border-ink bg-surface'
-        : 'border border-line bg-fill';
+  const Glyph = STEP_ICON[step] ?? UtensilsIcon;
+  const fill = skipped ? 'bg-warm-soft' : done ? 'bg-good-soft' : 'bg-bg';
 
   return (
     <View
-      className={`h-7 w-7 items-center justify-center rounded-full ${
-        viewing ? 'border-2 border-primary' : ''
-      }`}
+      className={`h-[42px] w-[42px] items-center justify-center rounded-full ${viewing ? 'bg-primary-soft' : ''}`}
     >
-      <View className={`h-5 w-5 items-center justify-center rounded-full ${disc}`}>
+      <View
+        className={`h-[34px] w-[34px] items-center justify-center rounded-full border-2 ${
+          viewing ? 'border-primary' : 'border-edge'
+        } ${fill}`}
+      >
         {skipped ? (
-          <View className="h-0.5 w-2.5 rounded-full bg-muted" />
+          <View className="h-0.5 w-3 rounded-full bg-warm" />
         ) : done ? (
-          <CheckIcon size={12} tint={color.surface} />
-        ) : viewing ? (
-          <View className="h-2 w-2 rounded-full bg-surface" />
-        ) : null}
+          <CheckIcon size={15} tint={viewing ? color.primary : color.good} />
+        ) : (
+          <Glyph size={15} tint={viewing ? color.primary : color.ink} />
+        )}
       </View>
     </View>
   );
@@ -87,9 +91,6 @@ export function StepIndicator({
         const isCurrent = step === current;
         const isNext = step === next;
         const name = STEP_LABEL[step] ?? step;
-        // The track between two dots is filled once the step on its left is finished.
-        const leftFilled = index > 0 && completed.includes(steps[index - 1]);
-        const rightFilled = isDone;
 
         return (
           <Pressable
@@ -104,25 +105,13 @@ export function StepIndicator({
             className="flex-1 items-center gap-1"
           >
             <View className="w-full flex-row items-center">
-              <View
-                className={`mr-1 h-0.5 flex-1 ${
-                  index === 0 ? '' : leftFilled ? 'bg-good' : 'bg-line'
-                }`}
-              />
-              <StepNode done={isDone} skipped={isSkipped} viewing={isCurrent} next={isNext} />
-              <View
-                className={`ml-1 h-0.5 flex-1 ${
-                  index === steps.length - 1 ? '' : rightFilled ? 'bg-good' : 'bg-line'
-                }`}
-              />
+              <View className={`h-[1.5px] flex-1 ${index === 0 ? '' : 'bg-good/40'}`} />
+              <StepNode step={step} done={isDone} skipped={isSkipped} viewing={isCurrent} />
+              <View className={`h-[1.5px] flex-1 ${index === steps.length - 1 ? '' : 'bg-good/40'}`} />
             </View>
             <Text
-              className={`text-center text-sm ${
-                isCurrent
-                  ? 'font-semibold text-primary'
-                  : (isDone && !isSkipped) || isNext
-                    ? 'text-ink'
-                    : 'text-muted'
+              className={`rounded-full px-2 text-center text-xs ${
+                isCurrent ? 'bg-primary-soft text-primary' : isNext || isDone ? 'text-ink' : 'text-muted'
               }`}
             >
               {name}

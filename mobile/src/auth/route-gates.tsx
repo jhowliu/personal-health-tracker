@@ -1,8 +1,9 @@
 import { Redirect, useGlobalSearchParams, useLocalSearchParams, usePathname } from 'expo-router';
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { useSession } from '@/auth/session';
+import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
 import { color } from '@/theme/tokens';

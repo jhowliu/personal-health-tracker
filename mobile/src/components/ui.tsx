@@ -15,8 +15,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  Text,
-  TextInput,
   View,
   useWindowDimensions,
   type KeyboardTypeOptions,
@@ -27,7 +25,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/AppModal';
 import { FrameHostContext } from '@/components/frame-host';
-import { ChevronIcon, PlusIcon } from '@/components/icons';
+import { ChevronIcon, PlusIcon, type IconProps } from '@/components/icons';
+import { Text, TextInput } from '@/components/text';
 import { color } from '@/theme/tokens';
 
 /**
@@ -47,9 +46,12 @@ export function Screen({
   pinnedHeader,
   footer,
   footerSafeArea = true,
+  scrollEnabled = true,
 }: {
   children: ReactNode;
   scroll?: boolean;
+  /** Off while something on the screen is being dragged, so the page does not scroll with it. */
+  scrollEnabled?: boolean;
   /** Fixed above the scroll area for controls that must remain available while browsing. */
   pinnedHeader?: ReactNode;
   /** Pinned below the scroll area — for a running total the user needs while editing. */
@@ -71,6 +73,7 @@ export function Screen({
         {scroll ? (
           <ScrollView
             className="flex-1"
+            scrollEnabled={scrollEnabled}
             contentContainerClassName="px-5 pb-8 pt-2 gap-4"
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -91,7 +94,7 @@ export function Screen({
         {/* Inside KeyboardAvoidingView so it rides up with the keyboard. Padding sits on the inner
             View: on web SafeAreaView writes its own inline padding over any className padding. */}
         {footer ? (
-          <SafeAreaView edges={footerSafeArea ? ['bottom'] : []} className="border-t border-line bg-surface">
+          <SafeAreaView edges={footerSafeArea ? ['bottom'] : []} className="border-t border-line bg-bg">
             <View className="gap-2 px-5 pb-3 pt-3">{footer}</View>
           </SafeAreaView>
         ) : null}
@@ -123,10 +126,10 @@ export function Rows({ children }: { children: ReactNode }) {
 export function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
   return (
     <View className="gap-1">
-      <Text accessibilityRole="header" className="font-display text-3xl font-bold text-ink">
+      <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
         {children}
       </Text>
-      {sub ? <Text className="text-base text-muted">{sub}</Text> : null}
+      {sub ? <Text className="text-sm text-muted">{sub}</Text> : null}
     </View>
   );
 }
@@ -134,7 +137,7 @@ export function Title({ children, sub }: { children: React.ReactNode; sub?: stri
 export function SectionHeading({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <View className="flex-row items-center justify-between">
-      <Text accessibilityRole="header" className="font-display text-xl font-bold text-ink">
+      <Text accessibilityRole="header" className="text-[17px] text-ink">
         {children}
       </Text>
       {action}
@@ -147,7 +150,7 @@ export function Card({ className = '', ...props }: ViewProps & { className?: str
     <View
       // overflow-hidden clips children to the radius. Without it a child that paints its
       // own background (FoodOptionRow) covers the corners and the card renders square.
-      className={`overflow-hidden rounded-card border border-line bg-surface p-4 ${className}`}
+      className={`overflow-hidden rounded-card border-2 border-edge bg-surface p-4 ${className}`}
       {...props}
     />
   );
@@ -179,7 +182,7 @@ export function Field({
           {label}
         </Text>
       ) : null}
-      <View className="flex-row items-center rounded-field border border-line bg-surface px-3">
+      <View className="flex-row items-center rounded-field border-[1.5px] border-edge bg-surface px-3">
         <TextInput
           // min-w-0: a browser input keeps its default width otherwise and pushes the suffix out.
           className={`min-h-[44px] min-w-0 flex-1 text-base text-ink ${className}`}
@@ -213,11 +216,12 @@ export function PrimaryButton({
   icon?: ComponentType<{ tint?: string }>;
 }) {
   const unavailable = disabled || busy;
+  // The berry button is the main action; outlined ones sit beside or under it.
   const skin = {
-    primary: 'bg-primary',
-    dark: 'bg-ink',
-    plain: 'border border-line bg-surface',
-    danger: 'border border-line bg-surface',
+    primary: 'min-h-[47px] rounded-button border-2 border-edge bg-primary',
+    dark: 'min-h-[47px] rounded-button border-2 border-edge bg-ink',
+    plain: 'min-h-[44px] rounded-control border-[1.5px] border-edge bg-surface',
+    danger: 'min-h-[44px] rounded-control border-[1.5px] border-edge bg-surface',
   }[tone];
   const label = { primary: 'text-white', dark: 'text-white', plain: 'text-ink', danger: 'text-danger' }[tone];
   const iconTint = { primary: color.surface, dark: color.surface, plain: color.ink, danger: color.danger }[tone];
@@ -228,12 +232,12 @@ export function PrimaryButton({
       accessibilityState={{ busy: Boolean(busy), disabled: Boolean(unavailable) }}
       onPress={onPress}
       disabled={unavailable}
-      className={`min-h-[52px] items-center justify-center rounded-field ${skin} ${
+      className={`items-center justify-center ${skin} ${
         Icon ? 'flex-row gap-2' : ''
       } ${unavailable ? 'opacity-40' : 'active:opacity-80'}`}
     >
       {Icon ? <Icon tint={iconTint} /> : null}
-      <Text className={`text-base font-semibold ${label} ${Icon ? 'shrink' : ''}`}>{children}</Text>
+      <Text className={`text-base ${label} ${Icon ? 'shrink' : ''}`}>{children}</Text>
     </Pressable>
   );
 }
@@ -281,7 +285,52 @@ export function TextAction({
   );
 }
 
-/** The dashed "＋ 加入…" row that ends a list the person can add to: a workout, a meal. */
+/** The berry "＋ 新增" button beside a tab's title. */
+export function HeaderAddButton({
+  label,
+  accessibilityLabel,
+  onPress,
+}: {
+  label: string;
+  accessibilityLabel?: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-button border-2 border-edge bg-primary px-4 active:opacity-80"
+    >
+      <PlusIcon size={17} tint={color.surface} />
+      <Text className="text-base text-white">{label}</Text>
+    </Pressable>
+  );
+}
+
+/** A square outlined icon button beside a tab's title, such as the camera on 餐點. */
+export function HeaderIconButton({
+  icon: Icon,
+  accessibilityLabel,
+  onPress,
+}: {
+  icon: ComponentType<IconProps>;
+  accessibilityLabel: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      className="h-11 w-11 items-center justify-center rounded-control border-2 border-edge bg-surface active:opacity-70"
+    >
+      <Icon size={20} tint={color.ink} />
+    </Pressable>
+  );
+}
+
+/** The outlined "＋ 加入…" button that ends a list the person can add to: a workout, a meal. */
 export function AddRow({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
     <Pressable
@@ -289,12 +338,12 @@ export function AddRow({ label, onPress, disabled }: { label: string; onPress: (
       accessibilityState={{ disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
-      className={`min-h-[52px] flex-row items-center justify-center gap-2 rounded-card border-2 border-dashed border-line ${
+      className={`min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control border-[1.5px] border-edge bg-surface ${
         disabled ? 'opacity-40' : 'active:opacity-70'
       }`}
     >
-      <PlusIcon size={18} tint={color.primary} />
-      <Text className="text-base font-semibold text-primary">{label}</Text>
+      <PlusIcon size={15} tint={color.ink} />
+      <Text className="text-sm text-ink">{label}</Text>
     </Pressable>
   );
 }
@@ -328,24 +377,24 @@ export function BackLink({
 }
 
 /**
- * How "selected" looks, so a new control picks one of these instead of inventing a fourth:
- * - one choice among a few options (Chip, Segmented, the profile Picker): solid ink pill;
+ * How "selected" looks, so a new control picks one of these instead of inventing another:
+ * - one choice among a few options (Segmented, Chip): an outlined pill on a soft fill;
  * - a row picked from a list (ChoiceOption, FoodOptionRow): primary-soft fill and a check;
- * - where you are (tab bar, StepIndicator): the primary colour.
+ * - where you are (tab bar, StepIndicator): the primary colour on primary-soft.
  */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
-  tone = 'dark',
 }: {
   options: { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
+  /** Kept for callers; both tones now draw the same outlined track. */
   tone?: 'dark' | 'soft';
 }) {
   return (
-    <View className={`flex-row rounded-full ${tone === 'soft' ? 'bg-fill' : ''} p-1`}>
+    <View className="flex-row rounded-[14px] border-2 border-edge bg-fill p-1">
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -354,13 +403,11 @@ export function Segmented<T extends string>({
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
             onPress={() => onChange(option.value)}
-            className={`min-h-[44px] flex-1 items-center justify-center rounded-full ${
-              active ? 'bg-ink' : ''
+            className={`min-h-[42px] flex-1 items-center justify-center rounded-control border-[1.5px] ${
+              active ? 'border-edge bg-primary-soft' : 'border-transparent'
             }`}
           >
-            <Text className={`text-base ${active ? 'font-semibold text-white' : 'text-muted'}`}>
-              {option.label}
-            </Text>
+            <Text className={`text-base ${active ? 'text-primary' : 'text-muted'}`}>{option.label}</Text>
           </Pressable>
         );
       })}
@@ -368,29 +415,47 @@ export function Segmented<T extends string>({
   );
 }
 
+type Tone = 'neutral' | 'primary' | 'good' | 'warm' | 'purple';
+
+const TONE_SKIN: Record<Tone, string> = {
+  neutral: 'bg-fill',
+  primary: 'bg-primary-soft',
+  good: 'bg-good-soft',
+  warm: 'bg-warm-soft',
+  purple: 'bg-purple-soft',
+};
+
+const TONE_TEXT: Record<Tone, string> = {
+  neutral: 'text-muted',
+  primary: 'text-primary',
+  good: 'text-good',
+  warm: 'text-warm',
+  purple: 'text-purple',
+};
+
+/** A filter or option pill. Selected, it is outlined on the soft yellow of the journal. */
 export function Chip({
   label,
   selected,
   onPress,
-  tone = 'neutral',
+  tone,
 }: {
   label: string;
   selected?: boolean;
   onPress?: () => void;
-  tone?: 'neutral' | 'primary' | 'good' | 'warm';
+  /** A coloured label rather than a choice; left out, the chip is plain text until selected. */
+  tone?: Tone;
 }) {
   const skin = selected
-    ? 'bg-ink'
-    : { neutral: 'bg-fill', primary: 'bg-primary-soft', good: 'bg-good-soft', warm: 'bg-warm-soft' }[
-        tone
-      ];
-  const label_ = selected
-    ? 'text-white'
-    : { neutral: 'text-muted', primary: 'text-primary', good: 'text-good', warm: 'text-warm' }[tone];
+    ? 'border-edge bg-warm-soft'
+    : tone
+      ? `border-transparent ${TONE_SKIN[tone]}`
+      : 'border-transparent';
+  const text = selected || !tone ? 'text-ink' : TONE_TEXT[tone];
 
   const content = (
-    <View className={`rounded-full px-3 py-1.5 ${skin}`}>
-      <Text className={`text-sm ${label_}`}>{label}</Text>
+    <View className={`rounded-control border-[1.5px] px-3 py-1.5 ${skin}`}>
+      <Text className={`text-sm ${text}`}>{label}</Text>
     </View>
   );
 
@@ -409,21 +474,10 @@ export function Chip({
 }
 
 /** A small label pill inside a list card, such as 肌力 or 在家. */
-export function Tag({
-  label,
-  tone = 'neutral',
-}: {
-  label: string;
-  tone?: 'neutral' | 'primary' | 'good' | 'warm';
-}) {
-  const skin = { neutral: 'bg-fill', primary: 'bg-primary-soft', good: 'bg-good-soft', warm: 'bg-warm-soft' }[
-    tone
-  ];
-  const text = { neutral: 'text-muted', primary: 'text-primary', good: 'text-good', warm: 'text-warm' }[tone];
-
+export function Tag({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
   return (
-    <View className={`rounded-full px-2 py-0.5 ${skin}`}>
-      <Text className={`text-xs ${text}`}>{label}</Text>
+    <View className={`rounded-full px-2 py-0.5 ${TONE_SKIN[tone]}`}>
+      <Text className={`text-xs ${TONE_TEXT[tone]}`}>{label}</Text>
     </View>
   );
 }
@@ -511,7 +565,7 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
         onPress={show}
         className="h-[18px] w-[18px] items-center justify-center rounded-full border border-muted"
       >
-        <Text className="text-xs font-bold text-muted">i</Text>
+        <Text className="text-xs text-muted">i</Text>
       </Pressable>
       {/* Translucent status bar keeps the modal's coordinates the same as measureInWindow's on Android. */}
       <AppModal visible={anchor !== null} transparent statusBarTranslucent animationType="fade" onRequestClose={hide}>

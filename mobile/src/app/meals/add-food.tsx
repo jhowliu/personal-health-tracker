@@ -1,12 +1,13 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
-import { FoodOptionRow } from '@/components/FoodOptionRow';
+import { categoryTone, FoodOptionRow } from '@/components/FoodOptionRow';
 import { CheckIcon, PlusIcon } from '@/components/icons';
 import { STEP_LABEL } from '@/components/StepIndicator';
+import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { ShowMore, usePaged } from '@/components/paging';
 import { draft } from '@/meals/draft';
@@ -179,11 +180,11 @@ export default function AddFood() {
             <View className="flex-row items-end gap-3">
               <View className="flex-1 gap-0.5">
                 <Text className="text-sm text-muted">已選擇</Text>
-                <Text className="text-base font-semibold text-ink" numberOfLines={1}>
+                <Text className="text-base text-ink" numberOfLines={1}>
                   {picked.name}
                 </Text>
               </View>
-              <Text className="font-display text-2xl font-bold text-ink">{kcal} 大卡</Text>
+              <Text className="text-2xl text-ink">{kcal} 大卡</Text>
             </View>
             <Field
               label="份量"
@@ -260,7 +261,7 @@ export default function AddFood() {
               key={food.id}
               name={food.name}
               detail={describeFood(food)}
-              badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: 'primary' }]}
+              badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: categoryTone(food.category_id) }]}
               selected={picked?.id === food.id}
               onPress={() => choose(food)}
             />

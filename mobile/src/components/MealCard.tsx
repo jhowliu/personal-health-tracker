@@ -1,23 +1,13 @@
-/** A saved meal that expands in place to show its composition and actions. */
-import { Text, View } from 'react-native';
+/** A saved meal in the 我的餐點 list; tapping it opens the meal for editing. */
+import { Pressable, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
-import { ExpandableCard } from '@/components/ExpandableCard';
-import { PencilIcon, TrashIcon } from '@/components/icons';
-import { formatPortion } from '@/meals/portion';
-import { color, foodCategoryColor } from '@/theme/tokens';
+import { ChevronIcon } from '@/components/icons';
+import { Text } from '@/components/text';
+import { Tag } from '@/components/ui';
+import { color } from '@/theme/tokens';
 
 type Meal = Schema<'MealOut'>;
-
-const CATEGORY_LABEL: Record<string, string> = {
-  staple: '主食',
-  protein: '蛋白質',
-  vegetable: '蔬菜',
-  fruit: '水果',
-  fat_sauce: '油脂與醬料',
-};
-
-const CATEGORY_ORDER = ['staple', 'protein', 'vegetable', 'fruit', 'fat_sauce'];
 
 const SLOT_LABEL: Record<string, string> = {
   breakfast: '早餐',
@@ -28,120 +18,42 @@ const SLOT_LABEL: Record<string, string> = {
 // The API returns a meal's slots in no particular order; show them the way the day runs.
 const SLOT_ORDER = ['breakfast', 'lunch', 'dinner'];
 
-const SLOT_TONE: Record<string, { backgroundColor: string; color: string }> = {
-  breakfast: {
-    backgroundColor: foodCategoryColor.staple.soft,
-    color: foodCategoryColor.staple.accent,
-  },
-  lunch: {
-    backgroundColor: foodCategoryColor.protein.soft,
-    color: foodCategoryColor.protein.accent,
-  },
-  dinner: {
-    backgroundColor: foodCategoryColor.fat_sauce.soft,
-    color: foodCategoryColor.fat_sauce.accent,
-  },
+const SLOT_TONE: Record<string, 'warm' | 'primary' | 'purple'> = {
+  breakfast: 'warm',
+  lunch: 'primary',
+  dinner: 'purple',
 };
 
-export function groupByCategory(items: Schema<'MealItemOut'>[]) {
-  const groups = new Map<string, Schema<'MealItemOut'>[]>();
-  for (const item of items) {
-    const list = groups.get(item.category_id) ?? [];
-    list.push(item);
-    groups.set(item.category_id, list);
-  }
-  return CATEGORY_ORDER.filter((c) => groups.has(c)).map((category) => ({
-    category,
-    label: CATEGORY_LABEL[category] ?? category,
-    items: groups.get(category) as Schema<'MealItemOut'>[],
-  }));
-}
-
-export function MealCard({
-  meal,
-  expanded,
-  busy,
-  onToggle,
-  onEdit,
-  onDelete,
-}: {
-  meal: Meal;
-  expanded: boolean;
-  busy?: boolean;
-  onToggle: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const groups = groupByCategory(meal.items);
+/** A saved meal in the list: its name and calories, the meals it suits and what is in it. */
+export function MealCard({ meal, onOpen }: { meal: Meal; onOpen: () => void }) {
   const summary = meal.items.map((item) => item.food.name).join('・');
   const slots = [...meal.meal_times].sort((a, b) => SLOT_ORDER.indexOf(a) - SLOT_ORDER.indexOf(b));
 
   return (
-    <ExpandableCard
-      name={meal.name}
-      expanded={expanded}
-      busy={busy}
-      onToggle={onToggle}
-      summary={
-        <>
-          <View className="flex-row items-baseline justify-between gap-3">
-            <Text className="flex-1 text-base font-semibold text-ink">{meal.name}</Text>
-            <Text className="text-base text-muted">{Math.round(meal.nutrients.kcal)} 大卡</Text>
-          </View>
-
-          <View className="flex-row flex-wrap gap-1.5">
-            {slots.map((slot) => {
-              const tone = SLOT_TONE[slot];
-              return (
-                <View
-                  key={slot}
-                  className="rounded-full px-2 py-0.5"
-                  style={{ backgroundColor: tone?.backgroundColor ?? color.fill }}
-                >
-                  <Text className="text-xs" style={{ color: tone?.color ?? color.muted }}>
-                    {SLOT_LABEL[slot] ?? slot}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-
-          <Text className="text-sm text-muted" numberOfLines={1}>
-            {summary || '還沒有食物'}
-          </Text>
-        </>
-      }
-      details={groups.map((group, groupIndex) => (
-        <View key={group.category}>
-          {groupIndex > 0 ? <View className="h-px bg-line" /> : null}
-          <View className="flex-row items-start gap-3 py-3">
-            <Text className="w-20 text-sm font-semibold text-ink">{group.label}</Text>
-            <View className="flex-1 gap-1.5">
-              {group.items.map((item) => (
-                <View key={item.id} className="flex-row items-baseline justify-between gap-2">
-                  <Text className="flex-1 text-sm text-ink">{item.food.name}</Text>
-                  <Text className="text-sm text-muted">{formatPortion(item.food, item.grams)}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`編輯${meal.name}，${Math.round(meal.nutrients.kcal)} 大卡`}
+      onPress={onOpen}
+      className="min-h-[96px] flex-row items-start gap-3 rounded-tile border-[1.5px] border-edge bg-surface px-4 py-3 active:bg-warm-soft"
+    >
+      <View className="flex-1 gap-1.5">
+        <Text className="text-[15px] text-ink">{meal.name}</Text>
+        <View className="flex-row flex-wrap gap-1.5">
+          {slots.map((slot) => (
+            <Tag key={slot} label={SLOT_LABEL[slot] ?? slot} tone={SLOT_TONE[slot] ?? 'neutral'} />
+          ))}
         </View>
-      ))}
-      actions={[
-        {
-          label: '編輯餐點',
-          accessibilityLabel: `編輯${meal.name}`,
-          icon: PencilIcon,
-          onPress: onEdit,
-        },
-        {
-          label: '刪除',
-          accessibilityLabel: `刪除${meal.name}`,
-          icon: TrashIcon,
-          onPress: onDelete,
-          tone: 'danger',
-        },
-      ]}
-    />
+        <Text className="text-xs text-muted" numberOfLines={2}>
+          {summary || '還沒有食物'}
+        </Text>
+      </View>
+      <View className="items-end gap-2">
+        <Text className="text-sm text-ink">
+          {Math.round(meal.nutrients.kcal)}
+          <Text className="text-xs text-muted"> 大卡</Text>
+        </Text>
+        <ChevronIcon direction="right" size={15} tint={color.ink} />
+      </View>
+    </Pressable>
   );
 }

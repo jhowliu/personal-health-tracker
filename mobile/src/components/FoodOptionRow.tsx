@@ -5,8 +5,9 @@
  * primary background, and 24 px is always reserved on the right for the checkmark — so
  * selecting never shifts the layout.
  */
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { CheckIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 
 const CHECK_SLOT = 24;
 
@@ -15,7 +16,7 @@ export type FoodOptionRowProps = {
   /** Substitute screen: grams sit immediately right of the food name */
   grams?: string;
   detail?: string;
-  badges?: { label: string; tone?: 'neutral' | 'primary' | 'good' | 'warm' }[];
+  badges?: { label: string; tone?: BadgeTone }[];
   trailing?: string;
   note?: string;
   /**
@@ -28,12 +29,27 @@ export type FoodOptionRowProps = {
   onPress?: () => void;
 };
 
+type BadgeTone = 'neutral' | 'primary' | 'good' | 'warm' | 'purple';
+
 const BADGE_SKIN = {
   neutral: { box: 'bg-fill', text: 'text-muted' },
   primary: { box: 'bg-primary-soft', text: 'text-primary' },
   good: { box: 'bg-good-soft', text: 'text-good' },
   warm: { box: 'bg-warm-soft', text: 'text-warm' },
+  purple: { box: 'bg-purple-soft', text: 'text-purple' },
 } as const;
+
+const CATEGORY_TONE: Record<string, BadgeTone> = {
+  staple: 'warm',
+  protein: 'primary',
+  vegetable: 'good',
+  fruit: 'purple',
+};
+
+/** A food category's badge in the same colour as its label in a meal's list. */
+export function categoryTone(category: string | null | undefined): BadgeTone {
+  return CATEGORY_TONE[category ?? ''] ?? 'neutral';
+}
 
 export function FoodOptionRow({
   name,
@@ -66,8 +82,8 @@ export function FoodOptionRow({
     >
       <View className="flex-1 gap-1.5">
         <View className="flex-row flex-wrap items-center gap-2">
-          <Text className="text-base font-semibold text-ink">{name}</Text>
-          {grams ? <Text className="text-base font-semibold text-primary">{grams}</Text> : null}
+          <Text className="text-base text-ink">{name}</Text>
+          {grams ? <Text className="text-base text-primary">{grams}</Text> : null}
           {badgesBelow ? null : chips}
         </View>
         {badgesBelow && chips.length ? (

@@ -1,8 +1,9 @@
 /** The building blocks of the focus screen (spec §3 B–E, §7). */
 import { useEffect, useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { Text } from '@/components/text';
 import { color } from '@/theme/tokens';
 
 /** Timers and weights must not jitter as digits change. */
@@ -44,7 +45,7 @@ export function Stepper({
       <View className="flex-row items-center gap-1">
         <HoldButton label={`減少${label}`} symbol="−" onStep={() => onStep(-1)} />
         <View className="min-w-[110px] flex-row items-baseline justify-center">
-          <Text className="text-[38px] font-bold text-ink" style={tabular}>
+          <Text className="text-[38px] text-ink" style={tabular}>
             {value}
           </Text>
           <Text className="ml-1 text-sm text-muted">{unit}</Text>
@@ -76,7 +77,7 @@ function HoldButton({ label, symbol, onStep }: { label: string; symbol: string; 
       }}
       onPressOut={stop}
       delayLongPress={400}
-      className="h-14 w-[60px] items-center justify-center rounded-[14px] bg-ink/5 active:bg-ink/10"
+      className="h-14 w-[60px] items-center justify-center rounded-button border-2 border-edge bg-surface active:bg-warm-soft"
     >
       <Text className="text-[28px] text-ink">{symbol}</Text>
     </Pressable>
@@ -113,7 +114,7 @@ export function RestRing({ leftSec, totalSec }: { leftSec: number; totalSec: num
           transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
         />
       </Svg>
-      <Text className="text-sm font-semibold text-primary">休息中</Text>
+      <Text className="text-sm text-primary">休息中</Text>
       <Text className="text-[52px] font-extrabold text-ink" style={tabular}>
         {clock(leftSec)}
       </Text>

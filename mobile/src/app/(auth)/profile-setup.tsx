@@ -1,10 +1,11 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { Card, Field, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
 import { deviceTimezone } from '@/timezone';
@@ -109,9 +110,9 @@ export default function ProfileSetup() {
           {payload && targets ? (
             <View>
               <Text className="text-xs text-muted">每日目標</Text>
-              <Text className="font-display text-lg font-bold text-ink">
+              <Text className="text-lg text-ink">
                 {targets.kcal.toLocaleString()}{' '}
-                <Text className="text-xs font-normal text-muted">大卡</Text>
+                <Text className="text-xs text-muted">大卡</Text>
               </Text>
             </View>
           ) : null}
@@ -197,11 +198,11 @@ function Picker<T extends string | number>({
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => onChange(option)}
-              className={`min-h-[44px] justify-center overflow-hidden rounded-field px-3 ${
-                active ? 'bg-ink' : 'border border-line bg-surface'
+              className={`min-h-[44px] justify-center overflow-hidden rounded-control border-[1.5px] px-3 ${
+                active ? 'border-edge bg-primary-soft' : 'border-line bg-surface'
               }`}
             >
-              <Text className={`text-base ${active ? 'font-semibold text-white' : 'text-ink'}`}>
+              <Text className={`text-base ${active ? 'text-primary' : 'text-ink'}`}>
                 {labels[key]}
               </Text>
             </Pressable>
@@ -224,8 +225,8 @@ function TargetPreview({ targets }: { targets: Targets | null }) {
   return (
     <Card className="gap-3">
       <Text className="text-sm text-muted">你的每日目標</Text>
-      <Text className="font-display text-4xl font-bold text-ink">
-        {targets.kcal.toLocaleString()} <Text className="text-base font-normal text-muted">大卡</Text>
+      <Text className="text-[28px] text-ink">
+        {targets.kcal.toLocaleString()} <Text className="text-sm text-muted">大卡</Text>
       </Text>
 
       <View className="flex-row gap-2">
@@ -245,7 +246,7 @@ function TargetPreview({ targets }: { targets: Targets | null }) {
 function Macro({ value, label, box, text }: { value: string; label: string; box: string; text: string }) {
   return (
     <View className={`flex-1 items-center gap-0.5 rounded-field py-3 ${box}`}>
-      <Text className={`text-base font-bold ${text}`}>{value}</Text>
+      <Text className={`text-base ${text}`}>{value}</Text>
       <Text className="text-xs text-muted">{label}</Text>
     </View>
   );

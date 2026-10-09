@@ -8,13 +8,14 @@
  */
 import { type Href, router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
+import { Text } from '@/components/text';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';
 import { todayISO } from '@/dates';
 import { color } from '@/theme/tokens';
@@ -361,13 +362,13 @@ export default function FocusWorkout() {
           accessibilityRole="button"
           accessibilityLabel="離開訓練"
           onPress={() => setSheet('exit')}
-          className="h-[46px] w-[46px] items-center justify-center rounded-full bg-ink/5"
+          className="h-[46px] w-[46px] items-center justify-center rounded-full border-2 border-edge bg-surface"
         >
           <CloseIcon size={20} tint={color.ink} />
         </Pressable>
         <View className="items-center">
           <Text className="text-xs text-muted">訓練時間</Text>
-          <Text className="text-xl font-bold text-ink" style={tabular}>
+          <Text className="text-xl text-ink" style={tabular}>
             {clock(elapsedMs(session, now) / 1000)}
           </Text>
         </View>
@@ -375,9 +376,9 @@ export default function FocusWorkout() {
           accessibilityRole="button"
           accessibilityLabel={`動作清單，目前第 ${session.currentIndex + 1} 個，共 ${session.exercises.length} 個`}
           onPress={() => setSheet('list')}
-          className="h-[46px] flex-row items-center rounded-full bg-ink/5 px-3.5"
+          className="h-[46px] flex-row items-center rounded-full border-2 border-edge bg-surface px-3.5"
         >
-          <Text className="text-[15px] font-semibold text-ink" style={tabular}>
+          <Text className="text-[15px] text-ink" style={tabular}>
             {session.currentIndex + 1} / {session.exercises.length}
           </Text>
         </Pressable>
@@ -394,7 +395,7 @@ export default function FocusWorkout() {
           </Pressable>
         ) : null}
         {resting ? (
-          <Text className="text-sm font-bold text-primary">
+          <Text className="text-sm text-primary">
             {session.rest?.nextIsNewExercise
               ? '下一個動作'
               : warmup
@@ -402,7 +403,7 @@ export default function FocusWorkout() {
                 : `下一組 · 第 ${setNumber} / ${exercise.plannedSets} 組`}
           </Text>
         ) : null}
-        <Text className="text-[30px] font-bold leading-tight text-ink">{exercise.name}</Text>
+        <Text className="text-[30px] leading-tight text-ink">{exercise.name}</Text>
         <Text className="text-[15px] text-muted">
           {exercise.kind === 'time'
             ? `目標 ${exercise.targetMin} 分鐘`
@@ -427,9 +428,9 @@ export default function FocusWorkout() {
                     : { since: null, spentMs: timer.spentMs + Date.now() - timer.since },
                 )
               }
-              className="h-[50px] justify-center rounded-[18px] bg-ink/5 px-5"
+              className="h-[50px] justify-center rounded-button border-2 border-edge bg-surface px-5"
             >
-              <Text className="text-base font-semibold text-ink">
+              <Text className="text-base text-ink">
                 {cardio.since !== null ? '暫停' : cardio.spentMs > 0 ? '繼續計時' : '開始計時'}
               </Text>
             </Pressable>
@@ -443,7 +444,7 @@ export default function FocusWorkout() {
               </Text>
               <Text className="text-[17px] text-muted">/ {warmup.total} 組</Text>
             </View>
-            <Text className="text-[26px] font-bold text-ink" style={tabular}>
+            <Text className="text-[26px] text-ink" style={tabular}>
               {kg(warmup.set.weightKg)} kg × {warmup.set.reps} 下
             </Text>
             <Text className="text-[13px] text-muted">
@@ -518,7 +519,7 @@ export default function FocusWorkout() {
           <View className="mt-2.5 flex-row flex-wrap gap-1.5">
             {warmedUp.map((set, index) => (
               <View key={index} className="rounded-full bg-warm-soft px-2.5 py-1.5">
-                <Text className="text-[13px] font-semibold text-warm" style={tabular}>
+                <Text className="text-[13px] text-warm" style={tabular}>
                   ✓ 熱身 {kg(set.weightKg)} × {set.reps}
                 </Text>
               </View>
@@ -530,7 +531,7 @@ export default function FocusWorkout() {
           <View className="mt-2.5 flex-row flex-wrap gap-1.5">
             {exercise.logs.map((log, index) => (
               <View key={index} className="rounded-full bg-good-soft px-2.5 py-1.5">
-                <Text className="text-[13px] font-semibold text-good" style={tabular}>
+                <Text className="text-[13px] text-good" style={tabular}>
                   ✓ 第 {index + 1} 組 {log.weightKg !== null ? `${kg(log.weightKg)} × ${log.reps}` : `× ${log.reps}`}
                 </Text>
               </View>
@@ -549,7 +550,7 @@ export default function FocusWorkout() {
               onPress={endRest}
               className="h-16 flex-1 items-center justify-center rounded-[18px] border-2 border-primary bg-surface/60"
             >
-              <Text className="text-[17px] font-bold text-primary">略過休息</Text>
+              <Text className="text-[17px] text-primary">略過休息</Text>
             </Pressable>
           </View>
         ) : (
@@ -569,7 +570,7 @@ export default function FocusWorkout() {
               onPress={complete}
               className={`h-16 items-center justify-center rounded-[18px] bg-primary ${busy ? 'opacity-60' : ''}`}
             >
-              <Text className="text-[19px] font-bold text-white">
+              <Text className="text-[19px] text-white">
                 {busy
                   ? '記錄中…'
                   : warmup
@@ -587,7 +588,7 @@ export default function FocusWorkout() {
                 onPress={endWarmup}
                 className="min-h-[44px] items-center justify-center"
               >
-                <Text className="text-base font-semibold text-primary">略過熱身，直接做正式組</Text>
+                <Text className="text-base text-primary">略過熱身，直接做正式組</Text>
               </Pressable>
             ) : null}
           </>
@@ -628,11 +629,11 @@ export default function FocusWorkout() {
                 onPress={() => switchTo(index)}
                 className="min-h-14 flex-1 flex-row items-center justify-between gap-2"
               >
-                <Text className="flex-1 text-base font-semibold text-ink">
+                <Text className="flex-1 text-base text-ink">
                   {index + 1}. {candidate.name}
                 </Text>
                 <Text
-                  className={`text-sm ${done ? 'font-semibold text-good' : current ? 'font-semibold text-primary' : 'text-muted'}`}
+                  className={`text-sm ${done ? 'text-good' : current ? 'text-primary' : 'text-muted'}`}
                 >
                   {status}
                 </Text>
@@ -644,7 +645,7 @@ export default function FocusWorkout() {
                   onPress={() => openElsewhere(replacePath(candidate))}
                   className="min-h-[36px] justify-center rounded-full border border-primary bg-surface px-3"
                 >
-                  <Text className="text-sm font-semibold text-primary">換動作</Text>
+                  <Text className="text-sm text-primary">換動作</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -663,7 +664,7 @@ export default function FocusWorkout() {
         </PrimaryButton>
         {anyLogged ? (
           <Pressable accessibilityRole="button" onPress={finishEarly} className="min-h-[44px] items-center justify-center">
-            <Text className="text-base font-semibold text-primary">結束並儲存</Text>
+            <Text className="text-base text-primary">結束並儲存</Text>
           </Pressable>
         ) : null}
       </Sheet>
@@ -691,9 +692,9 @@ function DockButton({ label, onPress }: { label: string; onPress: () => void }) 
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      className="h-16 items-center justify-center rounded-[18px] bg-ink/5 px-4"
+      className="h-16 items-center justify-center rounded-button border-2 border-edge bg-surface px-4"
     >
-      <Text className="text-base font-semibold text-ink" style={tabular}>
+      <Text className="text-base text-ink" style={tabular}>
         {label}
       </Text>
     </Pressable>
@@ -703,7 +704,7 @@ function DockButton({ label, onPress }: { label: string; onPress: () => void }) 
 /** Asked once a whole exercise is done; optional, so the next set never waits on it. */
 function FeedbackAsk({ exercise, onPick }: { exercise: FocusExercise; onPick: (exercise: FocusExercise, effort: Effort) => void }) {
   return (
-    <View className="gap-2 rounded-card bg-surface/70 p-3">
+    <View className="gap-2 rounded-tile border-[1.5px] border-edge bg-surface p-3">
       <Text className="text-sm text-ink">
         「{exercise.name}」感覺如何？
         {/* Only a weight has a next step to suggest; bodyweight work just keeps the note. */}
@@ -770,10 +771,10 @@ function Summary({
           {totals.exercises.map(({ exercise, newRecord }) => (
             <View key={exercise.itemId} className="border-b border-line py-3">
               <View className="flex-row items-center justify-between gap-2">
-                <Text className="flex-1 text-base font-semibold text-ink">{exercise.name}</Text>
+                <Text className="flex-1 text-base text-ink">{exercise.name}</Text>
                 {newRecord ? (
                   <View className="rounded-full bg-primary-soft px-2.5 py-0.5">
-                    <Text className="text-xs font-bold text-primary">新紀錄</Text>
+                    <Text className="text-xs text-primary">新紀錄</Text>
                   </View>
                 ) : null}
               </View>
@@ -805,7 +806,7 @@ function Summary({
           onPress={onSave}
           className={`h-16 items-center justify-center rounded-[18px] bg-primary ${busy ? 'opacity-60' : ''}`}
         >
-          <Text className="text-[19px] font-bold text-white">{busy ? '儲存中…' : '完成並儲存'}</Text>
+          <Text className="text-[19px] text-white">{busy ? '儲存中…' : '完成並儲存'}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -814,8 +815,8 @@ function Summary({
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <View className="flex-1 rounded-[14px] bg-fill px-2.5 py-3">
-      <Text className="text-[22px] font-bold text-ink" style={tabular}>
+    <View className="flex-1 rounded-control border-[1.5px] border-line bg-surface px-2.5 py-3">
+      <Text className="text-[22px] text-ink" style={tabular}>
         {value}
       </Text>
       <Text className="text-xs text-muted">{label}</Text>

@@ -1,10 +1,9 @@
 /** Profile rows on the settings screen. Tapping a row opens a sheet to change just that value. */
 import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ChoiceOption, Sheet } from '@/components/Sheet';
-import { ChevronIcon } from '@/components/icons';
-import { color } from '@/theme/tokens';
+import { Text } from '@/components/text';
 import { Field, PrimaryButton } from '@/components/ui';
 
 function TapRow({
@@ -24,9 +23,9 @@ function TapRow({
       className="min-h-[44px] flex-row items-center justify-between py-3"
     >
       <Text className="text-base text-ink">{label}</Text>
-      <View className="shrink flex-row items-center gap-1">
-        <Text className="shrink text-base text-muted">{display}</Text>
-        <ChevronIcon direction="right" size={16} tint={color.muted} />
+      {/* An editable value sits in a soft box, like a field; read-only rows show plain text. */}
+      <View className="min-w-[118px] shrink rounded-field border border-line bg-warm-soft px-3 py-2">
+        <Text className="shrink text-right text-base text-ink">{display}</Text>
       </View>
     </Pressable>
   );

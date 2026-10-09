@@ -1,11 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { ChevronIcon } from '@/components/icons';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
+import { Text } from '@/components/text';
 import { BackLink, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
@@ -71,17 +72,17 @@ export default function AddTodayWorkout() {
       footer={
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-base text-ink">
-            {word}共 <Text className="text-2xl font-bold text-primary">{workout?.items.length ?? 0}</Text> 個動作
+            {word}共 <Text className="text-2xl text-primary">{workout?.items.length ?? 0}</Text> 個動作
           </Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => backOrReplace('/today')}
             disabled={busy}
-            className={`min-h-[44px] flex-row items-center justify-center gap-1 rounded-full bg-primary px-4 ${
+            className={`min-h-[44px] flex-row items-center justify-center gap-1 rounded-control border-[1.5px] border-edge bg-primary px-4 ${
               busy ? 'opacity-40' : 'active:opacity-80'
             }`}
           >
-            <Text className="text-sm font-semibold text-white">{from === 'focus' ? '回到訓練' : `查看${word}的訓練`}</Text>
+            <Text className="text-sm text-white">{from === 'focus' ? '回到訓練' : `查看${word}的訓練`}</Text>
             <ChevronIcon direction="right" size={16} tint={color.surface} />
           </Pressable>
         </View>

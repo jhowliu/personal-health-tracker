@@ -1,14 +1,15 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
 import { Sheet } from '@/components/Sheet';
+import { Text } from '@/components/text';
 import { TrendChart } from '@/components/TrendChart';
 import { ChevronIcon } from '@/components/icons';
-import { Card, Field, Hint, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { Card, Field, PrimaryButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
@@ -184,25 +185,25 @@ export default function BodyScreen() {
         </View>
       </Sheet>
 
-      <View className="flex-row gap-2">
-        <Kpi label="本週平均" value={summary.week_avg_weight?.toFixed(1) ?? '—'} />
+      <View className="flex-row border-b border-line pb-4">
+        <Kpi label="本週平均" value={summary.week_avg_weight?.toFixed(1) ?? '—'} unit="kg" />
         <Kpi
           label="比上週"
-          value={summary.week_avg_delta === null ? '—' : summary.week_avg_delta.toFixed(1)}
+          value={
+            summary.week_avg_delta === null
+              ? '—'
+              : `${summary.week_avg_delta > 0 ? '+' : summary.week_avg_delta < 0 ? '−' : ''}${Math.abs(summary.week_avg_delta).toFixed(1)}`
+          }
+          unit="kg"
           tone={
             summary.week_avg_delta === null ? 'ink' : summary.week_avg_delta <= 0 ? 'good' : 'warm'
           }
         />
-        <Kpi label="腰圍" value={summary.latest_waist?.toFixed(1) ?? '—'} />
+        <Kpi label="腰圍" value={summary.latest_waist?.toFixed(1) ?? '—'} unit="cm" />
       </View>
 
       <TrendChart title="體重" unit="kg，近 30 天" points={summary.weight_series} />
-      <TrendChart
-        title="腰圍"
-        unit="cm，近 30 天"
-        points={summary.waist_series}
-        stroke={color.good}
-      />
+      <TrendChart title="腰圍" unit="cm，近 30 天" points={summary.waist_series} />
 
       <SectionHeading>紀錄</SectionHeading>
       <Card className="py-0">
@@ -284,7 +285,6 @@ function LogForm({
       <PrimaryButton onPress={submit} disabled={busy || !validDate || !hasValue}>
         {busy ? '儲存中…' : '儲存紀錄'}
       </PrimaryButton>
-      {showWaist ? <Hint>兩個可以只填一個。腰圍一週量一次就好。</Hint> : null}
     </View>
   );
 }
@@ -293,18 +293,31 @@ function Stat({ label, value, note }: { label: string; value: string; note?: str
   return (
     <View className="flex-1 gap-0.5">
       <Text className="text-sm text-muted">{label}</Text>
-      <Text className="font-display text-2xl font-bold text-ink">{value}</Text>
+      <Text className="text-2xl text-ink">{value}</Text>
       {note ? <Text className="text-xs text-muted">{note}</Text> : null}
     </View>
   );
 }
 
-function Kpi({ label, value, tone = 'ink' }: { label: string; value: string; tone?: 'ink' | 'good' | 'warm' }) {
+function Kpi({
+  label,
+  value,
+  unit,
+  tone = 'ink',
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  tone?: 'ink' | 'good' | 'warm';
+}) {
   const text = { ink: 'text-ink', good: 'text-good', warm: 'text-warm' }[tone];
   return (
-    <View className="flex-1 gap-0.5 rounded-card border border-line bg-surface p-3">
+    <View className="flex-1 gap-0.5">
       <Text className="text-xs text-muted">{label}</Text>
-      <Text className={`font-display text-2xl font-bold ${text}`}>{value}</Text>
+      <Text className={`text-[25px] ${text}`}>
+        {value}
+        {value === '—' ? null : <Text className="text-xs text-muted"> {unit}</Text>}
+      </Text>
     </View>
   );
 }

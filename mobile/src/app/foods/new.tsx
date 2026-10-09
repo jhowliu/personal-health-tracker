@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 import { newFoodHandoff } from '@/meals/new-food-handoff';
@@ -188,7 +189,7 @@ export default function NewFoodScreen() {
         <>
           <View className="flex-row items-baseline justify-between">
             <Text className="text-sm text-muted">每 100 g</Text>
-            <Text className="font-display text-2xl font-bold text-ink">約 {kcal} 大卡</Text>
+            <Text className="text-2xl text-ink">約 {kcal} 大卡</Text>
           </View>
           <PrimaryButton onPress={save} busy={busy}>
             {busy ? '處理中…' : fromSearch ? '新增並加入' : isNew ? '新增食物' : '儲存食物'}
@@ -235,7 +236,7 @@ export default function NewFoodScreen() {
       </Card>
 
       <Card className="gap-3">
-        <Text className="text-base font-semibold text-ink">份量</Text>
+        <Text className="text-base text-ink">份量</Text>
         <View className="flex-row flex-wrap gap-2">
           {([['g', 'g'], ['ml', 'ml'], ['piece', '顆'], ['scoop', '匙'], ['bowl', '碗']] as const).map(([value, label]) => (
             <Chip key={value} label={label} selected={unit === value} onPress={() => setUnit(value)} />
@@ -252,7 +253,7 @@ export default function NewFoodScreen() {
       </Card>
 
       <Card className="gap-3">
-        <Text className="text-base font-semibold text-ink">每 100 g 營養</Text>
+        <Text className="text-base text-ink">每 100 g 營養</Text>
         <Field label="熱量" value={kcalValue} onChangeText={setKcalValue} suffix="kcal" keyboardType="decimal-pad" />
         <View className="flex-row gap-3">
           <Field label="蛋白質" value={protein} onChangeText={(value) => changeMacro('protein', value)} suffix="g" keyboardType="decimal-pad" />

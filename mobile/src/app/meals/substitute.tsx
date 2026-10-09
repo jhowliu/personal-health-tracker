@@ -1,10 +1,11 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
+import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { backOrReplace } from '@/navigation/back';
@@ -105,7 +106,7 @@ export default function Substitute() {
         picked ? (
           <>
             <View className="flex-row items-baseline justify-between gap-3">
-              <Text className="flex-1 text-base font-semibold text-ink" numberOfLines={1}>
+              <Text className="flex-1 text-base text-ink" numberOfLines={1}>
                 {picked.food.name}
               </Text>
               <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>
@@ -120,11 +121,11 @@ export default function Substitute() {
       <Title>替換{source ? CATEGORY_LABEL[source.category_id] ?? '食物' : '食物'}</Title>
 
       {source ? (
-        <Card className="gap-1 bg-fill">
+        <Card className="gap-1 bg-warm-soft">
           <Text className="text-sm text-muted">目前</Text>
           <View className="flex-row items-baseline justify-between">
-            <Text className="text-base font-semibold text-ink">{source.name}</Text>
-            <Text className="text-base font-semibold text-ink">{Math.round(Number(grams))} g</Text>
+            <Text className="text-base text-ink">{source.name}</Text>
+            <Text className="text-base text-ink">{Math.round(Number(grams))} g</Text>
           </View>
           <Hint>
             蛋白質 {Math.round((source.per_100g.protein_g * Number(grams)) / 100)} g,

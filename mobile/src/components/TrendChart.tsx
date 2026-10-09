@@ -6,9 +6,10 @@
  * Consumes the points returned by /body-logs/summary; no averaging happens here.
  */
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
+import { FONT_FAMILY, Text } from '@/components/text';
 import { daysBetween, valueAxis } from '@/components/trend-axis';
 import { dayWord, shiftDay, todayISO } from '@/dates';
 import { color } from '@/theme/tokens';
@@ -74,12 +75,12 @@ export function TrendChart({
     `${title}，最新 ${oneDecimal(last.value)}，近 30 天最低 ${oneDecimal(Math.min(...values))}、最高 ${oneDecimal(Math.max(...values))}`;
 
   return (
-    <View className="gap-2 rounded-card border border-line bg-surface p-4">
+    <View className="gap-2 rounded-card border-2 border-edge bg-surface p-4">
       <View className="flex-row items-baseline justify-between">
-        <Text className="text-base font-semibold text-ink">{title}</Text>
+        <Text className="text-base text-ink">{title}</Text>
         <Text className="text-sm text-muted">
           {last && points.length >= 2 ? (
-            <Text className="text-base font-semibold text-ink">{oneDecimal(last.value)} </Text>
+            <Text className="text-base text-ink">{oneDecimal(last.value)} </Text>
           ) : null}
           {unit}
         </Text>
@@ -106,6 +107,7 @@ export function TrendChart({
             ))}
             {axis.ticks.map((tick) => (
               <SvgText
+                fontFamily={FONT_FAMILY}
                 key={`tick-${tick}`}
                 x={PAD.left - 6}
                 y={y(tick) + 3.5}
@@ -116,10 +118,24 @@ export function TrendChart({
                 {tickLabel(tick)}
               </SvgText>
             ))}
-            <SvgText x={PAD.left} y={HEIGHT - 4} fontSize={10} fill={color.muted} textAnchor="start">
+            <SvgText
+              fontFamily={FONT_FAMILY}
+              x={PAD.left}
+              y={HEIGHT - 4}
+              fontSize={10}
+              fill={color.muted}
+              textAnchor="start"
+            >
               {dayWord(start)}
             </SvgText>
-            <SvgText x={width - PAD.right} y={HEIGHT - 4} fontSize={10} fill={color.muted} textAnchor="end">
+            <SvgText
+              fontFamily={FONT_FAMILY}
+              x={width - PAD.right}
+              y={HEIGHT - 4}
+              fontSize={10}
+              fill={color.muted}
+              textAnchor="end"
+            >
               {dayWord(end)}
             </SvgText>
 

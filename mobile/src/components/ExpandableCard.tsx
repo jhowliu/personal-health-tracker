@@ -1,8 +1,9 @@
 /** A list card that opens in place: a summary that toggles, the details, and two actions. */
 import type { ComponentType, ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { ChevronIcon, type IconProps } from '@/components/icons';
+import { Text } from '@/components/text';
 import { color } from '@/theme/tokens';
 
 export type CardAction = {
@@ -36,26 +37,26 @@ export function ExpandableCard({
   actions: CardAction[];
 }) {
   return (
-    <View className="overflow-hidden rounded-card border border-line bg-surface">
+    <View className="overflow-hidden rounded-tile border-[1.5px] border-edge bg-surface">
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded, disabled: Boolean(busy) }}
         accessibilityLabel={`${expanded ? '收起' : '展開'}${name}`}
         disabled={busy}
         onPress={onToggle}
-        className={`min-h-[104px] flex-row items-start gap-3 px-4 py-3 active:bg-fill ${
+        className={`min-h-[104px] flex-row items-start gap-3 px-4 py-3 active:bg-warm-soft ${
           busy ? 'opacity-40' : ''
         }`}
       >
         <View className="flex-1 gap-1.5">{summary}</View>
         <View className="h-11 justify-center self-center">
-          <ChevronIcon direction={expanded ? 'up' : 'down'} size={16} tint={color.muted} />
+          <ChevronIcon direction={expanded ? 'down' : 'right'} size={16} tint={color.ink} />
         </View>
       </Pressable>
 
       {expanded ? (
         <View className="gap-3 px-4 pb-4">
-          <View className="rounded-field bg-fill px-3">{details}</View>
+          <View className="rounded-field bg-warm-soft px-3">{details}</View>
 
           <View className="flex-row gap-3">
             {actions.map((action) => {
@@ -67,12 +68,10 @@ export function ExpandableCard({
                   accessibilityLabel={action.accessibilityLabel}
                   disabled={busy}
                   onPress={action.onPress}
-                  className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-field active:opacity-70 ${
-                    danger ? 'bg-primary-soft' : 'bg-fill'
-                  }`}
+                  className="min-h-[44px] flex-1 flex-row items-center justify-center gap-2 rounded-control border-[1.5px] border-edge bg-surface active:opacity-70"
                 >
                   <action.icon size={17} tint={danger ? color.danger : color.ink} />
-                  <Text className={`text-base font-semibold ${danger ? 'text-danger' : 'text-ink'}`}>
+                  <Text className={`text-base ${danger ? 'text-danger' : 'text-ink'}`}>
                     {action.label}
                   </Text>
                 </Pressable>

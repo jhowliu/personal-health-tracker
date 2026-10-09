@@ -1,15 +1,16 @@
 import { router, useLocalSearchParams, useNavigation, type Href } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { CameraIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
-import { AddRow, BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { Text } from '@/components/text';
+import { AddRow, BackLink, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft, useDraft, type DraftItem } from '@/meals/draft';
-import { FoodGroup, FoodItem } from '@/meals/FoodGroup';
+import { FoodActions, FoodGroup, FoodItem, FoodMacros } from '@/meals/FoodGroup';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
@@ -169,9 +170,9 @@ export default function EditMeal() {
         <>
           <View className="flex-row items-baseline justify-between">
             <Text className="text-base text-muted">整份餐點</Text>
-            <Text className="font-display text-2xl font-bold text-ink">
+            <Text className="text-2xl text-ink">
               {shownTotals ? Math.round(shownTotals.kcal).toLocaleString() : '—'}{' '}
-              <Text className="text-sm font-normal text-muted">大卡</Text>
+              <Text className="text-sm text-muted">大卡</Text>
             </Text>
           </View>
           {shownTotals ? (
@@ -216,33 +217,26 @@ export default function EditMeal() {
         </View>
       </View>
 
-      <Text className="font-display text-xl font-bold text-ink">組成</Text>
+      <Text className="text-xl text-ink">組成</Text>
 
-      {/* Drawn like the today list: a block per category, then one dashed row to add. */}
-      <View className="gap-2.5">
-        {grouped.length ? (
-          <Card className="gap-3 p-2">
-            {grouped.map((group) => (
-              <FoodGroup
-                key={group.category}
-                category={group.category}
-                label={CATEGORY_LABEL[group.category] ?? group.category}
-              >
-                {group.items.map((item) => (
-                  <ItemRow
-                    key={item.key}
-                    item={item}
-                    draftKey={id}
-                    open={editing === item.key}
-                    onToggle={() => setEditing((current) => (current === item.key ? null : item.key))}
-                  />
-                ))}
-              </FoodGroup>
-            ))}
-          </Card>
-        ) : null}
-        <AddRow label="加入食物" onPress={() => setAdding(true)} />
-      </View>
+      {grouped.map((group) => (
+        <FoodGroup
+          key={group.category}
+          category={group.category}
+          label={CATEGORY_LABEL[group.category] ?? group.category}
+        >
+          {group.items.map((item) => (
+            <ItemRow
+              key={item.key}
+              item={item}
+              draftKey={id}
+              open={editing === item.key}
+              onToggle={() => setEditing((current) => (current === item.key ? null : item.key))}
+            />
+          ))}
+        </FoodGroup>
+      ))}
+      <AddRow label="加入食物" onPress={() => setAdding(true)} />
 
       <Sheet visible={adding} title="加入食物" onClose={() => setAdding(false)}>
         <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => addFrom(`/meals/add-food?meal_id=${id}`)}>
@@ -286,23 +280,37 @@ function ItemRow({
     draft.setGrams(draftKey, item.key, amountToGrams(item.food, value));
   };
 
-  const kcal = Math.round((item.food.per_100g.kcal * item.grams) / 100);
+  const per100 = item.food.per_100g;
+  const share = item.grams / 100;
+  const nutrients = {
+    kcal: per100.kcal * share,
+    protein_g: per100.protein_g * share,
+    fat_g: per100.fat_g * share,
+    carb_g: per100.carb_g * share,
+  };
 
   return (
     <FoodItem
       name={item.food.name}
+      kcal={Math.round(nutrients.kcal)}
       amount={formatPortion(item.food, item.grams)}
       open={open}
-      onReplace={() =>
-        router.navigate(
-          `/meals/substitute?meal_id=${draftKey}&key=${item.key}&food=${item.food.id}&grams=${item.grams}`,
-        )
-      }
-      onAmount={onToggle}
-      onRemove={() => draft.removeItem(draftKey, item.key)}
+      onToggle={onToggle}
     >
       <Field label="份量" value={display} onChangeText={onChange} suffix={unit.label} keyboardType="decimal-pad" />
-      <Text className="text-sm text-muted">{kcal} 大卡</Text>
+      <FoodMacros nutrients={nutrients} />
+      <FoodActions
+        actions={[
+          {
+            label: '替換',
+            onPress: () =>
+              router.navigate(
+                `/meals/substitute?meal_id=${draftKey}&key=${item.key}&food=${item.food.id}&grams=${item.grams}`,
+              ),
+          },
+          { label: '移除', onPress: () => draft.removeItem(draftKey, item.key), danger: true },
+        ]}
+      />
     </FoodItem>
   );
 }

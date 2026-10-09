@@ -1,14 +1,17 @@
-import { Pressable, Text } from 'react-native';
+import { Pressable } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
+import { LogOutIcon, TrashIcon } from '@/components/icons';
 import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
+import { Text } from '@/components/text';
 import { TimezoneRow } from '@/components/TimezoneRow';
-import { Card, PrimaryButton, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { Card, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { todayISO } from '@/dates';
 import { syncWeighInReminder } from '@/notifications/reminder';
+import { color } from '@/theme/tokens';
 
 const SEX_OPTIONS = [
   { value: 'f' as const, label: '女' },
@@ -127,7 +130,7 @@ export default function SettingsScreen() {
             onSave={(weight_kg) => patchProfile({ weight_kg })}
           />
           <ChoiceRow
-            label="日常活動量（不含運動）"
+            label="日常活動量"
             value={me.activity_level}
             options={ACTIVITY_OPTIONS}
             onSave={(activity_level) => patchProfile({ activity_level })}
@@ -141,10 +144,10 @@ export default function SettingsScreen() {
         </Rows>
       </Card>
 
-      <SectionHeading>每日目標</SectionHeading>
+      <SectionHeading action={<Text className="text-xs text-muted">不含運動</Text>}>每日目標</SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="熱量（不含運動）" value={`${targets.kcal.toLocaleString()} 大卡`} />
+          <Row label="熱量" value={`${targets.kcal.toLocaleString()} 大卡`} />
           <Row label="蛋白質" value={`${targets.protein_g} g`} />
           <Row label="脂肪" value={`${targets.fat_g} g`} />
           <Row label="碳水" value={`${targets.carb_g} g`} />
@@ -168,17 +171,27 @@ export default function SettingsScreen() {
         </Rows>
       </Card>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={signOut}
-        className="min-h-[52px] items-center justify-center rounded-field border border-line bg-surface"
-      >
-        <Text className="text-base font-semibold text-ink">登出</Text>
-      </Pressable>
-
-      <PrimaryButton tone="danger" onPress={confirmDelete}>
-        刪除帳號
-      </PrimaryButton>
+      <SectionHeading>帳號</SectionHeading>
+      <Card className="py-0">
+        <Rows>
+          <Pressable
+            accessibilityRole="button"
+            onPress={signOut}
+            className="min-h-[52px] flex-row items-center justify-between py-3 active:opacity-70"
+          >
+            <Text className="text-base text-ink">登出</Text>
+            <LogOutIcon size={18} tint={color.ink} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={confirmDelete}
+            className="min-h-[52px] flex-row items-center justify-between py-3 active:opacity-70"
+          >
+            <Text className="text-base text-danger">刪除帳號</Text>
+            <TrashIcon size={18} tint={color.danger} />
+          </Pressable>
+        </Rows>
+      </Card>
     </Screen>
   );
 }
