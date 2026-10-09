@@ -12,6 +12,7 @@ from app.api.routes import (
     foods,
     meal_photos,
     meals,
+    progress,
     training,
     users,
 )
@@ -49,5 +50,16 @@ async def healthz() -> dict[str, str]:
     return {"status": "ok"}
 
 
-for router in (auth, users, body_logs, days, foods, meals, meal_photos, training, devices):
+for router in (
+    auth,
+    users,
+    body_logs,
+    days,
+    foods,
+    meals,
+    meal_photos,
+    training,
+    devices,
+    progress,
+):
     app.include_router(router.router)

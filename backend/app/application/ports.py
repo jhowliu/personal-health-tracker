@@ -26,6 +26,7 @@ from app.domain.models import (
     TemplateItem,
     WorkoutTemplate,
 )
+from app.domain.progress import DayActivity
 from app.domain.streak import DayRecord
 from app.domain.workout_execution import (
     DayWorkoutItem,
@@ -54,6 +55,14 @@ class UnitOfWork(Protocol):
 
     async def commit(self) -> None:
         """Make everything written so far durable, even if the request fails afterwards."""
+
+
+class ProgressStore(Protocol):
+    async def activity(self, user_id: str, first: date, last: date) -> tuple[DayActivity, ...]:
+        """The days between `first` and `last` with anything logged, oldest first."""
+
+    async def volume_kg(self, user_id: str, first: date, last: date) -> float:
+        """Weight × reps over every set with a load logged between `first` and `last`."""
 
 
 class Clock(Protocol):

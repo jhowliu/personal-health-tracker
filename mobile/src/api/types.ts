@@ -824,6 +824,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/progress/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendar
+         * @description One month's days, marked complete or not; this month when none is given.
+         */
+        get: operations["calendar_progress_calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/progress/weekly": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekly
+         * @description The week `week` falls in, Monday to Sunday; the last finished week when none is given.
+         */
+        get: operations["weekly_progress_weekly_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -864,6 +904,36 @@ export interface components {
         CalculateIn: {
             /** Items */
             items: components["schemas"]["MealItemIn"][];
+        };
+        /** CalendarDayOut */
+        CalendarDayOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Mark
+             * @enum {string}
+             */
+            mark: "complete" | "empty";
+            /** Workout */
+            workout: ("done" | "skipped") | null;
+        };
+        /**
+         * CalendarMonthOut
+         * @description Every day of one month, for the calendar on 進度.
+         */
+        CalendarMonthOut: {
+            /** Month */
+            month: string;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Days */
+            days: components["schemas"]["CalendarDayOut"][];
         };
         /** DayFlowOut */
         DayFlowOut: {
@@ -1699,6 +1769,38 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WeeklyReviewOut
+         * @description A week on 進度 in a few numbers; the AI review reads the detail behind them.
+         */
+        WeeklyReviewOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Weight Average */
+            weight_average: number | null;
+            /** Weight Change */
+            weight_change: number | null;
+            /** Waist Latest */
+            waist_latest: number | null;
+            /** Waist Change */
+            waist_change: number | null;
+            /** Days Complete */
+            days_complete: number;
+            /** Workouts */
+            workouts: number;
+            /** Volume Kg */
+            volume_kg: number;
+            /** Previous Volume Kg */
+            previous_volume_kg: number;
         };
         /** WorkoutExecutionItemOut */
         WorkoutExecutionItemOut: {
@@ -3994,6 +4096,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendar_progress_calendar_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarMonthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    weekly_progress_weekly_get: {
+        parameters: {
+            query?: {
+                week?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyReviewOut"];
+                };
             };
             /** @description Validation Error */
             422: {
