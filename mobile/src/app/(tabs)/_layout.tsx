@@ -11,7 +11,7 @@ import { color } from '@/theme/tokens';
 
 const TABS = [
   { name: 'today', title: '今天', icon: CalendarCheckIcon },
-  { name: 'body', title: '身形', icon: ScaleIcon },
+  { name: 'body', title: '進度', icon: ScaleIcon },
   { name: 'meals', title: '餐點', icon: UtensilsIcon },
   { name: 'workouts', title: '訓練', icon: DumbbellIcon },
   { name: 'settings', title: '設定', icon: SlidersIcon },

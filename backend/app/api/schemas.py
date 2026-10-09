@@ -34,6 +34,7 @@ from app.domain.models import (
     TemplateItem,
     WorkoutTemplate,
 )
+from app.domain.progress import CalendarMonth, WeeklyReview
 from app.domain.workout_execution import (
     DayWorkoutItem,
     PastSet,
@@ -180,6 +181,54 @@ class TrendPointOut(BaseModel):
     date: date
     value: float
     average_7d: float | None
+
+
+class CalendarDayOut(BaseModel):
+    date: date
+    mark: Literal["complete", "empty"]
+    workout: Literal["done", "skipped"] | None
+
+
+class CalendarMonthOut(BaseModel):
+    """Every day of one month, for the calendar on 進度."""
+
+    month: str  # "2026-10"
+    today: date
+    days: list[CalendarDayOut]
+
+    @classmethod
+    def of(cls, month: CalendarMonth) -> "CalendarMonthOut":
+        return cls(
+            month=month.month.strftime("%Y-%m"),
+            today=month.today,
+            days=[
+                CalendarDayOut(
+                    date=day.date,
+                    mark=day.mark.value,
+                    workout=day.workout.value if day.workout else None,
+                )
+                for day in month.days
+            ],
+        )
+
+
+class WeeklyReviewOut(BaseModel):
+    """A week on 進度 in a few numbers; the AI review reads the detail behind them."""
+
+    start: date
+    end: date
+    weight_average: float | None
+    weight_change: float | None
+    waist_latest: float | None
+    waist_change: float | None
+    days_complete: int
+    workouts: int
+    volume_kg: float
+    previous_volume_kg: float
+
+    @classmethod
+    def of(cls, review: WeeklyReview) -> "WeeklyReviewOut":
+        return cls(**_values(review))
 
 
 class BodySummaryOut(BaseModel):

@@ -18,6 +18,7 @@ import {
   GripVertical,
   Leaf,
   LogOut,
+  PawPrint,
   Pencil,
   Plus,
   SlidersHorizontal,
@@ -87,3 +88,4 @@ export const SlidersIcon = icon(SlidersHorizontal);
 export const CopyIcon = icon(Copy);
 export const LogOutIcon = icon(LogOut);
 export const GripIcon = icon(GripVertical);
+export const PawIcon = icon(PawPrint);

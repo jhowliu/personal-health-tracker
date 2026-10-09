@@ -20,6 +20,7 @@ from app.adapters.sqlite.days import SqliteDayStore
 from app.adapters.sqlite.foods import SqliteFoodStore
 from app.adapters.sqlite.meal_photos import SqliteMealPhotoStore
 from app.adapters.sqlite.meals import SqliteMealStore
+from app.adapters.sqlite.progress import SqliteProgressStore
 from app.adapters.sqlite.reminders import SqliteReminderStore
 from app.adapters.sqlite.training import SqliteTrainingStore
 from app.adapters.sqlite.unit_of_work import SqliteUnitOfWork
@@ -35,6 +36,7 @@ from app.application.meals import MealService
 from app.application.planning import DailyPlanService
 from app.application.plate_intake import PlateIntake
 from app.application.profiles import ProfileService
+from app.application.progress import ProgressService
 from app.application.reminders import ReminderService
 from app.application.training import TrainingService
 from app.application.workout_execution import WorkoutExecutionService
@@ -132,6 +134,10 @@ def profiles(conn: DbConn) -> ProfileService:
     return ProfileService(SqliteAccountStore(conn), clock())
 
 
+def progress(conn: DbConn) -> ProgressService:
+    return ProgressService(SqliteProgressStore(conn), SqliteBodyStore(conn), clock())
+
+
 def body_tracking(conn: DbConn) -> BodyTrackingService:
     return BodyTrackingService(SqliteBodyStore(conn), clock())
 
@@ -209,6 +215,7 @@ def decisions() -> DecisionService:
 Accounts = Annotated[AccountService, Depends(accounts)]
 Profiles = Annotated[ProfileService, Depends(profiles)]
 BodyTracking = Annotated[BodyTrackingService, Depends(body_tracking)]
+Progress = Annotated[ProgressService, Depends(progress)]
 Training = Annotated[TrainingService, Depends(training)]
 DailyFlow = Annotated[DailyFlowService, Depends(daily_flow)]
 WorkoutExecution = Annotated[WorkoutExecutionService, Depends(workout_execution)]

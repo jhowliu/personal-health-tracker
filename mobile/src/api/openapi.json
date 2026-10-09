@@ -4045,6 +4045,140 @@
           }
         }
       }
+    },
+    "/progress/calendar": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Calendar",
+        "description": "One month's days, marked complete or not; this month when none is given.",
+        "operationId": "calendar_progress_calendar_get",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarMonthOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/weekly": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Weekly",
+        "description": "The week `week` falls in, Monday to Sunday; the last finished week when none is given.",
+        "operationId": "weekly_progress_weekly_get",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Week"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyReviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4194,6 +4328,73 @@
           "items"
         ],
         "title": "CalculateIn"
+      },
+      "CalendarDayOut": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "mark": {
+            "type": "string",
+            "enum": [
+              "complete",
+              "empty"
+            ],
+            "title": "Mark"
+          },
+          "workout": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "skipped"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workout"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "mark",
+          "workout"
+        ],
+        "title": "CalendarDayOut"
+      },
+      "CalendarMonthOut": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "today": {
+            "type": "string",
+            "format": "date",
+            "title": "Today"
+          },
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/CalendarDayOut"
+            },
+            "type": "array",
+            "title": "Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "today",
+          "days"
+        ],
+        "title": "CalendarMonthOut",
+        "description": "Every day of one month, for the calendar on 進度."
       },
       "DayFlowOut": {
         "properties": {
@@ -7027,6 +7228,95 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WeeklyReviewOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "weight_average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Average"
+          },
+          "weight_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Change"
+          },
+          "waist_latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waist Latest"
+          },
+          "waist_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Waist Change"
+          },
+          "days_complete": {
+            "type": "integer",
+            "title": "Days Complete"
+          },
+          "workouts": {
+            "type": "integer",
+            "title": "Workouts"
+          },
+          "volume_kg": {
+            "type": "number",
+            "title": "Volume Kg"
+          },
+          "previous_volume_kg": {
+            "type": "number",
+            "title": "Previous Volume Kg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "weight_average",
+          "weight_change",
+          "waist_latest",
+          "waist_change",
+          "days_complete",
+          "workouts",
+          "volume_kg",
+          "previous_volume_kg"
+        ],
+        "title": "WeeklyReviewOut",
+        "description": "A week on 進度 in a few numbers; the AI review reads the detail behind them."
       },
       "WorkoutExecutionItemOut": {
         "properties": {

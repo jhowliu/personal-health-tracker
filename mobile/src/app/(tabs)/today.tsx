@@ -11,11 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError, api, type Schema } from '@/api/client';
+import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
 import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
+import { MonthCalendar } from '@/components/MonthCalendar';
 import { ReorderList } from '@/components/ReorderList';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
 import { Text } from '@/components/text';
@@ -24,6 +26,7 @@ import { dayWord, shiftDay, todayISO } from '@/dates';
 import { FoodActions, FoodGroup, FoodItem, FoodMacros } from '@/meals/FoodGroup';
 import { photoDraft } from '@/meals/photo-draft';
 import { stepCache } from '@/today/step-cache';
+import { syncWeighInReminder } from '@/notifications/reminder';
 import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
@@ -163,6 +166,8 @@ export default function TodayScreen() {
       canGoForward={day.date < today}
       onShift={(days) => goTo(shiftDay(day.date, days))}
       onToday={() => goTo(today)}
+      onPick={goTo}
+      earliest={shiftDay(today, -MAX_DAYS_BACK)}
     />
   );
 
@@ -224,6 +229,8 @@ function TodayHeader({
   canGoForward,
   onShift,
   onToday,
+  onPick,
+  earliest,
 }: {
   day: Today;
   step: string;
@@ -233,7 +240,12 @@ function TodayHeader({
   /** Move the screen to another day: -1 is the day before. */
   onShift: (days: -1 | 1) => void;
   onToday: () => void;
+  /** Jump straight to a day picked on the calendar. */
+  onPick: (date: string) => void;
+  /** The furthest back a day can be opened. */
+  earliest: string;
 }) {
+  const [picking, setPicking] = useState(false);
   const parsed = new Date(`${day.date}T00:00:00`);
   const isToday = day.date === todayISO();
   // Done is not a step on the track, so after looking back the summary needs its own way in.
@@ -250,7 +262,12 @@ function TodayHeader({
         >
           <ChevronIcon direction="left" size={22} tint={canGoBack ? color.ink : color.disabled} />
         </Pressable>
-        <View className="items-center">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="打開月曆選日期"
+          onPress={() => setPicking(true)}
+          className="items-center active:opacity-70"
+        >
           <Text className="text-center text-[21px] text-ink">
             {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
           </Text>
@@ -258,7 +275,7 @@ function TodayHeader({
             {dayWord(day.date)}
             {day.streak > 0 ? ` · 連續 ${day.streak} 天` : ''}
           </Text>
-        </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="後一天"
@@ -284,6 +301,17 @@ function TodayHeader({
       {canReturnToSummary ? (
         <TextAction label={`回到${dayWord(day.date)}總結`} onPress={() => onSelect('done')} className="justify-center" />
       ) : null}
+      <Sheet visible={picking} title="選日期" onClose={() => setPicking(false)}>
+        <View className="pb-4">
+          <MonthCalendar
+            selectable={(date) => date >= earliest}
+            onSelect={(date) => {
+              setPicking(false);
+              onPick(date);
+            }}
+          />
+        </View>
+      </Sheet>
     </View>
   );
 }
@@ -307,6 +335,7 @@ function WeighInStep({
   const [busy, setBusy] = useState(false);
   const { weight, waist } = value;
   const prefilled = useRef(false);
+  const { profile } = useSession();
   const word = dayWord(date);
 
   useEffect(() => {
@@ -336,6 +365,10 @@ function WeighInStep({
         weight_kg: weight ? Number(weight) : null,
         waist_cm: waist ? Number(waist) : null,
       });
+      // Logging today's weigh-in drops today's reminder if it has not fired yet.
+      if (date === todayISO()) {
+        void syncWeighInReminder(profile?.profile.reminder_time ?? null).catch(() => {});
+      }
       onSaved();
     } catch (error) {
       Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
