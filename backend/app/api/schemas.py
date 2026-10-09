@@ -420,6 +420,12 @@ class TemplateOut(BaseModel):
         )
 
 
+class WorkoutOrderIn(BaseModel):
+    """Every exercise on the day, once each, in the order they should be done."""
+
+    item_ids: list[str] = Field(min_length=1)
+
+
 class SaveDayTemplateIn(BaseModel):
     name: str = Field(min_length=1)
 

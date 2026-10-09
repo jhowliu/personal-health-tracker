@@ -176,6 +176,9 @@ class WorkoutExecutionStore(Protocol):
         replacing: bool,
     ) -> bool: ...
 
+    async def reorder(self, user_id: str, day: date, item_ids: tuple[str, ...]) -> None:
+        """Give the day's exercises this order, the first id first."""
+
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool:
         """Take one exercise off the day, along with the sets logged for it."""
 
