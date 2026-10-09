@@ -202,6 +202,13 @@ class SqliteWorkoutExecutionStore:
         )
         return cursor.rowcount == 1
 
+    async def reorder(self, user_id: str, day: date, item_ids: tuple[str, ...]) -> None:
+        await self._ensure_snapshot(user_id, day)
+        await self._conn.executemany(
+            "UPDATE day_workout_items SET sort_order = ? WHERE id = ? AND user_id = ? AND date = ?",
+            [(index, item_id, user_id, to_day(day)) for index, item_id in enumerate(item_ids)],
+        )
+
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool:
         await open_day(self._conn, user_id, day)
         await self._ensure_snapshot(user_id, day)

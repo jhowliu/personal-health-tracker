@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { BackLink, Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
@@ -62,7 +63,7 @@ export default function SaveTodayWorkout() {
       <Title sub={`從${date ? dayWord(date) : '今天'}調整後的動作建立新課表；不會修改原課表或每週排程。`}>另存課表</Title>
       <Field label="課表名稱" value={name} onChangeText={setName} placeholder="我的全身訓練" />
       <Card className="gap-2">
-        <Text className="text-base font-semibold text-ink">{workout.items.length} 個動作</Text>
+        <Text className="text-base text-ink">{workout.items.length} 個動作</Text>
         {workout.items.map(({ item }, index) => (
           <Hint key={item.id}>{index + 1}. {item.exercise_name}</Hint>
         ))}

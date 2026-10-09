@@ -1,13 +1,14 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { MealCard } from '@/components/MealCard';
 import { ShowMore, usePaged } from '@/components/paging';
-import { CameraIcon, ChevronIcon, PlusIcon } from '@/components/icons';
-import { Card, Chip, Empty, Hint, Rows, Screen, Segmented } from '@/components/ui';
+import { CameraIcon, ChevronIcon } from '@/components/icons';
+import { Text } from '@/components/text';
+import { Card, Chip, Empty, HeaderAddButton, HeaderIconButton, Hint, Rows, Screen, Segmented } from '@/components/ui';
 import { byCategoryOrder } from '@/meals/order';
 import { describeFood, formatPortion } from '@/meals/portion';
 import { color } from '@/theme/tokens';
@@ -41,30 +42,22 @@ export default function MealsScreen() {
       pinnedHeader={
         <>
           <View className="flex-row items-center justify-between">
-            <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
+            <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
               餐點
             </Text>
             <View className="flex-row items-center gap-2">
               {tab === 'mine' ? (
-                <Pressable
-                  accessibilityRole="button"
+                <HeaderIconButton
+                  icon={CameraIcon}
                   accessibilityLabel="用照片記錄今天吃的食物"
                   onPress={() => router.navigate('/meals/photo?destination=today')}
-                  className="h-11 w-11 items-center justify-center rounded-field bg-fill"
-                >
-                  <CameraIcon size={22} />
-                </Pressable>
+                />
               ) : null}
-              <Pressable
-                accessibilityRole="button"
+              <HeaderAddButton
+                label="新增"
+                accessibilityLabel={tab === 'mine' ? '新增餐點' : '新增食物'}
                 onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
-                className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-field bg-primary px-4"
-              >
-                <PlusIcon size={18} tint={color.surface} />
-                <Text className="text-base font-semibold text-white">
-                  {tab === 'mine' ? '新增餐點' : '新增食物'}
-                </Text>
-              </Pressable>
+              />
             </View>
           </View>
           <Segmented
@@ -87,8 +80,6 @@ export default function MealsScreen() {
 function MyMeals() {
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [slot, setSlot] = useState('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -105,29 +96,6 @@ function MyMeals() {
     }, [load]),
   );
 
-  const removeMeal = (meal: Meal) =>
-    Alert.alert('刪除餐點', '之後就不能從我的餐點選這道。已經吃過的紀錄不受影響。', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '刪除',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            setRemovingId(meal.id);
-            try {
-              await api.delete(`/meals/${meal.id}`);
-              setMeals((current) => current?.filter((candidate) => candidate.id !== meal.id) ?? current);
-              setExpandedId((current) => (current === meal.id ? null : current));
-            } catch (error) {
-              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
-            } finally {
-              setRemovingId(null);
-            }
-          })();
-        },
-      },
-    ]);
-
   return (
     <>
       <View className="flex-row flex-wrap gap-2">
@@ -136,10 +104,7 @@ function MyMeals() {
             key={option.id}
             label={option.label}
             selected={slot === option.id}
-            onPress={() => {
-              setSlot(option.id);
-              setExpandedId(null);
-            }}
+            onPress={() => setSlot(option.id)}
           />
         ))}
       </View>
@@ -151,15 +116,7 @@ function MyMeals() {
       ) : (
         <View className="gap-3">
           {meals.map((meal) => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              expanded={expandedId === meal.id}
-              busy={removingId === meal.id}
-              onToggle={() => setExpandedId((current) => (current === meal.id ? null : meal.id))}
-              onEdit={() => router.navigate(`/meals/${meal.id}`)}
-              onDelete={() => removeMeal(meal)}
-            />
+            <MealCard key={meal.id} meal={meal} onOpen={() => router.navigate(`/meals/${meal.id}`)} />
           ))}
         </View>
       )}
@@ -228,7 +185,7 @@ function FoodLibrary() {
                 className="min-h-[52px] flex-row items-center justify-between gap-3 py-3"
               >
                 <View className="flex-1 gap-0.5">
-                  <Text className="text-base font-semibold text-ink">{food.name}</Text>
+                  <Text className="text-base text-ink">{food.name}</Text>
                   <Text className="text-sm text-muted">{describeFood(food)}</Text>
                 </View>
                 <View className="items-end">

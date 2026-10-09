@@ -6,11 +6,12 @@
  */
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
+import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { dayWord } from '@/dates';
@@ -115,7 +116,7 @@ export default function SwapToday() {
         picked ? (
           <>
             <View className="flex-row items-baseline justify-between gap-3">
-              <Text className="flex-1 text-base font-semibold text-ink" numberOfLines={1}>
+              <Text className="flex-1 text-base text-ink" numberOfLines={1}>
                 {picked.food.name}
               </Text>
               <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>

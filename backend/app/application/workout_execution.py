@@ -157,6 +157,15 @@ class WorkoutExecutionService:
             raise NotFound("找不到今天排定的動作")
         return await self.view(user_id, day)
 
+    async def reorder(self, user_id: str, day: date, item_ids: tuple[str, ...]) -> WorkoutExecution:
+        """Put the day's exercises in this order. Only the day changes, never its template."""
+        workout = await self._store.load(user_id, day)
+        on_day = sorted(entry.item.id for entry in workout.items)
+        if sorted(item_ids) != on_day:
+            raise ValidationFailed("新的順序要包含今天的每個動作各一次")
+        await self._store.reorder(user_id, day, item_ids)
+        return await self.view(user_id, day)
+
     async def delete_item(self, user_id: str, day: date, item_id: str) -> None:
         if not await self._store.delete_item(user_id, day, item_id):
             raise NotFound("找不到今天排定的動作")

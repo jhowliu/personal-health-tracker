@@ -1,9 +1,10 @@
 /** The time zone control on the settings screen: the current zone, and a dropdown list to switch it. */
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { ChevronIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { color } from '@/theme/tokens';
 import { LabelWithTip } from '@/components/ui';
 import { COMMON_TIMEZONES, deviceTimezone, timezoneLabel } from '@/timezone';

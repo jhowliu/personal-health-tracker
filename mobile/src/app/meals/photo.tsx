@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, View } from 'react-native';
 
 import { Alert } from '@/components/alert';
 import { CameraIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
@@ -80,12 +81,12 @@ export default function MealPhotoCapture() {
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           onPress={choose}
-          className="items-center gap-2 rounded-card border-2 border-dashed border-line bg-surface px-4 py-10 active:opacity-70"
+          className="items-center gap-2 rounded-card border-2 border-dashed border-edge bg-surface px-4 py-10 active:opacity-70"
         >
           <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-soft">
             <CameraIcon size={32} />
           </View>
-          <Text className="text-base font-semibold text-primary">點這裡拍照或選照片</Text>
+          <Text className="text-base text-primary">點這裡拍照或選照片</Text>
           <Hint>不會自動儲存成餐點，確認後才會加入。</Hint>
         </Pressable>
       )}
@@ -94,7 +95,7 @@ export default function MealPhotoCapture() {
         <Card className="flex-row items-center gap-3">
           <ActivityIndicator color={color.primary} />
           <View className="flex-1 gap-0.5">
-            <Text className="text-base font-semibold text-ink">正在辨識照片</Text>
+            <Text className="text-base text-ink">正在辨識照片</Text>
             <Hint>正在縮小、上傳並分析餐點。</Hint>
           </View>
         </Card>

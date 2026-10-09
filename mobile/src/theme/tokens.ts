@@ -1,30 +1,43 @@
 /** SVG and charts cannot take a className, so the colours are repeated here.
  *  Keep in sync with tailwind.config.js. */
 export const color = {
-  ink: '#1F1B1D',
-  muted: '#5E585B',
-  line: '#D9D3CB',
-  fill: '#EFEBE5',
-  bg: '#FBFAF7',
+  /** Titles, names, main numbers and input values. */
+  ink: '#30302E',
+  /** Notes, units, targets and legends. */
+  muted: '#514E49',
+  placeholder: '#625E58',
+  /** A control that cannot be used, such as the next-day arrow on today. */
+  disabled: '#776D65',
+  /** The dark outline of cards, buttons and inputs. */
+  edge: '#3E3A39',
+  /** Hairlines between rows and chart grid lines. */
+  line: '#E7DFD5',
+  /** Progress tracks and quiet neutral fills. */
+  fill: '#F3EDE4',
+  bg: '#FFFCF6',
   surface: '#FFFFFF',
-  primary: '#A3245F',
+  primary: '#A32B64',
   primarySoft: '#F6E3EC',
-  good: '#2F6B4C',
-  goodSoft: '#E2F0E7',
-  warm: '#8A5A0B',
-  warmSoft: '#F6EBD3',
+  good: '#30694D',
+  goodSoft: '#E3EFD9',
+  /** Text for going over the target and for skipped steps. */
+  warm: '#89580E',
+  warmSoft: '#FFF2D7',
+  /** Bars that went over the target, and the fat bar. */
+  warmFill: '#B17B23',
+  purple: '#7450A5',
+  purpleSoft: '#EEE5F8',
   danger: '#B42318',
-  placeholder: '#9C9599',
 } as const;
 
 /** Category accents used by meal composition cards and their generated SVG icons. */
 export const foodCategoryColor = {
-  staple: { accent: '#C77A08', soft: '#FFF1D8' },
-  protein: { accent: '#D94B67', soft: '#FCE6EB' },
-  vegetable: { accent: '#4F8E3C', soft: '#E8F3E4' },
-  fruit: { accent: '#A3245F', soft: '#F6E3EC' },
-  fat_sauce: { accent: '#7650B5', soft: '#EEE7F8' },
-  other: { accent: '#5E585B', soft: '#EFEBE5' },
+  staple: { accent: '#89580E', soft: '#FFF2D7' },
+  protein: { accent: '#A32B64', soft: '#F6E3EC' },
+  vegetable: { accent: '#30694D', soft: '#E3EFD9' },
+  fruit: { accent: '#7450A5', soft: '#EEE5F8' },
+  fat_sauce: { accent: '#514E49', soft: '#F3EDE4' },
+  other: { accent: '#514E49', soft: '#F3EDE4' },
 } as const;
 
 export function foodCategoryTone(category: string | null | undefined) {

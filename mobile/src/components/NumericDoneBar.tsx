@@ -6,8 +6,9 @@
  *
  * Android is a no-op — its numeric keyboard has a system back button.
  */
-import { InputAccessoryView, Keyboard, Platform, Pressable, Text, View } from 'react-native';
+import { InputAccessoryView, Keyboard, Platform, Pressable, View } from 'react-native';
 
+import { Text } from '@/components/text';
 import { NUMERIC_ACCESSORY_ID } from '@/components/ui';
 
 export function NumericDoneBar() {
@@ -15,13 +16,13 @@ export function NumericDoneBar() {
 
   return (
     <InputAccessoryView nativeID={NUMERIC_ACCESSORY_ID}>
-      <View className="flex-row justify-end border-t border-line bg-fill px-4 py-2">
+      <View className="flex-row justify-end border-t border-line bg-bg px-4 py-2">
         <Pressable
           accessibilityRole="button"
           onPress={Keyboard.dismiss}
           className="min-h-[44px] justify-center px-4"
         >
-          <Text className="text-base font-semibold text-primary">完成</Text>
+          <Text className="text-base text-primary">完成</Text>
         </Pressable>
       </View>
     </InputAccessoryView>

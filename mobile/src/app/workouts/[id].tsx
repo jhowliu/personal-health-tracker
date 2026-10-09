@@ -1,13 +1,15 @@
 import { router, useLocalSearchParams, useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/components/ExerciseLibrary';
 import { NumberStepper } from '@/components/NumberStepper';
-import { PlusIcon } from '@/components/icons';
+import { ReorderList } from '@/components/ReorderList';
+import { ChevronIcon, PlusIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import {
   BackLink,
   Card,
@@ -26,6 +28,8 @@ import { replacement } from '@/workouts/replacement';
 
 type Template = Schema<'TemplateOut'>;
 type Draft = {
+  /** Stable across moves; the saved id, or a made-up one for an exercise not saved yet. */
+  key: string;
   id: string | null;
   exercise_id: string;
   exercise_name: string;
@@ -36,6 +40,9 @@ type Draft = {
   rest_sec: number;
   note: string | null;
 };
+
+let unsavedKeys = 0;
+const newKey = () => `new-${++unsavedKeys}`;
 
 export default function EditTemplate() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,7 +82,7 @@ export default function EditTemplate() {
           setName(template.name);
           setDuration(template.duration_min ? String(template.duration_min) : '');
           setIsBuiltin(template.is_builtin);
-          const loadedItems = template.items.map((item) => ({ ...item }));
+          const loadedItems = template.items.map((item) => ({ ...item, key: item.id }));
           setItems(loadedItems);
           setBaseline(serialiseTemplate(
             template.name,
@@ -130,14 +137,8 @@ export default function EditTemplate() {
     ]);
   });
 
-  const move = (index: number, delta: number) => {
-    const next = [...items];
-    const target = index + delta;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
-    setItems(next);
-    setEditing(editing === index ? target : editing === target ? index : editing);
-  };
+  // While a row is dragged the page holds still under the finger.
+  const [dragging, setDragging] = useState(false);
 
   const patch = (index: number, changes: Partial<Draft>) =>
     setItems(items.map((item, i) => (i === index ? { ...item, ...changes } : item)));
@@ -147,6 +148,7 @@ export default function EditTemplate() {
     setItems([
       ...items,
       {
+        key: newKey(),
         id: null,
         exercise_id: exercise.id,
         exercise_name: exercise.name,
@@ -212,6 +214,7 @@ export default function EditTemplate() {
 
   return (
     <Screen
+      scrollEnabled={!dragging}
       footer={
         isBuiltin ? (
           <PrimaryButton onPress={copy} busy={busy}>
@@ -261,140 +264,152 @@ export default function EditTemplate() {
         動作
       </SectionHeading>
 
-      {items.map((item, index) =>
-        editing === index ? (
-          <Card key={`${item.exercise_id}-${index}`} className="gap-3 border-primary">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-base font-semibold text-ink">
-                {index + 1}. {item.exercise_name}
-              </Text>
-              <TextAction
-                tone="danger"
-                label="移除"
-                onPress={() => {
-                  setItems(items.filter((_, i) => i !== index));
-                  setEditing(null);
-                }}
-              />
-            </View>
+      <ReorderList
+        items={items}
+        keyOf={(item) => item.key}
+        divided={false}
+        disabled={isBuiltin}
+        estimatedHeight={86}
+        onDragChange={(active) => {
+          setDragging(active);
+          // Rows are dragged closed, so every one is the same short card.
+          if (active) setEditing(null);
+        }}
+        onReorder={(keys) =>
+          setItems(keys.flatMap((key) => items.filter((item) => item.key === key)))
+        }
+        renderRow={(item, handle) => {
+          const index = items.indexOf(item);
+          return (
+            <View className="pb-3">
+              {editing === index ? (
+                <Card className="gap-3 border-primary">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-base text-ink">
+                      {index + 1}. {item.exercise_name}
+                    </Text>
+                    <TextAction
+                      tone="danger"
+                      label="移除"
+                      onPress={() => {
+                        setItems(items.filter((_, i) => i !== index));
+                        setEditing(null);
+                      }}
+                    />
+                  </View>
 
-            <Segmented
-              value={item.duration_sec === null ? 'reps' : 'time'}
-              onChange={(mode) =>
-                patch(
-                  index,
-                  mode === 'time'
-                    ? { duration_sec: item.duration_sec ?? 1200, reps: null, sets: null }
-                    : { duration_sec: null, reps: item.reps ?? '10-12', sets: item.sets ?? 3 },
-                )
-              }
-              options={[
-                { value: 'reps', label: '次數' },
-                { value: 'time', label: '時間' },
-              ]}
-            />
-
-            {item.duration_sec === null ? (
-              <View className="flex-row items-end gap-3">
-                <View className="gap-1">
-                  <Text className="text-sm text-muted">組數</Text>
-                  <NumberStepper
-                    value={item.sets ?? 1}
-                    onChange={(sets) => patch(index, { sets })}
+                  <Segmented
+                    value={item.duration_sec === null ? 'reps' : 'time'}
+                    onChange={(mode) =>
+                      patch(
+                        index,
+                        mode === 'time'
+                          ? { duration_sec: item.duration_sec ?? 1200, reps: null, sets: null }
+                          : { duration_sec: null, reps: item.reps ?? '10-12', sets: item.sets ?? 3 },
+                      )
+                    }
+                    options={[
+                      { value: 'reps', label: '次數' },
+                      { value: 'time', label: '時間' },
+                    ]}
                   />
+
+                  {item.duration_sec === null ? (
+                    <View className="flex-row items-end gap-3">
+                      <View className="gap-1">
+                        <Text className="text-sm text-muted">組數</Text>
+                        <NumberStepper
+                          value={item.sets ?? 1}
+                          onChange={(sets) => patch(index, { sets })}
+                        />
+                      </View>
+                      <Field
+                        label="次數"
+                        value={item.reps ?? ''}
+                        onChangeText={(reps) => patch(index, { reps })}
+                        placeholder="10-12"
+                      />
+                      <Field
+                        label="重量"
+                        suffix="kg"
+                        value={item.weight_kg === null ? '' : String(item.weight_kg)}
+                        onChangeText={(text) => patch(index, { weight_kg: text ? Number(text) : null })}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  ) : (
+                    <Field
+                      label="時間"
+                      suffix="分鐘"
+                      value={String(Math.round(item.duration_sec / 60))}
+                      onChangeText={(text) =>
+                        patch(index, { duration_sec: Math.max(1, Number(text) || 1) * 60 })
+                      }
+                      keyboardType="numeric"
+                    />
+                  )}
+
+                  <Field
+                    label="做法說明"
+                    value={item.note ?? ''}
+                    onChangeText={(note) => patch(index, { note: note || null })}
+                    placeholder="腳與肩同寬，膝蓋不要完全打直"
+                  />
+
+                  <Field
+                    label="休息"
+                    value={String(item.rest_sec)}
+                    onChangeText={(text) => patch(index, { rest_sec: Number(text) || 0 })}
+                    suffix="秒"
+                    keyboardType="numeric"
+                  />
+
+                  <TextAction
+                    label="找替代動作"
+                    onPress={() =>
+                      router.navigate(
+                        `/workouts/alternatives?template_id=${id}&exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
+                      )
+                    }
+                  />
+
+                  <TextAction tone="muted" label="收起" onPress={() => setEditing(null)} className="justify-center" />
+                </Card>
+              ) : (
+                // The handle sits beside the row's button, not inside it: a button in a button
+                // is invalid on web and steals the handle's touches.
+                <View
+                  className={`min-h-[44px] flex-row items-center gap-1 rounded-tile border-[1.5px] border-edge bg-surface py-3 pr-3 ${
+                    handle ? 'pl-1' : 'pl-3'
+                  }`}
+                >
+                  {handle}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`編輯${item.exercise_name}`}
+                    disabled={isBuiltin}
+                    onPress={() => setEditing(index)}
+                    className="min-h-[44px] flex-1 justify-center gap-0.5"
+                  >
+                    <Text className="text-base text-ink">
+                      {index + 1}. {item.exercise_name}
+                    </Text>
+                    <Text className="text-sm text-muted">
+                      {item.duration_sec
+                        ? `${Math.round(item.duration_sec / 60)} 分鐘`
+                        : item.sets
+                          ? `${item.sets} 組 × ${item.reps}`
+                          : item.reps}
+                      {item.weight_kg ? `,${item.weight_kg} kg` : ''}
+                    </Text>
+                  </Pressable>
+                  {isBuiltin ? null : <ChevronIcon direction="right" size={15} tint={color.ink} />}
                 </View>
-                <Field
-                  label="次數"
-                  value={item.reps ?? ''}
-                  onChangeText={(reps) => patch(index, { reps })}
-                  placeholder="10-12"
-                />
-                <Field
-                  label="重量"
-                  suffix="kg"
-                  value={item.weight_kg === null ? '' : String(item.weight_kg)}
-                  onChangeText={(text) => patch(index, { weight_kg: text ? Number(text) : null })}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-            ) : (
-              <Field
-                label="時間"
-                suffix="分鐘"
-                value={String(Math.round(item.duration_sec / 60))}
-                onChangeText={(text) =>
-                  patch(index, { duration_sec: Math.max(1, Number(text) || 1) * 60 })
-                }
-                keyboardType="numeric"
-              />
-            )}
-
-            <Field
-              label="做法說明"
-              value={item.note ?? ''}
-              onChangeText={(note) => patch(index, { note: note || null })}
-              placeholder="腳與肩同寬，膝蓋不要完全打直"
-            />
-
-            <Field
-              label="休息"
-              value={String(item.rest_sec)}
-              onChangeText={(text) => patch(index, { rest_sec: Number(text) || 0 })}
-              suffix="秒"
-              keyboardType="numeric"
-            />
-
-            <TextAction
-              label="找替代動作"
-              onPress={() =>
-                router.navigate(
-                  `/workouts/alternatives?template_id=${id}&exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
-                )
-              }
-            />
-
-            <TextAction tone="muted" label="收起" onPress={() => setEditing(null)} className="justify-center" />
-          </Card>
-        ) : (
-          // The arrows sit beside the row's button, not inside it: a button in a button is
-          // invalid on web and steals the arrows' taps.
-          <View
-            key={`${item.exercise_id}-${index}`}
-            className="min-h-[44px] flex-row items-center gap-2 rounded-card border border-line bg-surface p-3"
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`編輯${item.exercise_name}`}
-              disabled={isBuiltin}
-              onPress={() => setEditing(index)}
-              className="min-h-[44px] flex-1 justify-center gap-0.5"
-            >
-              <Text className="text-base font-semibold text-ink">
-                {index + 1}. {item.exercise_name}
-              </Text>
-              <Text className="text-sm text-muted">
-                {item.duration_sec
-                  ? `${Math.round(item.duration_sec / 60)} 分鐘`
-                  : item.sets
-                    ? `${item.sets} 組 × ${item.reps}`
-                    : item.reps}
-                {item.weight_kg ? `,${item.weight_kg} kg` : ''}
-              </Text>
-            </Pressable>
-            {isBuiltin ? null : (
-              <>
-                <Arrow label="上移" onPress={() => move(index, -1)} disabled={index === 0} glyph="↑" />
-                <Arrow
-                  label="下移"
-                  onPress={() => move(index, 1)}
-                  disabled={index === items.length - 1}
-                  glyph="↓"
-                />
-              </>
-            )}
-          </View>
-        ),
-      )}
+              )}
+            </View>
+          );
+        }}
+      />
 
       {items.length === 0 ? <Hint>還沒有動作，從下面加入。</Hint> : null}
 
@@ -422,30 +437,4 @@ export default function EditTemplate() {
 
 function serialiseTemplate(name: string, duration: string, items: Draft[]) {
   return JSON.stringify({ name, duration, items });
-}
-
-function Arrow({
-  label,
-  glyph,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  glyph: string;
-  onPress: () => void;
-  disabled: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-      disabled={disabled}
-      className={`h-11 w-11 items-center justify-center rounded-field border border-line ${
-        disabled ? 'opacity-30' : ''
-      }`}
-    >
-      <Text className="text-base text-ink">{glyph}</Text>
-    </Pressable>
-  );
 }

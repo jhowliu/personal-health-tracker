@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { CheckIcon, ChevronIcon, PlusIcon } from '@/components/icons';
 import { ShowMore, usePaged } from '@/components/paging';
 import { Sheet } from '@/components/Sheet';
+import { Text } from '@/components/text';
 import { Chip, Field, Hint, PrimaryButton, Tag } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
@@ -92,8 +93,8 @@ export function ExerciseLibrary({
             // button inside a button is invalid on web.
             <View
               key={exercise.id}
-              className={`flex-row gap-3 rounded-card border p-3 ${
-                addedIds?.has(exercise.id) ? 'border-good bg-good-soft/40' : 'border-line bg-surface'
+              className={`flex-row gap-3 rounded-tile border-[1.5px] p-3 ${
+                addedIds?.has(exercise.id) ? 'border-good bg-good-soft' : 'border-edge bg-surface'
               }`}
             >
               <Pressable
@@ -105,7 +106,7 @@ export function ExerciseLibrary({
                 <ExerciseFigure exerciseId={exercise.id} name={exercise.name} mode="single" size={88} />
               </Pressable>
               <View className="min-w-0 flex-1 gap-2">
-                <Text className="text-base font-semibold text-ink">{exercise.name}</Text>
+                <Text className="text-base text-ink">{exercise.name}</Text>
                 <View className="flex-row flex-wrap gap-1.5">
                   {/* A mobility exercise is 活動度 by category and by body region; show it once. */}
                   {[
@@ -129,25 +130,25 @@ export function ExerciseLibrary({
                     hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                     className="flex-row items-center gap-0.5"
                   >
-                    <Text className="text-sm font-semibold text-primary">查看動作</Text>
+                    <Text className="text-sm text-primary">查看動作</Text>
                     <ChevronIcon direction="right" size={16} tint={color.primary} />
                   </Pressable>
                   {addedIds?.has(exercise.id) ? (
                     <View
                       accessibilityRole="text"
-                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-full bg-good-soft px-4"
+                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control px-3"
                     >
                       <CheckIcon size={16} tint={color.good} />
-                      <Text className="text-sm font-semibold text-good">已加入</Text>
+                      <Text className="text-sm text-good">已加入</Text>
                     </View>
                   ) : (
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => onSelect(exercise)}
-                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-full bg-primary px-4 active:opacity-80"
+                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control border-[1.5px] border-edge bg-primary px-4 active:opacity-80"
                     >
                       <PlusIcon size={16} tint={color.surface} />
-                      <Text className="text-sm font-semibold text-white">{selectLabel}</Text>
+                      <Text className="text-sm text-white">{selectLabel}</Text>
                     </Pressable>
                   )}
                 </View>

@@ -1,10 +1,11 @@
 /** Bottom sheet and the selectable lines that go in it. */
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/AppModal';
 import { CheckIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 
 /** One selectable line in a sheet's list; the selected one is tinted and checked. */
 export function ChoiceOption({
@@ -26,8 +27,8 @@ export function ChoiceOption({
       accessibilityState={{ selected, disabled: Boolean(disabled) }}
       disabled={disabled}
       onPress={onPress}
-      className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-field px-3 py-2 ${
-        selected ? 'bg-primary-soft' : 'bg-fill'
+      className={`min-h-[44px] flex-row items-center justify-between gap-3 rounded-control border-[1.5px] px-3 py-2 ${
+        selected ? 'border-edge bg-primary-soft' : 'border-line bg-surface'
       } ${disabled ? 'opacity-40' : ''}`}
     >
       <View className="flex-1 gap-0.5">
@@ -61,14 +62,14 @@ export function Sheet({
           className="flex-1 justify-end bg-scrim"
         >
           {/* Padding sits on the inner Pressable: on web SafeAreaView overwrites className padding. */}
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet bg-bg">
+          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet border-x-2 border-t-2 border-edge bg-bg">
             <Pressable
               accessible={false}
               onPress={(event) => event.stopPropagation()}
               className="gap-3 px-5 pb-3 pt-5"
             >
               <View className="flex-row items-center justify-between gap-3">
-                <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
+                <Text accessibilityRole="header" className="text-2xl text-ink">
                   {title}
                 </Text>
                 <Pressable

@@ -1,25 +1,25 @@
 /**
  * Today's header: how much is left to eat, against a target that may include the workout.
  *
- * The number that drives a decision is "how much is left", so it leads in large type; what
- * was eaten and the full target sit under it. On a workout day a chip says how much of the
- * target the workout added — the half of its burn handed back (see compute_targets), not the
- * burn itself, which the workout screen shows.
+ * How much is left leads the card, since it is what the next meal is decided by; what was eaten
+ * and the full target sit under it in one line. On a workout day a badge says how much of the
+ * target the workout added — the half of its burn handed back
+ * (see compute_targets), not the burn itself, which the workout screen shows.
  *
  * Collapsed by default: the macro breakdown is something you check occasionally, not on every
- * screen load. Expanded, it opens in the same card as three columns. There is no ring: it
- * would only repeat the headline.
+ * screen load. Expanded, it opens in the same card as three columns, then how the target is
+ * made up when a workout added to it.
  *
  * Deliberately absent: the BMR floor. `compute_targets` clamps the target with
  * `max(..., bmr, floor)`, so clearing the target always clears the floor — two gaps pointing
  * the same way, one of them always redundant.
  */
-import { type ComponentType, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
-import { BowlIcon, ChevronIcon, DropletIcon, PlusIcon, ProteinIcon, RunIcon } from '@/components/icons';
-import { TextAction } from '@/components/ui';
+import { ChevronIcon, RunIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { color } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -42,45 +42,24 @@ function Bar({ value, target, tone, thin }: { value: number; target: number; ton
   return (
     // Width goes through `style`: NativeWind has no arbitrary percentage class that
     // behaves the same on native and web.
-    <View className={`${thin ? 'h-1.5' : 'h-2.5'} overflow-hidden rounded-full bg-fill`}>
-      <View
-        className="h-full rounded-full"
-        style={{ width: `${ratio(value, target) * 100}%`, backgroundColor: tone }}
-      />
+    <View className={`${thin ? 'h-[5px]' : 'h-[7px]'} overflow-hidden rounded-lg bg-surface`}>
+      <View className="h-full rounded-lg" style={{ width: `${ratio(value, target) * 100}%`, backgroundColor: tone }} />
     </View>
   );
 }
 
-function MacroColumn({
-  label,
-  value,
-  target,
-  tone,
-  soft,
-  icon: Icon,
-}: {
-  label: string;
-  value: number;
-  target: number;
-  tone: string;
-  soft: string;
-  icon: ComponentType<{ size?: number; tint?: string }>;
-}) {
-  // A full bar reads as "done"; only the number can say you went past the target.
-  const over = value > target;
+function MacroColumn({ label, value, target, tone }: { label: string; value: number; target: number; tone: string }) {
+  // A full bar reads as "done"; only the number's colour says you went past the target.
+  const eaten = Math.round(value);
+  const over = eaten > target;
   return (
-    <View className="flex-1 gap-1.5">
-      <View className="flex-row items-center gap-1.5">
-        <View className="h-6 w-6 items-center justify-center rounded-full" style={{ backgroundColor: soft }}>
-          <Icon size={14} tint={tone} />
-        </View>
-        <Text className="text-sm text-muted">{label}</Text>
-      </View>
-      <Text className="text-sm text-muted">
-        <Text className={`text-base font-bold ${over ? 'text-warm' : 'text-ink'}`}>{Math.round(value)} g</Text> /{' '}
-        {target} g
+    <View className="flex-1 gap-1">
+      <Text className="text-xs text-muted">{label}</Text>
+      <Text className={`text-[20px] ${over ? 'text-warm' : 'text-ink'}`}>
+        {eaten}
+        <Text className="text-xs text-muted"> / {target} g</Text>
       </Text>
-      <Bar value={value} target={target} tone={over ? color.warm : tone} thin />
+      <Bar value={value} target={target} tone={over ? color.warmFill : tone} thin />
     </View>
   );
 }
@@ -88,11 +67,9 @@ function MacroColumn({
 export function DaySummary({
   eaten,
   targets,
-  onAddSnack,
 }: {
   eaten: Nutrients;
   targets: Targets;
-  onAddSnack?: () => void;
 }) {
   const [open, setOpen] = useState(expanded);
   const kcal = Math.round(eaten.kcal);
@@ -111,7 +88,7 @@ export function DaySummary({
   }`;
 
   return (
-    <View className="gap-4 rounded-card border border-line bg-surface p-4">
+    <View className="gap-3 rounded-[18px] border-[2.5px] border-edge bg-warm-soft px-4 py-3.5">
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
@@ -121,70 +98,46 @@ export function DaySummary({
         className="gap-3"
       >
         <View className="flex-row items-center justify-between">
-          <Text className={`text-base ${over ? 'text-warm' : 'text-muted'}`}>{over ? '超出' : '還可以吃'}</Text>
-          <ChevronIcon direction={open ? 'up' : 'down'} size={18} tint={color.muted} />
+          <Text className={`text-sm ${over ? 'text-warm' : 'text-ink'}`}>{over ? '超出目標' : '還可以吃'}</Text>
+          <View className="flex-row items-center gap-1.5">
+            <Text className={`text-[22px] ${over ? 'text-warm' : 'text-ink'}`}>
+              {Math.abs(remaining).toLocaleString()}
+              <Text className="text-xs text-muted"> 大卡</Text>
+            </Text>
+            <ChevronIcon direction={open ? 'up' : 'down'} size={16} tint={color.ink} />
+          </View>
         </View>
 
-        <View className="flex-row items-end justify-between gap-3">
-          <View className="flex-1 gap-1">
-            <Text className={`font-display text-4xl font-bold ${over ? 'text-warm' : 'text-ink'}`}>
-              {Math.abs(remaining).toLocaleString()}
-              <Text className="text-lg font-normal"> 大卡</Text>
-            </Text>
-            <Text className="text-sm text-muted">
-              已吃 {kcal.toLocaleString()} / {targets.kcal.toLocaleString()} 大卡
-            </Text>
-          </View>
+        <View className="flex-row items-center justify-between gap-3">
+          <Text className="flex-1 text-xs text-muted">
+            已吃 {kcal.toLocaleString()} / {targets.kcal.toLocaleString()} 大卡
+          </Text>
           {added > 0 ? (
-            <View className="flex-row items-center gap-2 rounded-field bg-primary-soft px-3 py-2">
-              <RunIcon size={20} tint={color.primary} />
+            <View className="flex-row items-center gap-2 rounded-control bg-primary-soft px-3 py-1.5">
+              <RunIcon size={17} tint={color.primary} />
               <View>
-                <Text className="text-xs text-muted">{addedLabel}</Text>
-                <Text className="text-sm font-bold text-primary">+{added.toLocaleString()} 大卡</Text>
+                <Text className="text-xs text-primary">{addedLabel}</Text>
+                <Text className="text-sm text-primary">+{added.toLocaleString()} 大卡</Text>
               </View>
             </View>
           ) : null}
         </View>
 
-        <Bar value={kcal} target={targets.kcal} tone={over ? color.warm : color.primary} />
+        <Bar value={kcal} target={targets.kcal} tone={over ? color.warmFill : color.primary} />
       </Pressable>
 
       {open ? (
-        <View className="gap-1 border-t border-line pt-3">
+        <View className="gap-3 border-t border-line pt-3">
           <View className="flex-row gap-4">
-            <MacroColumn
-              label="蛋白質"
-              value={eaten.protein_g}
-              target={targets.protein_g}
-              tone={color.good}
-              soft={color.goodSoft}
-              icon={ProteinIcon}
-            />
-            <MacroColumn
-              label="脂肪"
-              value={eaten.fat_g}
-              target={targets.fat_g}
-              tone={color.warm}
-              soft={color.warmSoft}
-              icon={DropletIcon}
-            />
-            <MacroColumn
-              label="碳水"
-              value={eaten.carb_g}
-              target={targets.carb_g}
-              tone={color.primary}
-              soft={color.primarySoft}
-              icon={BowlIcon}
-            />
+            <MacroColumn label="蛋白質" value={eaten.protein_g} target={targets.protein_g} tone={color.good} />
+            <MacroColumn label="脂肪" value={eaten.fat_g} target={targets.fat_g} tone={color.warmFill} />
+            <MacroColumn label="碳水" value={eaten.carb_g} target={targets.carb_g} tone={color.primary} />
           </View>
-          {/* A snack eaten between meals has nowhere else to go before the day is done. */}
-          {onAddSnack ? (
-            <TextAction
-              icon={PlusIcon}
-              label="補記點心"
-              onPress={onAddSnack}
-              className="min-h-[44px] justify-center self-start"
-            />
+          {added > 0 ? (
+            <View className="flex-row justify-between">
+              <Text className="text-xs text-muted">原目標 {targets.base_kcal.toLocaleString()} 大卡</Text>
+              <Text className="text-xs text-muted">+ 訓練 {added.toLocaleString()} 大卡</Text>
+            </View>
           ) : null}
         </View>
       ) : null}

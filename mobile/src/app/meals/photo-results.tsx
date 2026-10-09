@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { type ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Sheet } from '@/components/Sheet';
+import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
 import { draft } from '@/meals/draft';
 import { photoDraft, type RecognizedFood, type RecognizedItem } from '@/meals/photo-draft';
@@ -410,7 +411,7 @@ function ReviewRow({
     <View className={`gap-2 py-3 ${item.skipped ? 'opacity-40' : ''}`}>
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-1">
-          <Text className="text-base font-semibold text-ink">{item.selected?.label ?? item.label}</Text>
+          <Text className="text-base text-ink">{item.selected?.label ?? item.label}</Text>
           {/* Shows the pairing, so "豬肉片 → 梅花豬(熟)" can be checked at a glance. */}
           {item.selected && bareName(item.selected.label) !== bareName(item.label) ? (
             <Text className="text-sm text-muted">看起來是：{item.label}</Text>
@@ -433,13 +434,13 @@ function ReviewRow({
           editable={!item.skipped}
         />
         <View className="h-11 w-24 items-end justify-center">
-          <Text className="text-base font-semibold text-ink">{kcal === null ? '—' : `${kcal} 大卡`}</Text>
+          <Text className="text-base text-ink">{kcal === null ? '—' : `${kcal} 大卡`}</Text>
         </View>
       </View>
       <TextAction label={open ? '收起' : '換成其他食物'} onPress={() => setOpen(!open)} />
 
       {open ? (
-        <View className="gap-3 rounded-card border border-line p-3">
+        <View className="gap-3 rounded-tile border-[1.5px] border-edge p-3">
           {item.alternatives.length ? (
             <View className="gap-2">
               <Text className="text-sm text-muted">可能是</Text>

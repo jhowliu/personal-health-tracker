@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,13 +14,16 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
 import { DaySummary } from '@/components/DaySummary';
-import { BowlIcon, CameraIcon, CheckIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
+import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
+import { ReorderList } from '@/components/ReorderList';
 import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
-import { AddRow, Card, Empty, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
+import { Text } from '@/components/text';
+import { AddRow, Card, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
-import { FoodGroup, FoodItem } from '@/meals/FoodGroup';
+import { FoodActions, FoodGroup, FoodItem, FoodMacros } from '@/meals/FoodGroup';
 import { photoDraft } from '@/meals/photo-draft';
+import { stepCache } from '@/today/step-cache';
 import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
@@ -105,6 +107,7 @@ export default function TodayScreen() {
       const fresh = await api.get(`/days/${date}`);
       if (version !== loadVersion.current) return;
       settle(fresh, resetStep ? null : shown.current.viewing);
+      stepCache.prefetch(date);
     } catch (error) {
       if (version !== loadVersion.current) return;
       Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
@@ -170,7 +173,6 @@ export default function TodayScreen() {
         header={header}
         date={day.date}
         logged={day.flow.completed.includes('body')}
-        after={stepAfter(day, 'body')}
         value={weighIn}
         onChange={setWeighIn}
         onSaved={() => {
@@ -182,8 +184,7 @@ export default function TodayScreen() {
   }
   if (step === 'done') {
     return (
-      <Screen key={day.date} footerSafeArea={false}>
-        {header}
+      <Screen key={day.date} footerSafeArea={false} pinnedHeader={header}>
         <DoneStep day={day} onChanged={() => load()} />
       </Screen>
     );
@@ -197,7 +198,6 @@ export default function TodayScreen() {
         after={stepAfter(day, 'workout')}
         resolved={day.flow.completed.includes('workout')}
         skipped={day.flow.skipped.includes('workout')}
-        burnAdded={day.targets.exercise_kcal > 0}
         onDone={() => load(true)}
         onStateChanged={() => refreshAt('workout')}
       />
@@ -239,43 +239,40 @@ function TodayHeader({
   // Done is not a step on the track, so after looking back the summary needs its own way in.
   const canReturnToSummary = day.flow.current === 'done' && step !== 'done';
   return (
-    <View className="gap-3 pb-3">
+    <View className="gap-3">
       <View className="flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="前一天"
           disabled={!canGoBack}
           onPress={() => onShift(-1)}
-          className={`h-11 w-11 items-center justify-center ${canGoBack ? '' : 'opacity-30'}`}
+          className="h-11 w-11 items-center justify-center"
         >
-          <ChevronIcon direction="left" size={22} tint={color.ink} />
+          <ChevronIcon direction="left" size={22} tint={canGoBack ? color.ink : color.disabled} />
         </Pressable>
-        <Text className="text-center font-display text-lg font-bold text-ink">
-          {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
-          {day.streak > 0 ? (
-            <Text className="text-sm font-normal text-muted">{`  ·  連續 ${day.streak} 天`}</Text>
-          ) : null}
-        </Text>
+        <View className="items-center">
+          <Text className="text-center text-[21px] text-ink">
+            {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
+          </Text>
+          <Text className="text-xs text-muted">
+            {dayWord(day.date)}
+            {day.streak > 0 ? ` · 連續 ${day.streak} 天` : ''}
+          </Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="後一天"
           disabled={!canGoForward}
           onPress={() => onShift(1)}
-          className={`h-11 w-11 items-center justify-center ${canGoForward ? '' : 'opacity-30'}`}
+          className="h-11 w-11 items-center justify-center"
         >
-          <ChevronIcon direction="right" size={22} tint={color.ink} />
+          <ChevronIcon direction="right" size={22} tint={canGoForward ? color.ink : color.disabled} />
         </Pressable>
       </View>
       {isToday ? null : (
         <TextAction label="回到今天" onPress={onToday} className="min-h-[44px] justify-center self-center" />
       )}
-      <DaySummary
-        eaten={day.flow.eaten}
-        targets={day.targets}
-        onAddSnack={() =>
-          router.navigate({ pathname: '/meals/add-food', params: { destination: 'day', date: day.date, slot: 'extras' } })
-        }
-      />
+      <DaySummary eaten={day.flow.eaten} targets={day.targets} />
       <StepIndicator
         steps={day.flow.steps}
         completed={day.flow.completed}
@@ -295,7 +292,6 @@ function WeighInStep({
   header,
   date,
   logged,
-  after,
   value,
   onChange,
   onSaved,
@@ -304,7 +300,6 @@ function WeighInStep({
   date: string;
   /** Today's weigh-in is already saved, so the form starts from it instead of empty. */
   logged: boolean;
-  after: string;
   value: { weight: string; waist: string };
   onChange: (value: { weight: string; waist: string }) => void;
   onSaved: () => void;
@@ -313,7 +308,6 @@ function WeighInStep({
   const { weight, waist } = value;
   const prefilled = useRef(false);
   const word = dayWord(date);
-  const isToday = word === '今天';
 
   useEffect(() => {
     if (!logged || prefilled.current || weight || waist) return;
@@ -351,29 +345,19 @@ function WeighInStep({
   };
 
   return (
-    <Screen
-      footerSafeArea={false}
-      footer={
-        <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
-          {busy ? '儲存中…' : logged ? '更新' : `儲存，下一步：${after}`}
-        </PrimaryButton>
-      }
-    >
-      {header}
+    <Screen footerSafeArea={false} pinnedHeader={header}>
       <View className="gap-4">
-      <View className="gap-1">
-        <Hint>
-          {logged
-            ? `${word}已記錄，改完按更新`
-            : isToday
-              ? '起床、上完廁所、還沒吃喝前'
-              : `補記${word}的體重和腰圍`}
-        </Hint>
-        <Title>{isToday ? '早安，先量一下' : '補記體重'}</Title>
-      </View>
+        <View className="flex-row items-end justify-between gap-3">
+          <View className="flex-1 gap-1">
+            <Hint>{word}的紀錄</Hint>
+            <Text accessibilityRole="header" className="text-2xl text-ink">
+              量身形
+            </Text>
+          </View>
+          {logged ? <StatusBadge label="已記錄" tone="good" /> : null}
+        </View>
 
-      <Card className="gap-3">
-        <View className="flex-row gap-3">
+        <Card className="gap-4">
           <Field
             label="體重"
             suffix="kg"
@@ -381,19 +365,85 @@ function WeighInStep({
             onChangeText={(next) => onChange({ ...value, weight: next })}
             keyboardType="decimal-pad"
           />
+          <View className="h-px bg-line" />
           <Field
-            label="腰圍（選填）"
+            label="腰圍　選填"
             suffix="cm"
             value={waist}
             onChangeText={(next) => onChange({ ...value, waist: next })}
             keyboardType="decimal-pad"
           />
-        </View>
-        <Hint>腰圍量肚臍那一圈，自然吐氣時讀數字。一週量一次就好。</Hint>
-      </Card>
+          <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
+            {busy ? '儲存中…' : logged ? '更新紀錄' : '儲存紀錄'}
+          </PrimaryButton>
+        </Card>
 
+        <BodyStats />
       </View>
     </Screen>
+  );
+}
+
+/** This week's average, the change from last week and the latest waist, with a way to the trends. */
+function BodyStats() {
+  const [stats, setStats] = useState<Schema<'BodySummaryOut'> | null>(() => stepCache.get('body-summary'));
+
+  useEffect(() => {
+    let live = true;
+    api
+      .get('/body-logs/summary')
+      .then((summary) => {
+        stepCache.set('body-summary', summary);
+        if (live) setStats(summary);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!stats) return null;
+  const delta = stats.week_avg_delta;
+  return (
+    <View className="gap-3">
+      <View className="flex-row">
+        <BodyStat label="本週平均" value={stats.week_avg_weight?.toFixed(1)} unit="kg" />
+        <BodyStat
+          label="比上週"
+          value={delta === null ? undefined : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta).toFixed(1)}`}
+          unit="kg"
+          tone={delta === null ? undefined : delta <= 0 ? 'text-good' : 'text-warm'}
+        />
+        <BodyStat label="最近腰圍" value={stats.latest_waist?.toFixed(1)} unit="cm" />
+      </View>
+      <View className="h-px bg-line" />
+      <TextAction
+        label="查看身形趨勢 ›"
+        onPress={() => router.navigate('/body')}
+        className="min-h-[44px] justify-center self-start"
+      />
+    </View>
+  );
+}
+
+function BodyStat({ label, value, unit, tone }: { label: string; value?: string; unit: string; tone?: string }) {
+  return (
+    <View className="flex-1 gap-0.5">
+      <Text className="text-xs text-muted">{label}</Text>
+      <Text className={`text-[25px] ${tone ?? 'text-ink'}`}>
+        {value ?? '—'}
+        {value ? <Text className="text-xs text-muted"> {unit}</Text> : null}
+      </Text>
+    </View>
+  );
+}
+
+/** The small state pill beside a step's title: 已記錄, 已吃完, 還沒吃, 已完成 or 已略過. */
+function StatusBadge({ label, tone }: { label: string; tone: 'good' | 'warm' }) {
+  return (
+    <View className={`rounded-full px-2.5 py-1 ${tone === 'good' ? 'bg-good-soft' : 'bg-warm-soft'}`}>
+      <Text className={`text-xs ${tone === 'good' ? 'text-good' : 'text-warm'}`}>{label}</Text>
+    </View>
   );
 }
 
@@ -412,16 +462,20 @@ function MealStep({
   onStateChanged: () => void;
   onPlanChanged: () => void | Promise<void>;
 }) {
-  const [plan, setPlan] = useState<DayPlan | null>(null);
+  const [plan, setPlan] = useState<DayPlan | null>(() => stepCache.get(`plan:${day.date}`));
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [portionItem, setPortionItem] = useState<PlannedMealItem | null>(null);
   const [portion, setPortion] = useState('');
   const [adding, setAdding] = useState(false);
+  // The food opened to show its macros and actions; one at a time keeps the list short.
+  const [openItem, setOpenItem] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setPlan((await api.get(`/days/${day.date}/plan`)) as unknown as DayPlan);
+      const fresh = (await api.get(`/days/${day.date}/plan`)) as unknown as DayPlan;
+      stepCache.set(`plan:${day.date}`, fresh);
+      setPlan(fresh);
     } catch (error) {
       Alert.alert(`讀不到${dayWord(day.date)}的餐點`, error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -546,8 +600,7 @@ function MealStep({
 
   if (!plan) {
     return (
-      <Screen footerSafeArea={false}>
-        {header}
+      <Screen footerSafeArea={false} pinnedHeader={header}>
         <View className="items-center py-12">
           <ActivityIndicator color={color.primary} />
         </View>
@@ -555,25 +608,39 @@ function MealStep({
     );
   }
 
+  const title = (
+    <View className="flex-row items-end justify-between gap-3">
+      <View className="flex-1 gap-1">
+        <Hint>
+          {word}的{STEP_LABEL[step]}
+        </Hint>
+        <Text accessibilityRole="header" className="text-2xl text-ink">
+          {meal?.name || STEP_LABEL[step]}
+        </Text>
+      </View>
+      {meal?.skipped || (resolved && !meal?.items.length) ? (
+        <StatusBadge label="已略過" tone="warm" />
+      ) : meal?.eaten ? (
+        <StatusBadge label="已吃完" tone="good" />
+      ) : (
+        <StatusBadge label="還沒吃" tone="warm" />
+      )}
+    </View>
+  );
+
   if (!meal || meal.items.length === 0) {
     // Nothing logged for this slot yet: photograph what was eaten (the quickest way in), add a
     // saved meal or foods by hand, or skip.
     return (
       <Screen
+        pinnedHeader={header}
         footerSafeArea={false}
         footer={
           <>
             <PrimaryButton icon={CameraIcon} onPress={recordFromPhoto} disabled={busy} busy={photoBusy}>
               {photoBusy ? '辨識中…' : '拍照記錄這餐'}
             </PrimaryButton>
-            <View className="flex-row items-center justify-center gap-8">
-              <TextAction
-                label="加入"
-                icon={PlusIcon}
-                disabled={busy || photoBusy}
-                onPress={() => setAdding(true)}
-                className="min-h-[44px] justify-center"
-              />
+            <View className="items-center">
               {resolved ? (
                 <TextAction
                   label="改回未吃"
@@ -593,138 +660,112 @@ function MealStep({
           </>
         }
       >
-        {header}
         <View className="gap-4">
-          <Title>{STEP_LABEL[step]}</Title>
-          {resolved ? (
-            <Card className="gap-2 bg-fill">
-              <Text className="text-base font-semibold text-ink">這餐已略過</Text>
-              <Hint>不會計入{word}的熱量和流程。</Hint>
-            </Card>
-          ) : (
-            <Empty compact>拍下{word}的{STEP_LABEL[step]}，確認份量後就記錄完成；也可以從我的餐點或食物庫加入。</Empty>
-          )}
+          {title}
+          <AddRow label="加入食物" disabled={busy || photoBusy} onPress={() => setAdding(true)} />
         </View>
         {addSheet}
       </Screen>
     );
   }
 
-  // Pinned under the main button so the total stays in view while the list scrolls.
-  const total = (
-    <View className="flex-row items-baseline justify-between px-1">
-      <Text className="text-sm text-muted">整份熱量</Text>
-      <Text className="text-lg font-bold text-ink">{Math.round(meal.nutrients.kcal)} 大卡</Text>
-    </View>
-  );
-
   const footer = (
     <>
       {meal.skipped ? (
-        <>
-          <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
-            {busy ? '處理中…' : '仍要標記吃完'}
-          </PrimaryButton>
-          <TextAction
-            label="改回未吃"
-            disabled={busy}
-            onPress={() => setMealState('planned')}
-            className="justify-center"
-          />
-        </>
+        <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
+          {busy ? '處理中…' : '仍要標記吃完'}
+        </PrimaryButton>
       ) : meal.eaten ? (
-        <>
-          <Hint>這餐已標記吃完。</Hint>
-          {total}
+        <PrimaryButton onPress={() => setMealState('planned')} busy={busy}>
+          {busy ? '處理中…' : '改回未吃'}
+        </PrimaryButton>
+      ) : (
+        <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
+          {busy ? '處理中…' : '標記吃完'}
+        </PrimaryButton>
+      )}
+
+      <View className="items-center">
+        {meal.skipped ? (
           <TextAction
             label="改回未吃"
             disabled={busy}
             onPress={() => setMealState('planned')}
-            className="justify-center"
+            className="min-h-[44px] justify-center"
           />
-        </>
-      ) : (
-        // Foods added by hand: once they are all in, finishing the meal is the main step.
-        <>
-          <PrimaryButton icon={CheckIcon} onPress={() => setMealState('eaten')} busy={busy}>
-            {busy ? '處理中…' : `標記${STEP_LABEL[step]}吃完，下一步：${stepAfter(day, step)}`}
-          </PrimaryButton>
-          {total}
+        ) : meal.eaten ? null : (
           <TextAction
             label="略過這餐"
             disabled={busy}
             onPress={() => setMealState('skipped')}
             className="min-h-[44px] justify-center"
           />
-        </>
-      )}
+        )}
+      </View>
     </>
   );
 
   return (
-    <Screen footerSafeArea={false} footer={footer}>
-      {header}
+    <Screen footerSafeArea={false} pinnedHeader={header} footer={footer}>
       <View className="gap-4">
-      <View className="gap-1">
-        {meal.name ? (
-          <>
-            <Hint>{word}的{STEP_LABEL[step]}</Hint>
-            <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-              {meal.name}
-            </Text>
-          </>
-        ) : (
-          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-            {word}的{STEP_LABEL[step]}
-          </Text>
-        )}
-      </View>
+        {title}
 
-      {meal.skipped ? (
-        <Card className="gap-2 bg-fill">
-          <Text className="text-base font-semibold text-ink">這餐已略過</Text>
-          <Hint>不會計入{word}的熱量和流程。</Hint>
-        </Card>
-      ) : (
-        <>
-          {/* The list, a dashed row to add to it, then saving the meal as a whole, like the
-              workout list, so the footer only finishes the meal. */}
-          <View className="gap-2.5">
-            <Card className="gap-3 p-2">
-              {groupPlanItems(meal.items).map((group) => (
-                <FoodGroup key={group.category} category={group.category} label={group.label}>
-                  {group.items.map((item) => {
-                    // Only a food from the library has a portion to edit or a swap to offer.
-                    const canEditGrams = item.food !== null && item.grams !== null;
-                    return (
-                      <FoodItem
-                        key={item.id}
-                        name={item.food?.name ?? item.custom_name ?? '未命名食物'}
-                        amount={formatPlanAmount(item)}
-                        busy={busy}
-                        onReplace={canEditGrams ? () => replaceItem(item) : undefined}
-                        onAmount={canEditGrams ? () => editPortion(item) : undefined}
-                        onRemove={() => removeItem(item)}
-                      />
-                    );
-                  })}
-                </FoodGroup>
-              ))}
-            </Card>
-            <AddRow label="加入食物" disabled={busy} onPress={() => setAdding(true)} />
-          </View>
-          {meal.items.some((item) => item.food) ? (
-            <View className="items-center">
-              <TextAction
-                label="存成我的餐點"
-                disabled={busy}
-                onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
-                className="min-h-[44px] justify-center"
-              />
+        {meal.skipped ? null : (
+          <>
+            <View className="flex-row items-center justify-between rounded-control border-[1.5px] border-edge bg-primary-soft px-4 py-2.5">
+              <Text className="text-xs text-ink">這份餐點</Text>
+              <Text className="text-[22px] text-ink">
+                {Math.round(meal.nutrients.kcal)}
+                <Text className="text-xs text-muted"> 大卡</Text>
+              </Text>
             </View>
-          ) : null}
-        </>
-      )}
+
+            {groupPlanItems(meal.items).map((group) => (
+              <FoodGroup key={group.category} category={group.category} label={group.label}>
+                {group.items.map((item) => {
+                  // Only a food from the library has a portion to edit or a swap to offer.
+                  const canEditGrams = item.food !== null && item.grams !== null;
+                  return (
+                    <FoodItem
+                      key={item.id}
+                      name={item.food?.name ?? item.custom_name ?? '未命名食物'}
+                      kcal={Math.round(item.nutrients.kcal)}
+                      amount={formatPlanAmount(item)}
+                      open={openItem === item.id}
+                      busy={busy}
+                      onToggle={() => setOpenItem((current) => (current === item.id ? null : item.id))}
+                    >
+                      <FoodMacros nutrients={item.nutrients} />
+                      <FoodActions
+                        busy={busy}
+                        actions={[
+                          ...(canEditGrams
+                            ? [
+                                { label: '調整份量', onPress: () => editPortion(item) },
+                                { label: '替換', onPress: () => replaceItem(item) },
+                              ]
+                            : []),
+                          { label: '移除', onPress: () => removeItem(item), danger: true },
+                        ]}
+                      />
+                    </FoodItem>
+                  );
+                })}
+              </FoodGroup>
+            ))}
+            <AddRow label="加入食物" disabled={busy} onPress={() => setAdding(true)} />
+            {meal.items.some((item) => item.food) ? (
+              <View className="items-center">
+                <TextAction
+                  label="存成我的餐點"
+                  disabled={busy}
+                  onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
+                  className="min-h-[44px] justify-center"
+                />
+              </View>
+            ) : null}
+          </>
+        )}
 
       </View>
 
@@ -842,12 +883,12 @@ function PortionEditor({
               className="gap-4 px-5 pb-3 pt-5"
             >
               {keyboardVisible ? (
-                <Text accessibilityRole="header" className="text-base font-semibold text-ink">
+                <Text accessibilityRole="header" className="text-base text-ink">
                   調整 {itemName} 的份量
                 </Text>
               ) : (
                 <View className="gap-1">
-                  <Text accessibilityRole="header" className="font-display text-2xl font-bold text-ink">
+                  <Text accessibilityRole="header" className="text-2xl text-ink">
                     調整份量
                   </Text>
                   <Text className="text-base text-muted">{itemName}</Text>
@@ -901,7 +942,6 @@ function WorkoutStep({
   after,
   resolved,
   skipped,
-  burnAdded,
   onDone,
   onStateChanged,
 }: {
@@ -912,12 +952,10 @@ function WorkoutStep({
   resolved: boolean;
   /** Skipped, and not done since. */
   skipped: boolean;
-  /** The day's target already counts this workout, which it does only once it is done. */
-  burnAdded: boolean;
   onDone: () => void;
   onStateChanged: () => void;
 }) {
-  const [workout, setWorkout] = useState<Workout | null>(null);
+  const [workout, setWorkout] = useState<Workout | null>(() => stepCache.get(`workout:${date}`));
   const [busy, setBusy] = useState(false);
   // Several exercises can be open at once, so a whole day can be typed in top to bottom.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
@@ -927,11 +965,15 @@ function WorkoutStep({
   const [drafts, setDrafts] = useState<Record<string, RecordRow[]>>({});
   const [suggestions, setSuggestions] = useState<Record<string, number>>({});
   const [sessionStarted, setSessionStarted] = useState(false);
+  // While a row is dragged the page holds still under the finger.
+  const [dragging, setDragging] = useState(false);
   const word = dayWord(date);
 
   const load = useCallback(async () => {
     try {
-      setWorkout(await api.get(`/days/${date}/workout`));
+      const fresh = await api.get(`/days/${date}/workout`);
+      stepCache.set(`workout:${date}`, fresh);
+      setWorkout(fresh);
     } catch (error) {
       Alert.alert(`讀不到${dayWord(date)}的訓練`, error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -943,6 +985,25 @@ function WorkoutStep({
       void loadSession(date).then((stored) => setSessionStarted(stored !== null));
     }, [load, date]),
   );
+
+  // Drawn in the new order at once; the saved order replaces it, or a failed save reloads.
+  const reorder = async (itemIds: string[]) => {
+    if (!workout) return;
+    const byId = new Map(workout.items.map((entry) => [entry.item.id, entry]));
+    const items = itemIds.flatMap((id) => {
+      const entry = byId.get(id);
+      return entry ? [entry] : [];
+    });
+    setWorkout({ ...workout, items });
+    try {
+      const fresh = await api.put(`/days/${date}/workout/order`, { item_ids: itemIds });
+      stepCache.set(`workout:${date}`, fresh);
+      setWorkout(fresh);
+    } catch (error) {
+      Alert.alert('順序存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      void load();
+    }
+  };
 
   // One save for everything typed in, so the footer never offers a way out that drops it.
   const dirty = Object.keys(drafts).length > 0 || Object.keys(targets).length > 0;
@@ -1087,8 +1148,7 @@ function WorkoutStep({
 
   if (!workout) {
     return (
-      <Screen footerSafeArea={false}>
-        {header}
+      <Screen footerSafeArea={false} pinnedHeader={header}>
         <View className="items-center py-12">
           <ActivityIndicator color={color.primary} />
         </View>
@@ -1155,73 +1215,76 @@ function WorkoutStep({
           </View>
         );
       case 'done':
-        return <Text className="pt-2 text-center text-base font-semibold text-good">✓ {word}的訓練已完成</Text>;
       case 'skipped':
-        return <Text className="pt-2 text-center text-base font-semibold text-muted">{word}已略過訓練</Text>;
       case 'none':
+        // The badge beside the title says done or skipped.
         return null;
     }
   })();
 
   return (
-    <Screen footerSafeArea={false} footer={footerView}>
-      {header}
+    <Screen footerSafeArea={false} footer={footerView} pinnedHeader={header} scrollEnabled={!dragging}>
       <View className="gap-4">
-        <View className="gap-1">
-          <View className="flex-row items-center gap-2">
-            <Hint>{word}的訓練</Hint>
-            {skipped ? (
-              <Text className="rounded-full bg-warm-soft px-2 py-0.5 text-xs font-semibold text-warm">已略過</Text>
-            ) : null}
-          </View>
-          <Text accessibilityRole="header" className="text-3xl font-bold text-ink">
-            {templateName ?? (total ? `${word}的訓練` : `${word}沒有排定訓練`)}
-          </Text>
-          {total > 0 ? (
+        <View className="flex-row items-end justify-between gap-3">
+          <View className="flex-1 gap-1">
             <Hint>
-              {total} 個動作
+              {word}的訓練
+              {total > 0 ? ` · ${total} 個動作` : ''}
               {workout.template?.duration_min ? ` · 約 ${workout.template.duration_min} 分鐘` : ''}
-              {' · 點動作可以改目標或補記組數'}
             </Hint>
+            <Text accessibilityRole="header" className="text-2xl text-ink">
+              {templateName ?? (total ? `${word}的訓練` : `${word}沒有排定訓練`)}
+            </Text>
+          </View>
+          {skipped ? (
+            <StatusBadge label="已略過" tone="warm" />
+          ) : resolved ? (
+            <StatusBadge label="已完成" tone="good" />
           ) : null}
         </View>
 
-        <View className="gap-2.5">
-          {workout.items.map((entry, index) => {
-            const itemId = entry.item.id;
-            return (
-              <WorkoutItemRow
-                key={itemId}
-                entry={entry}
-                index={index}
-                open={open.has(itemId)}
-                onToggle={() => toggle(itemId)}
-                target={targets[itemId] ?? targetFromItem(entry)}
-                onTargetChange={(target) => setTargets((current) => ({ ...current, [itemId]: target }))}
-                rows={drafts[itemId] ?? rowsFromLogs(entry)}
-                onRowsChange={(rows) => setDrafts((current) => ({ ...current, [itemId]: rows }))}
-                edited={itemId in targets || itemId in drafts}
-                suggestion={suggestions[itemId]}
-                busy={busy}
-                word={word}
-                onReplace={() => replaceExercise(entry)}
-                onRemove={() => deleteItem(entry)}
-              />
-            );
-          })}
-          <AddRow
-            label="加入動作"
-            disabled={busy}
-            onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
-          />
-        </View>
-
-        {workout.estimated_burn_kcal ? (
-          <Hint>
-            {word}訓練約多消耗 {workout.estimated_burn_kcal} 大卡：依動作強度和時間粗估，已扣掉靜止時本來就會消耗的部分，所以會比跑步機面板顯示的少。
-            {burnAdded ? `其中一半已加進${word}的熱量目標。` : `標記完成後，其中一半會加進${word}的熱量目標。`}
-          </Hint>
+        {total > 0 ? (
+          <Card className="px-0 py-0">
+            <ReorderList
+              items={workout.items}
+              keyOf={(entry) => entry.item.id}
+              disabled={busy}
+              onDragChange={(active) => {
+                setDragging(active);
+                // Rows are dragged closed, so every one is the same short height.
+                if (active) setOpen(new Set());
+              }}
+              onReorder={(itemIds) => void reorder(itemIds)}
+              renderRow={(entry, handle) => {
+                const itemId = entry.item.id;
+                return (
+                  <WorkoutItemRow
+                    entry={entry}
+                    index={workout.items.indexOf(entry)}
+                    open={open.has(itemId)}
+                    onToggle={() => toggle(itemId)}
+                    target={targets[itemId] ?? targetFromItem(entry)}
+                    onTargetChange={(target) => setTargets((current) => ({ ...current, [itemId]: target }))}
+                    rows={drafts[itemId] ?? rowsFromLogs(entry)}
+                    onRowsChange={(rows) => setDrafts((current) => ({ ...current, [itemId]: rows }))}
+                    edited={itemId in targets || itemId in drafts}
+                    suggestion={suggestions[itemId]}
+                    busy={busy}
+                    word={word}
+                    onReplace={() => replaceExercise(entry)}
+                    onRemove={() => deleteItem(entry)}
+                    handle={handle}
+                  />
+                );
+              }}
+            />
+          </Card>
         ) : null}
+        <AddRow
+          label="加入動作"
+          disabled={busy}
+          onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
+        />
 
         {total > 0 ? (
           <View className="items-center">
@@ -1233,6 +1296,7 @@ function WorkoutStep({
             />
           </View>
         ) : null}
+
       </View>
     </Screen>
   );
@@ -1243,7 +1307,9 @@ function WorkoutStep({
 const UNDER_EATING_SHARE = 0.7;
 
 function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
-  const [extras, setExtras] = useState<Schema<'ExtraItemOut'>[] | null>(null);
+  const [extras, setExtras] = useState<Schema<'ExtraItemOut'>[] | null>(
+    () => stepCache.get<Schema<'DayPlanOut'>>(`plan:${day.date}`)?.extras ?? null,
+  );
   const target = day.targets.kcal;
   const eaten = Math.round(day.flow.eaten.kcal);
   const remaining = target - eaten;
@@ -1252,7 +1318,9 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
 
   const loadExtras = useCallback(async () => {
     try {
-      setExtras(((await api.get(`/days/${day.date}/plan`)) as Schema<'DayPlanOut'>).extras);
+      const fresh = await api.get(`/days/${day.date}/plan`);
+      stepCache.set(`plan:${day.date}`, fresh);
+      setExtras((fresh as Schema<'DayPlanOut'>).extras);
     } catch {
       setExtras([]);
     }
@@ -1290,15 +1358,15 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
       <Title sub={`${dayWord(day.date)}的流程都走完了`}>辛苦了</Title>
 
       <Card className="gap-3">
-        <Text className="font-display text-4xl font-bold text-ink">
+        <Text className="text-[28px] text-ink">
           {eaten.toLocaleString()}{' '}
-          <Text className="text-base font-normal text-muted">/ {target.toLocaleString()} 大卡</Text>
+          <Text className="text-base text-muted">/ {target.toLocaleString()} 大卡</Text>
         </Text>
         {remaining < 0 ? (
           <Text className="text-base text-warm">超過 {(-remaining).toLocaleString()} 大卡</Text>
         ) : share < UNDER_EATING_SHARE ? (
           <View className="gap-1">
-            <Text className="text-base font-semibold text-warm">只吃了目標的 {Math.round(share * 100)}%</Text>
+            <Text className="text-base text-warm">只吃了目標的 {Math.round(share * 100)}%</Text>
             <Hint>
               吃太少容易流失肌肉，隔天也更容易餓。
               {proteinShort > 0 ? `可以補一份蛋白質，還差 ${proteinShort} g。` : ''}

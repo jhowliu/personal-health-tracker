@@ -7,10 +7,11 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
 import { backOrReplace } from '@/navigation/back';
@@ -115,7 +116,7 @@ export default function SaveTodayMeal() {
         </View>
       </View>
       <Card className="gap-2">
-        <Text className="text-base font-semibold text-ink">{foods.length} 樣食物</Text>
+        <Text className="text-base text-ink">{foods.length} 樣食物</Text>
         {foods.map((item) => (
           <Hint key={item.id}>
             {item.food!.name}　{Math.round(item.grams!)} g

@@ -1,9 +1,10 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { color } from '@/theme/tokens';
@@ -108,7 +109,7 @@ export default function ReplaceTodayWorkout() {
                 <ExerciseFigure exerciseId={alternative.exercise.id} name={alternative.exercise.name} mode="single" />
                 <View className="flex-1 gap-1">
                   <View className="flex-row items-center gap-2">
-                    <Text className="flex-1 text-base font-semibold text-ink">{alternative.exercise.name}</Text>
+                    <Text className="flex-1 text-base text-ink">{alternative.exercise.name}</Text>
                     {alternative.recommended ? <Chip label="推薦" tone="good" /> : null}
                   </View>
                   {alternative.exercise.description ? <Hint>{alternative.exercise.description}</Hint> : null}

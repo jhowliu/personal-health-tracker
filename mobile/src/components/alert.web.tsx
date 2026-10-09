@@ -4,9 +4,10 @@
  * here, and AlertHost draws them one at a time inside the phone frame.
  */
 import { useSyncExternalStore } from 'react';
-import { Text, View, type AlertButton } from 'react-native';
+import { View, type AlertButton } from 'react-native';
 
 import { AppModal } from '@/components/AppModal';
+import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
 
 type Dialog = { title: string; message?: string; buttons: AlertButton[] };
@@ -56,9 +57,9 @@ export function AlertHost() {
   return (
     <AppModal visible transparent onRequestClose={escape ? () => press(escape) : undefined}>
       <View className="flex-1 items-center justify-center bg-scrim px-8">
-        <View accessibilityRole="alert" className="w-full max-w-[320px] gap-4 rounded-sheet bg-bg p-5">
+        <View accessibilityRole="alert" className="w-full max-w-[320px] gap-4 rounded-sheet border-2 border-edge bg-bg p-5">
           <View className="gap-1.5">
-            <Text accessibilityRole="header" className="text-lg font-bold text-ink">
+            <Text accessibilityRole="header" className="text-lg text-ink">
               {dialog.title}
             </Text>
             {dialog.message ? <Text className="text-base text-muted">{dialog.message}</Text> : null}

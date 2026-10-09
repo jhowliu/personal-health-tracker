@@ -1,9 +1,10 @@
 /** A workout template that expands in place to show its exercises and actions. */
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import type { Schema } from '@/api/client';
 import { ExpandableCard } from '@/components/ExpandableCard';
 import { CopyIcon, EyeIcon, PencilIcon, TrashIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { Tag } from '@/components/ui';
 import { workoutCategory } from '@/workouts/category';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
@@ -45,13 +46,13 @@ export function TemplateCard({
       summary={
         <>
           <View className="flex-row items-baseline justify-between gap-3">
-            <Text className="flex-1 text-base font-semibold text-ink">{template.name}</Text>
+            <Text className="flex-1 text-base text-ink">{template.name}</Text>
             <Text className="text-base text-muted">{length}</Text>
           </View>
 
           <View className="flex-row flex-wrap gap-1.5">
             {category ? <Tag label={category.label} tone={category.tone} /> : null}
-            <Tag label={gym ? '健身房' : '在家'} tone={gym ? 'primary' : 'neutral'} />
+            <Tag label={gym ? '健身房' : '在家'} tone={gym ? 'good' : 'warm'} />
           </View>
 
           <Text className="text-sm text-muted" numberOfLines={1}>
@@ -64,7 +65,7 @@ export function TemplateCard({
           {index > 0 ? <View className="h-px bg-line" /> : null}
           <View className="flex-row items-center gap-3 py-2">
             <ExerciseFigure exerciseId={item.exercise_id} name={item.exercise_name} mode="single" />
-            <Text className="flex-1 text-sm font-semibold text-ink">{item.exercise_name}</Text>
+            <Text className="flex-1 text-sm text-ink">{item.exercise_name}</Text>
             <Text className="text-sm text-muted">{formatPrescription(item)}</Text>
           </View>
         </View>

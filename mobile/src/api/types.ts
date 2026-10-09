@@ -352,6 +352,23 @@ export interface paths {
         patch: operations["update_workout_item_days__day__workout_items__item_id__patch"];
         trace?: never;
     };
+    "/days/{day}/workout/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Workout Items */
+        put: operations["reorder_workout_items_days__day__workout_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/days/{day}/workout/items/{item_id}/sets": {
         parameters: {
             query?: never;
@@ -1748,6 +1765,14 @@ export interface components {
             /** Note */
             note?: string | null;
         };
+        /**
+         * WorkoutOrderIn
+         * @description Every exercise on the day, once each, in the order they should be done.
+         */
+        WorkoutOrderIn: {
+            /** Item Ids */
+            item_ids: string[];
+        };
         /** WorkoutTemplateMetaOut */
         WorkoutTemplateMetaOut: {
             /** Id */
@@ -2586,6 +2611,43 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WorkoutItemPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutExecutionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_workout_items_days__day__workout_order_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkoutOrderIn"];
             };
         };
         responses: {

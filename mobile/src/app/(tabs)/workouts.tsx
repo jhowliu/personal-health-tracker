@@ -1,13 +1,14 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
-import { ChevronIcon, PlusIcon } from '@/components/icons';
+import { ChevronIcon } from '@/components/icons';
 import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { TemplateCard } from '@/components/TemplateCard';
-import { Card, Chip, Empty, Hint, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { Text } from '@/components/text';
+import { Card, Empty, HeaderAddButton, Hint, Rows, Screen, SectionHeading, Tag, Title } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { workoutCategory } from '@/workouts/category';
 
@@ -126,6 +127,7 @@ export default function WorkoutsScreen() {
   const ownedTemplates = templates.filter((template) => !template.is_builtin);
   const editingEntry = schedule.find((item) => item.weekday === editingDay);
   const editingTemplate = editingEntry ? byId.get(editingEntry.template_id) : undefined;
+  const thisWeekday = todayWeekday();
 
   const renderTemplate = (template: Template) => (
     <TemplateCard
@@ -146,66 +148,68 @@ export default function WorkoutsScreen() {
       pinnedHeader={
         <View className="flex-row items-center justify-between">
           <Title>訓練</Title>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.navigate('/workouts/new')}
-            className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-field bg-primary px-4"
-          >
-            <PlusIcon size={18} tint={color.surface} />
-            <Text className="text-base font-semibold text-white">新增課表</Text>
-          </Pressable>
+          <HeaderAddButton label="新增" accessibilityLabel="新增課表" onPress={() => router.navigate('/workouts/new')} />
         </View>
       }
     >
-      <SectionHeading>一週排程</SectionHeading>
+      <SectionHeading action={<Text className="text-xs text-muted">{weekRange()}</Text>}>一週排程</SectionHeading>
       {templates.length === 0 ? (
         <Hint>先新增一份課表，才排得進星期幾。</Hint>
       ) : null}
-      <Card className="py-0">
+      <Card className="px-0 py-0">
         <Rows>
           {WEEKDAYS.map((label, weekday) => {
             const entry = schedule.find((item) => item.weekday === weekday);
             const template = entry ? byId.get(entry.template_id) : undefined;
             const category = template ? workoutCategory(template.category_id) : undefined;
             const open = editingDay === weekday;
+            const isToday = weekday === thisWeekday;
 
             return (
-              <View key={label}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`更改${label}的課表`}
-                  accessibilityState={{ expanded: open }}
-                  disabled={busy}
-                  onPress={() => setEditingDay(open ? null : weekday)}
-                  className={`min-h-[44px] flex-row items-center justify-between gap-3 py-3 ${busy ? 'opacity-40' : ''}`}
-                >
-                  <View className="flex-1 gap-0.5">
-                    <Text className="text-base font-semibold text-ink">{label}</Text>
-                    <Text className="text-sm text-muted">{template?.name ?? '休息日'}</Text>
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                accessibilityLabel={`更改${label}的課表，目前${template?.name ?? '休息日'}`}
+                accessibilityState={{ expanded: open }}
+                disabled={busy}
+                onPress={() => setEditingDay(open ? null : weekday)}
+                className={`min-h-[52px] flex-row items-center gap-3 px-4 py-3 ${isToday ? 'bg-primary-soft' : ''} ${
+                  busy ? 'opacity-40' : ''
+                }`}
+              >
+                <Text className="w-9 text-sm text-muted">{label}</Text>
+                <Text className="flex-1 text-[15px] text-ink">{template?.name ?? '休息日'}</Text>
+                {isToday ? (
+                  <View className="rounded-full border-[1.5px] border-edge px-2 py-0.5">
+                    <Text className="text-xs text-ink">今天</Text>
                   </View>
-                  {category ? <Chip label={category.label} tone={category.tone} /> : null}
-                  <ChevronIcon direction="right" size={16} tint={color.muted} />
-                </Pressable>
-              </View>
+                ) : category ? (
+                  <Tag label={category.label} tone={category.tone} />
+                ) : null}
+                <ChevronIcon direction="right" size={15} tint={color.ink} />
+              </Pressable>
             );
           })}
         </Rows>
       </Card>
 
-      {builtinTemplates.length > 0 ? (
-        <>
-          <SectionHeading>公用課表</SectionHeading>
-          <Hint>公用課表可直接排程；要調整內容時，先複製成自己的課表。</Hint>
-          <View className="gap-3">{builtinTemplates.map(renderTemplate)}</View>
-        </>
-      ) : null}
-
-      <SectionHeading>我的課表</SectionHeading>
+      <SectionHeading action={<Text className="text-xs text-muted">{ownedTemplates.length} 份</Text>}>
+        我的課表
+      </SectionHeading>
       {ownedTemplates.length === 0 ? (
-        <Empty>還沒有自己的課表，可新增或從公用課表複製</Empty>
+        <Empty compact>還沒有自己的課表，可新增或從公用課表複製</Empty>
       ) : (
         <View className="gap-3">{ownedTemplates.map(renderTemplate)}</View>
       )}
+
+      {builtinTemplates.length > 0 ? (
+        <>
+          <SectionHeading action={<Text className="text-xs text-muted">{builtinTemplates.length} 份</Text>}>
+            公用課表
+          </SectionHeading>
+          <View className="gap-3">{builtinTemplates.map(renderTemplate)}</View>
+        </>
+      ) : null}
 
       <Sheet
         visible={editingDay !== null}
@@ -236,6 +240,21 @@ export default function WorkoutsScreen() {
       </Sheet>
     </Screen>
   );
+}
+
+/** Today on the schedule's Monday-first week: Monday is 0. */
+function todayWeekday(): number {
+  return (new Date().getDay() + 6) % 7;
+}
+
+/** "10/5 — 10/11": this week, Monday to Sunday. */
+function weekRange(): string {
+  const monday = new Date();
+  monday.setDate(monday.getDate() - todayWeekday());
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const short = (day: Date) => `${day.getMonth() + 1}/${day.getDate()}`;
+  return `${short(monday)} — ${short(sunday)}`;
 }
 
 function describe(template: Template): string {

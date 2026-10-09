@@ -2,10 +2,11 @@
  * One exercise's sets, typed in after the fact: a row per set with its reps and weight, or the
  * minutes for timed work. Sets are added and removed freely; nothing is saved from here.
  */
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
 import { CloseIcon, PlusIcon } from '@/components/icons';
+import { Text } from '@/components/text';
 import { Chip, Field, Hint, TextAction } from '@/components/ui';
 import { color } from '@/theme/tokens';
 import { isTimed, isTreadmill, nextRow, prescribedRows, type Effort, type RecordRow } from '@/workouts/record';
@@ -68,7 +69,6 @@ export function SetRecordEditor({
                 selectTextOnFocus
               />
             </View>
-            <Hint>填了速度和坡度，熱量會照實際走或跑的強度算。</Hint>
           </>
         ) : null}
       </View>
@@ -84,24 +84,30 @@ export function SetRecordEditor({
 
   return (
     <View className="gap-2">
+      {rows.length ? (
+        <View className="flex-row items-center gap-2">
+          <Text className="w-8 text-xs text-muted">組數</Text>
+          <Text className="flex-1 text-xs text-muted">重量 kg</Text>
+          <Text className="flex-1 text-xs text-muted">次數</Text>
+          <View className="w-11" />
+        </View>
+      ) : null}
       {rows.map((row, index) => (
         <View key={index} className="flex-row items-center gap-2">
-          <Text className="w-12 text-sm text-muted">第 {index + 1} 組</Text>
-          <Field
-            accessibilityLabel={`第 ${index + 1} 組次數`}
-            suffix="下"
-            value={row.reps}
-            onChangeText={(reps) => update(index, { reps })}
-            keyboardType="number-pad"
-            selectTextOnFocus
-          />
+          <Text className="w-8 text-sm text-ink">{index + 1}</Text>
           <Field
             accessibilityLabel={`第 ${index + 1} 組重量`}
-            suffix="kg"
             placeholder={bodyweight ? '自重' : '選填'}
             value={row.weight}
             onChangeText={(weight) => update(index, { weight })}
             keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Field
+            accessibilityLabel={`第 ${index + 1} 組次數`}
+            value={row.reps}
+            onChangeText={(reps) => update(index, { reps })}
+            keyboardType="number-pad"
             selectTextOnFocus
           />
           <RemoveButton label={`刪除第 ${index + 1} 組`} onPress={() => remove(index)} />
@@ -126,7 +132,7 @@ export function SetRecordEditor({
 
       {last ? (
         <View className="gap-1">
-          <Hint>最後一組感覺如何？（選填，用來建議下次的重量）</Hint>
+          <Hint>最後一組感覺如何？</Hint>
           <View className="flex-row gap-2">
             {EFFORTS.map(([effort, label, tone]) => (
               <Chip

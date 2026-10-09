@@ -112,6 +112,38 @@ async def test_a_logged_exercise_is_removed_with_its_sets(with_profile: AsyncCli
     assert (await last_set_next_week()) is None
 
 
+async def test_the_days_exercises_can_be_put_in_a_new_order(with_profile: AsyncClient):
+    original, alternative, _ = await _workout(with_profile)
+    for exercise in (alternative, original):
+        added = await with_profile.post(
+            f"/days/{DAY}/workout/items",
+            json={"exercise_id": exercise["id"], "sets": 2, "reps": "8"},
+        )
+        assert added.status_code == 201
+    ids = [item["id"] for item in await _day_items(with_profile)]
+    assert len(ids) == 3
+
+    reordered = [ids[2], ids[0], ids[1]]
+    response = await with_profile.put(f"/days/{DAY}/workout/order", json={"item_ids": reordered})
+    assert response.status_code == 200
+    assert [entry["item"]["id"] for entry in response.json()["items"]] == reordered
+    assert [item["id"] for item in await _day_items(with_profile)] == reordered
+
+
+async def test_a_new_order_names_every_exercise_on_the_day_once(with_profile: AsyncClient):
+    _, alternative, _ = await _workout(with_profile)
+    await with_profile.post(
+        f"/days/{DAY}/workout/items",
+        json={"exercise_id": alternative["id"], "sets": 2, "reps": "8"},
+    )
+    first, second = [item["id"] for item in await _day_items(with_profile)]
+
+    for item_ids in ([first], [first, first], [first, second, "not-on-the-day"]):
+        response = await with_profile.put(f"/days/{DAY}/workout/order", json={"item_ids": item_ids})
+        assert response.status_code == 422, item_ids
+    assert [item["id"] for item in await _day_items(with_profile)] == [first, second]
+
+
 async def test_the_workout_itself_cannot_be_taken_off_the_day(with_profile: AsyncClient):
     await _workout(with_profile)
     # Not training is 略過; there is no separate way to clear the day.

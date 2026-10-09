@@ -21,6 +21,7 @@ from app.api.schemas import (
     WorkoutExecutionOut,
     WorkoutItemIn,
     WorkoutItemPatch,
+    WorkoutOrderIn,
 )
 from app.application.commands import DayAdjustment, SetRecord, WorkoutItemChange
 from app.domain.models import PLANNED_SLOTS, MealTime, SwapBasis, WorkoutTime
@@ -100,6 +101,16 @@ async def update_workout_item(
     return WorkoutExecutionOut.of(
         await service.update_item(user_id, day, item_id, _item_change(payload))
     )
+
+
+@router.put("/{day}/workout/order", response_model=WorkoutExecutionOut)
+async def reorder_workout_items(
+    day: date,
+    payload: WorkoutOrderIn,
+    user_id: CurrentUserId,
+    service: WorkoutExecution,
+) -> WorkoutExecutionOut:
+    return WorkoutExecutionOut.of(await service.reorder(user_id, day, tuple(payload.item_ids)))
 
 
 @router.delete("/{day}/workout/items/{item_id}", status_code=204)
