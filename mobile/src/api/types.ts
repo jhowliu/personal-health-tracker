@@ -179,6 +179,27 @@ export interface paths {
         patch: operations["update_reminders_users_me_reminders_patch"];
         trace?: never;
     };
+    "/users/me/ai-consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Ai Consent */
+        get: operations["read_ai_consent_users_me_ai_consent_get"];
+        /**
+         * Set Ai Consent
+         * @description Agree to AI analysis, or withdraw; the AI features ask again once it is withdrawn.
+         */
+        put: operations["set_ai_consent_users_me_ai_consent_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/me": {
         parameters: {
             query?: never;
@@ -864,10 +885,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/progress/weekly/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending Week
+         * @description The report to pop up once: the last finished week, or this one on a Sunday whose flow is
+         *     done. null when it was already shown or the week held nothing.
+         */
+        get: operations["pending_week_progress_weekly_pending_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/progress/weekly/{week}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Week Seen
+         * @description The report of the week `week` falls in was shown, so it does not pop up again.
+         */
+        post: operations["week_seen_progress_weekly__week__seen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/progress/weeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weeks
+         * @description Weeks with anything logged and a report to read, newest first.
+         */
+        get: operations["weeks_progress_weeks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/progress/weekly/{week}/advice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Week Advice
+         * @description The AI review of the week `week` falls in, written on the first call and kept.
+         *
+         *     428 until the user agrees to AI analysis; null for a week with nothing logged.
+         */
+        post: operations["week_advice_progress_weekly__week__advice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/progress/volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Volume Trend
+         * @description Weight × reps per week for the last `weeks` weeks, this one included, oldest first.
+         */
+        get: operations["volume_trend_progress_volume_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AiConsentIn */
+        AiConsentIn: {
+            /** Consent */
+            consent: boolean;
+        };
+        /**
+         * AiConsentOut
+         * @description Whether meal photos and weekly logs may be sent to the AI provider.
+         */
+        AiConsentOut: {
+            /** Consent */
+            consent: boolean;
+        };
         /** BodyLogIn */
         BodyLogIn: {
             /** Weight Kg */
@@ -1771,6 +1908,63 @@ export interface components {
             ctx?: Record<string, never>;
         };
         /**
+         * VolumeTrendOut
+         * @description Training volume week by week, for the chart on 進度. The last week is this one, so far.
+         */
+        VolumeTrendOut: {
+            /**
+             * This Week
+             * Format: date
+             */
+            this_week: string;
+            /** Weeks */
+            weeks: components["schemas"]["WeekVolumeOut"][];
+        };
+        /**
+         * WeekSummaryOut
+         * @description One past week in the list on 進度.
+         */
+        WeekSummaryOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Days Complete */
+            days_complete: number;
+            /** Workouts */
+            workouts: number;
+        };
+        /** WeekVolumeOut */
+        WeekVolumeOut: {
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Volume Kg */
+            volume_kg: number;
+        };
+        /**
+         * WeeklyAdviceOut
+         * @description The AI's look back at a week and its plan for the next, shown under the numbers.
+         */
+        WeeklyAdviceOut: {
+            /** Summary */
+            summary: string;
+            /** Diet */
+            diet: string;
+            /** Training */
+            training: string;
+            /** Body */
+            body: string;
+        };
+        /**
          * WeeklyReviewOut
          * @description A week on 進度 in a few numbers; the AI review reads the detail behind them.
          */
@@ -2273,6 +2467,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_ai_consent_users_me_ai_consent_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_ai_consent_users_me_ai_consent_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiConsentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiConsentOut"];
                 };
             };
             /** @description Validation Error */
@@ -4161,6 +4421,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pending_week_progress_weekly_pending_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyReviewOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    week_seen_progress_weekly__week__seen_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    weeks_progress_weeks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeekSummaryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    week_advice_progress_weekly__week__advice_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                week: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyAdviceOut"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    volume_trend_progress_volume_get: {
+        parameters: {
+            query?: {
+                weeks?: number;
+            };
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VolumeTrendOut"];
                 };
             };
             /** @description Validation Error */

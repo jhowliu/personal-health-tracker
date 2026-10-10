@@ -7,6 +7,7 @@ import { useSession } from '@/auth/session';
 import { CalendarCheckIcon, DumbbellIcon, ScaleIcon, SlidersIcon, UtensilsIcon } from '@/components/icons';
 import { FONT_FAMILY } from '@/components/text';
 import { registerPushToken } from '@/notifications/push';
+import { WeeklyReportHost } from '@/progress/weekly-popup';
 import { color } from '@/theme/tokens';
 
 const TABS = [
@@ -58,6 +59,7 @@ export default function TabsLayout() {
           />
         ))}
       </Tabs>
+      <WeeklyReportHost />
     </ProtectedRoute>
   );
 }

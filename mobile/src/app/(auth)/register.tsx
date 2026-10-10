@@ -1,10 +1,11 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
 import { ApiError } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
+import { Text } from '@/components/text';
 import { BackLink, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { backOrReplace } from '@/navigation/back';
 import { safeReturnTo } from '@/navigation/return-to';
@@ -60,6 +61,13 @@ export default function Register() {
         <PrimaryButton onPress={submit} disabled={busy || password.length < 8 || !email}>
           {busy ? '建立中…' : '建立帳號'}
         </PrimaryButton>
+
+        <Text className="text-center text-sm text-muted">
+          建立帳號即表示同意{' '}
+          <Link href="/privacy" className="text-primary underline">
+            隱私權政策
+          </Link>
+        </Text>
       </View>
     </Screen>
   );

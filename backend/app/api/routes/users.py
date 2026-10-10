@@ -1,7 +1,9 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import Accounts, CurrentUserId, Profiles
+from app.api.deps import Accounts, AiConsent, CurrentUserId, Profiles
 from app.api.schemas import (
+    AiConsentIn,
+    AiConsentOut,
     ProfileIn,
     ProfileOut,
     ProfilePatch,
@@ -97,6 +99,19 @@ async def update_reminders(
 ) -> ProfileOut:
     profile, _ = await service.update(user_id, _profile_change(payload))
     return ProfileOut.of(profile)
+
+
+@router.get("/ai-consent", response_model=AiConsentOut)
+async def read_ai_consent(user_id: CurrentUserId, service: AiConsent) -> AiConsentOut:
+    return AiConsentOut(consent=await service.given(user_id))
+
+
+@router.put("/ai-consent", response_model=AiConsentOut)
+async def set_ai_consent(
+    payload: AiConsentIn, user_id: CurrentUserId, service: AiConsent
+) -> AiConsentOut:
+    """Agree to AI analysis, or withdraw; the AI features ask again once it is withdrawn."""
+    return AiConsentOut(consent=await service.set(user_id, payload.consent))
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

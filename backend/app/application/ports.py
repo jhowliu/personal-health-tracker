@@ -28,6 +28,7 @@ from app.domain.models import (
 )
 from app.domain.progress import DayActivity
 from app.domain.streak import DayRecord
+from app.domain.weekly_advice import WeekDigest, WeeklyAdvice
 from app.domain.workout_execution import (
     DayWorkoutItem,
     ExerciseHistory,
@@ -63,6 +64,34 @@ class ProgressStore(Protocol):
 
     async def volume_kg(self, user_id: str, first: date, last: date) -> float:
         """Weight × reps over every set with a load logged between `first` and `last`."""
+
+    async def daily_volume_kg(self, user_id: str, first: date, last: date) -> dict[date, float]:
+        """The same, day by day; days without a loaded set are left out."""
+
+    async def seen_weeks(self, user_id: str) -> frozenset[date]:
+        """The Mondays of the weeks whose report the user has been shown."""
+
+    async def mark_week_seen(self, user_id: str, start: date) -> None:
+        """Remember that the week starting `start` was shown; showing it again changes nothing."""
+
+    async def advice(self, user_id: str, start: date) -> WeeklyAdvice | None:
+        """The AI review kept for the week starting `start`, if one was written."""
+
+    async def save_advice(
+        self, user_id: str, start: date, advice: WeeklyAdvice, at: datetime
+    ) -> None: ...
+
+
+class WeeklyAdvisor(Protocol):
+    async def advise(self, week: WeekDigest) -> WeeklyAdvice:
+        """Three lines on the week. Raises ServiceUnavailable when the model cannot answer."""
+
+
+class AiConsentStore(Protocol):
+    async def consented_at(self, user_id: str) -> datetime | None: ...
+
+    async def set_consent(self, user_id: str, at: datetime | None) -> None:
+        """Record consent given at `at`, or withdrawn with None."""
 
 
 class Clock(Protocol):
@@ -338,6 +367,9 @@ class ObjectStorage(Protocol):
     async def create_download_url(self, object_key: str) -> str: ...
 
     async def exists(self, object_key: str) -> bool: ...
+
+    async def delete_user_objects(self, user_id: str) -> None:
+        """Remove everything stored under the user, for account deletion."""
 
 
 class ImageRecognizer(Protocol):

@@ -1,5 +1,8 @@
 from httpx import AsyncClient
 
+import app.api.deps as deps
+from app.domain.errors import ServiceUnavailable
+
 TODAY = "2026-09-22"
 
 
@@ -330,7 +333,23 @@ async def test_schedule_set_after_the_day_started_still_adds_the_workout_step(
     assert after["flow"]["current"] == "workout"
 
 
-async def test_deleting_the_account_removes_everything(with_profile: AsyncClient):
+async def test_deleting_the_account_removes_everything(with_profile: AsyncClient, photo_storage):
     await with_profile.put(f"/body-logs/{TODAY}", json={"weight_kg": 56.1})
     assert (await with_profile.delete("/users/me")).status_code == 204
     assert (await with_profile.get("/users/me/profile")).status_code == 404
+    # The stored meal photos go with it.
+    assert len(photo_storage.deleted_users) == 1
+
+
+async def test_the_account_stays_when_its_photos_cannot_be_deleted(
+    with_profile: AsyncClient, monkeypatch
+):
+    class DownStorage:
+        async def delete_user_objects(self, user_id: str) -> None:
+            raise ServiceUnavailable("照片儲存服務暫時不可用，請稍後再刪除帳號")
+
+    monkeypatch.setattr(deps, "object_storage", lambda: DownStorage())
+
+    assert (await with_profile.delete("/users/me")).status_code == 503
+    # Nothing was removed, so trying again later can finish the job.
+    assert (await with_profile.get("/users/me/profile")).status_code == 200

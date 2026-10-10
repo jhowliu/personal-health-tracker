@@ -34,7 +34,8 @@ from app.domain.models import (
     TemplateItem,
     WorkoutTemplate,
 )
-from app.domain.progress import CalendarMonth, WeeklyReview
+from app.domain.progress import CalendarMonth, WeeklyReview, WeekSummary
+from app.domain.weekly_advice import WeeklyAdvice
 from app.domain.workout_execution import (
     DayWorkoutItem,
     PastSet,
@@ -229,6 +230,54 @@ class WeeklyReviewOut(BaseModel):
     @classmethod
     def of(cls, review: WeeklyReview) -> "WeeklyReviewOut":
         return cls(**_values(review))
+
+
+class WeeklyAdviceOut(BaseModel):
+    """The AI's look back at a week and its plan for the next, shown under the numbers."""
+
+    summary: str
+    diet: str
+    training: str
+    body: str
+
+    @classmethod
+    def of(cls, advice: WeeklyAdvice) -> "WeeklyAdviceOut":
+        return cls(**_values(advice))
+
+
+class AiConsentIn(BaseModel):
+    consent: bool
+
+
+class AiConsentOut(BaseModel):
+    """Whether meal photos and weekly logs may be sent to the AI provider."""
+
+    consent: bool
+
+
+class WeekVolumeOut(BaseModel):
+    start: date
+    volume_kg: float
+
+
+class VolumeTrendOut(BaseModel):
+    """Training volume week by week, for the chart on 進度. The last week is this one, so far."""
+
+    this_week: date
+    weeks: list[WeekVolumeOut]
+
+
+class WeekSummaryOut(BaseModel):
+    """One past week in the list on 進度."""
+
+    start: date
+    end: date
+    days_complete: int
+    workouts: int
+
+    @classmethod
+    def of(cls, week: WeekSummary) -> "WeekSummaryOut":
+        return cls(**_values(week))
 
 
 class BodySummaryOut(BaseModel):

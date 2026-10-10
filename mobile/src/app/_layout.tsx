@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AiConsentHost } from '@/ai/consent';
 import { SessionProvider } from '@/auth/session';
 import { AlertHost } from '@/components/alert';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
@@ -38,6 +39,7 @@ export default function RootLayout() {
             <ReminderSync />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
             <NumericDoneBar />
+            <AiConsentHost />
             <AlertHost />
           </SessionProvider>
         </SafeAreaProvider>

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from httpx import AsyncClient
@@ -15,9 +15,7 @@ async def _log_day(client: AsyncClient, day: str, *, weighed: bool, meals: tuple
 
 
 async def test_the_calendar_marks_each_day_of_the_month(with_profile: AsyncClient):
-    await _log_day(
-        with_profile, "2026-09-01", weighed=True, meals=("breakfast", "lunch", "dinner")
-    )
+    await _log_day(with_profile, "2026-09-01", weighed=True, meals=("breakfast", "lunch", "dinner"))
     await _log_day(with_profile, "2026-09-02", weighed=True, meals=())
     await _log_day(with_profile, "2026-09-03", weighed=False, meals=("lunch",))
 
@@ -116,9 +114,7 @@ async def test_the_week_compares_average_weight_and_latest_waist(with_profile: A
 
 
 async def test_the_week_counts_its_complete_days(with_profile: AsyncClient):
-    await _log_day(
-        with_profile, "2026-09-15", weighed=True, meals=("breakfast", "lunch", "dinner")
-    )
+    await _log_day(with_profile, "2026-09-15", weighed=True, meals=("breakfast", "lunch", "dinner"))
     await _log_day(with_profile, "2026-09-16", weighed=True, meals=())
 
     week = (await with_profile.get("/progress/weekly", params={"week": "2026-09-14"})).json()
@@ -133,3 +129,78 @@ async def test_without_a_date_it_is_the_last_finished_week(with_profile: AsyncCl
 
     week = (await with_profile.get("/progress/weekly")).json()
     assert (week["start"], week["end"]) == (str(monday), str(monday + timedelta(days=6)))
+
+
+async def _finish_day(client: AsyncClient, day: str) -> None:
+    await _log_day(client, day, weighed=True, meals=("breakfast", "lunch", "dinner"))
+    assert (await client.patch(f"/days/{day}", json={"workout_skipped": True})).status_code == 200
+
+
+async def test_last_weeks_report_pops_up_once(with_profile: AsyncClient, today):
+    today(date(2026, 9, 21))  # a Monday
+    await _log_day(with_profile, "2026-09-15", weighed=True, meals=())
+
+    pending = (await with_profile.get("/progress/weekly/pending")).json()
+    assert (pending["start"], pending["end"]) == ("2026-09-14", "2026-09-20")
+
+    # Any day of the week marks it.
+    seen = await with_profile.post("/progress/weekly/2026-09-16/seen")
+    assert seen.status_code == 204
+    assert (await with_profile.get("/progress/weekly/pending")).json() is None
+
+
+async def test_a_week_with_nothing_logged_does_not_pop_up(with_profile: AsyncClient, today):
+    today(date(2026, 9, 21))
+    # Opening a day is not logging anything.
+    assert (await with_profile.get("/days/2026-09-15")).status_code == 200
+
+    assert (await with_profile.get("/progress/weekly/pending")).json() is None
+
+
+async def test_a_finished_sunday_brings_its_own_week(with_profile: AsyncClient, today):
+    today(date(2026, 9, 20))  # a Sunday
+    await _log_day(with_profile, "2026-09-09", weighed=True, meals=())
+    await _log_day(with_profile, "2026-09-15", weighed=True, meals=())
+
+    # Sunday still under way: the week before is the last one finished.
+    pending = (await with_profile.get("/progress/weekly/pending")).json()
+    assert pending["start"] == "2026-09-07"
+
+    await _finish_day(with_profile, "2026-09-20")
+    pending = (await with_profile.get("/progress/weekly/pending")).json()
+    assert pending["start"] == "2026-09-14"
+    assert pending["days_complete"] == 1
+
+
+async def test_past_weeks_list_the_logged_ones_newest_first(with_profile: AsyncClient, today):
+    today(date(2026, 9, 20))
+    await _finish_day(with_profile, "2026-09-01")
+    await with_profile.patch("/days/2026-09-02", json={"workout_done": True})
+    await _log_day(with_profile, "2026-09-09", weighed=True, meals=())
+    await _log_day(with_profile, "2026-09-15", weighed=True, meals=())
+
+    weeks = (await with_profile.get("/progress/weeks")).json()
+    # This week is still going, so it waits until Sunday's flow is done.
+    assert [week["start"] for week in weeks] == ["2026-09-07", "2026-08-31"]
+    assert (weeks[1]["days_complete"], weeks[1]["workouts"]) == (1, 1)
+
+    await _finish_day(with_profile, "2026-09-20")
+    weeks = (await with_profile.get("/progress/weeks")).json()
+    assert [week["start"] for week in weeks] == ["2026-09-14", "2026-09-07", "2026-08-31"]
+
+
+async def test_volume_runs_week_by_week_with_empty_weeks_as_zero(with_profile: AsyncClient, today):
+    today(date(2026, 9, 23))  # a Wednesday
+    await _train(with_profile, "2026-09-02", [(50, 5), (50, 5)])
+    await _train(with_profile, "2026-09-16", [(60, 5)])
+    await _train(with_profile, "2026-09-17", [(60, 5), (None, 12)])
+    await _train(with_profile, "2026-09-22", [(40, 10)])
+
+    trend = (await with_profile.get("/progress/volume", params={"weeks": 4})).json()
+    assert trend["this_week"] == "2026-09-21"
+    assert [(week["start"], week["volume_kg"]) for week in trend["weeks"]] == [
+        ("2026-08-31", 500),
+        ("2026-09-07", 0),
+        ("2026-09-14", 600),
+        ("2026-09-21", 400),
+    ]

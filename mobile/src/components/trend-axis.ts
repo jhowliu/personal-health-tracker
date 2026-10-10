@@ -1,4 +1,4 @@
-/** Scales for the body trend chart (TrendChart), kept apart so they can be tested. */
+/** Scales for the trend charts (TrendChart, VolumeChart), kept apart so they can be tested. */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TICK_STEPS = [0.5, 1, 2, 5, 10, 20, 50];
@@ -33,4 +33,20 @@ export function valueAxis(values: number[], minSpan: number) {
   const ticks: number[] = [];
   for (let tick = min; tick <= max + step / 2; tick += step) ticks.push(Math.round(tick * 10) / 10);
   return { min, max, ticks };
+}
+
+/**
+ * A scale from zero, for bars: the top is rounded up to a whole step of 1, 2 or 5 × 10ⁿ, so
+ * there are at most three gaps and every gridline is a round number.
+ */
+export function zeroAxis(high: number) {
+  if (high <= 0) return { max: 1, ticks: [0, 1] };
+  const magnitude = 10 ** Math.floor(Math.log10(high / MAX_TICK_GAPS));
+  const step =
+    [1, 2, 5, 10].map((m) => m * magnitude).find((candidate) => high / candidate <= MAX_TICK_GAPS) ??
+    10 * magnitude;
+  const max = Math.ceil(high / step) * step;
+  const ticks: number[] = [];
+  for (let tick = 0; tick <= max + step / 2; tick += step) ticks.push(Math.round(tick));
+  return { max, ticks };
 }

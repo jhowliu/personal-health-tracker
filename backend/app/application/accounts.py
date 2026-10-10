@@ -7,6 +7,7 @@ from app.application.ports import (
     Clock,
     FoodStore,
     IdentityVerifier,
+    ObjectStorage,
     PasswordHasher,
     TokenIssuer,
 )
@@ -32,6 +33,7 @@ class AccountService:
         tokens: TokenIssuer,
         identities: IdentityVerifier,
         clock: Clock,
+        objects: ObjectStorage,
     ) -> None:
         self._store = store
         self._foods = foods
@@ -39,6 +41,7 @@ class AccountService:
         self._tokens = tokens
         self._identities = identities
         self._clock = clock
+        self._objects = objects
 
     async def register(self, email: str, password: str, locale: str = "zh-TW") -> TokenPair:
         if len(password) < MIN_PASSWORD_LENGTH:
@@ -95,6 +98,12 @@ class AccountService:
         await self._store.revoke_all_refresh(user_id)
 
     async def delete_account(self, user_id: str) -> None:
+        """Everything goes: the stored photos, then the account and every record with it.
+
+        Photos first. If storage is down the account stays and deleting again finishes the
+        job; the other way round would leave photos with no account to find them by.
+        """
+        await self._objects.delete_user_objects(user_id)
         await self._store.delete_account(user_id)
 
     async def _open_account(self, account: Account, password_hash: str | None) -> None:

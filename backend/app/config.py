@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_photo_model: str = "claude-opus-5-5"
     anthropic_photo_effort: Literal["low", "medium", "high", "xhigh", "max"] = "low"
+    # The weekly review reads a week of logs and writes three lines; once per user per week.
+    anthropic_advice_model: str = "claude-opus-5-5"
+    anthropic_advice_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     openai_api_key: str = ""
     openai_model: str = "gpt-5-mini"
     jev_api_key: str = ""

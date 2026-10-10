@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from app.domain.errors import (
     AlreadyExists,
+    ConsentRequired,
     DomainError,
     InvalidCredentials,
     NotFound,
@@ -19,6 +20,8 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
     PermissionDenied: status.HTTP_403_FORBIDDEN,
     ValidationFailed: status.HTTP_422_UNPROCESSABLE_ENTITY,
     QuotaExceeded: status.HTTP_429_TOO_MANY_REQUESTS,
+    # The client asks for consent and tries again.
+    ConsentRequired: status.HTTP_428_PRECONDITION_REQUIRED,
     ServiceUnavailable: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 

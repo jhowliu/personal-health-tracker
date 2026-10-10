@@ -6,6 +6,13 @@ from botocore.exceptions import ClientError
 from app.domain.errors import ServiceUnavailable, ValidationFailed
 
 _CONTENT_TYPES = {"image/jpeg": "jpg", "image/png": "png"}
+# S3 deletes at most this many keys per request.
+_DELETE_BATCH = 1000
+
+
+def _user_prefix(user_id: str) -> str:
+    """Every object of a user sits under this, so deleting the account can find them all."""
+    return f"users/{user_id}/"
 
 
 class S3MealPhotoStorage:
@@ -41,7 +48,7 @@ class S3MealPhotoStorage:
         extension = _CONTENT_TYPES.get(content_type)
         if extension is None:
             raise ValidationFailed("照片只接受 JPEG 或 PNG")
-        key = f"users/{user_id}/meal-photos/{photo_id}.{extension}"
+        key = f"{_user_prefix(user_id)}meal-photos/{photo_id}.{extension}"
         await self._ensure_bucket()
         try:
             url = self._signer.generate_presigned_url(
@@ -75,6 +82,24 @@ class S3MealPhotoStorage:
             raise ServiceUnavailable("照片儲存服務暫時不可用") from exc
         except Exception as exc:
             raise ServiceUnavailable("照片儲存服務暫時不可用") from exc
+
+    async def delete_user_objects(self, user_id: str) -> None:
+        await self._ensure_bucket()
+        try:
+            pages = self._client.get_paginator("list_objects_v2").paginate(
+                Bucket=self._bucket, Prefix=_user_prefix(user_id)
+            )
+            keys = [item["Key"] for page in pages for item in page.get("Contents", [])]
+            for start in range(0, len(keys), _DELETE_BATCH):
+                batch = keys[start : start + _DELETE_BATCH]
+                result = self._client.delete_objects(
+                    Bucket=self._bucket,
+                    Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True},
+                )
+                if result.get("Errors"):
+                    raise RuntimeError(f"{len(result['Errors'])} objects were not deleted")
+        except Exception as exc:
+            raise ServiceUnavailable("照片儲存服務暫時不可用，請稍後再刪除帳號") from exc
 
     async def _ensure_bucket(self) -> None:
         if self._ready:
