@@ -368,6 +368,9 @@ class ObjectStorage(Protocol):
 
     async def exists(self, object_key: str) -> bool: ...
 
+    async def delete_user_objects(self, user_id: str) -> None:
+        """Remove everything stored under the user, for account deletion."""
+
 
 class ImageRecognizer(Protocol):
     async def recognize(

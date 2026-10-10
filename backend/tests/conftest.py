@@ -20,6 +20,23 @@ def isolate_ai_settings(monkeypatch) -> None:
     monkeypatch.setattr(settings, "jev_api_key", "")
 
 
+class RecordingStorage:
+    """Stands in for S3 where a test does not bring its own; remembers whose photos it deleted."""
+
+    def __init__(self) -> None:
+        self.deleted_users: list[str] = []
+
+    async def delete_user_objects(self, user_id: str) -> None:
+        self.deleted_users.append(user_id)
+
+
+@pytest.fixture(autouse=True)
+def photo_storage(monkeypatch) -> RecordingStorage:
+    storage = RecordingStorage()
+    monkeypatch.setattr(deps, "object_storage", lambda: storage)
+    return storage
+
+
 @pytest.fixture
 async def api(tmp_path, monkeypatch) -> AsyncIterator[AsyncClient]:
     db_path = str(tmp_path / "test.sqlite")

@@ -84,9 +84,15 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await api.delete('/users/me');
-          } finally {
-            await signOut();
+          } catch (error) {
+            // The account is still there (its photos go first), so stay signed in to try again.
+            // An expired session cannot be helped from here: sign out as before.
+            if (!(error instanceof ApiError) || error.status !== 401) {
+              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+              return;
+            }
           }
+          await signOut();
         },
       },
     ]);

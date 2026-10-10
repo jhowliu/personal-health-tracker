@@ -131,6 +131,7 @@ def accounts(conn: DbConn) -> AccountService:
         token_issuer(),
         identity_verifier(),
         clock(),
+        object_storage(),
     )
 
 

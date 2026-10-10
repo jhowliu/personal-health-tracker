@@ -9,6 +9,8 @@ import { View } from 'react-native';
 import { Text } from '@/components/text';
 import { BackLink, Card, Screen, SectionHeading, Title } from '@/components/ui';
 
+const CONTACT_EMAIL = 'jhowliu@gmail.com';
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View className="gap-2">
@@ -68,11 +70,11 @@ export default function PrivacyPolicy() {
 
       <Section title="你的選擇">
         <Item>關閉 AI 分析：設定 → AI 分析。</Item>
-        <Item>刪除帳號：設定 → 刪除帳號，會刪除帳號與所有紀錄，無法復原。</Item>
+        <Item>刪除帳號：設定 → 刪除帳號，會刪除帳號、所有紀錄與上傳過的餐點照片，無法復原。</Item>
       </Section>
 
       <Section title="聯絡我們">
-        <Para>（待填寫聯絡信箱）</Para>
+        <Para>對隱私或資料有任何問題，請來信 {CONTACT_EMAIL}。</Para>
       </Section>
     </Screen>
   );
