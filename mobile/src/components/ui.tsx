@@ -308,15 +308,20 @@ export function HeaderAddButton({
   );
 }
 
-/** A square outlined icon button beside a tab's title, such as the camera on 餐點. */
+/**
+ * A square outlined icon button beside a tab's title, such as the camera on 餐點. `badge` puts
+ * a berry dot on its corner for something new behind it; say so in the label too.
+ */
 export function HeaderIconButton({
   icon: Icon,
   accessibilityLabel,
   onPress,
+  badge,
 }: {
   icon: ComponentType<IconProps>;
   accessibilityLabel: string;
   onPress: () => void;
+  badge?: boolean;
 }) {
   return (
     <Pressable
@@ -326,6 +331,9 @@ export function HeaderIconButton({
       className="h-11 w-11 items-center justify-center rounded-control border-2 border-edge bg-surface active:opacity-70"
     >
       <Icon size={20} tint={color.ink} />
+      {badge ? (
+        <View className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-bg bg-primary" />
+      ) : null}
     </Pressable>
   );
 }

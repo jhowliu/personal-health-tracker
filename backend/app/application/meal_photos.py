@@ -3,6 +3,7 @@
 import json
 from datetime import date, timedelta
 
+from app.application.ai_consent import AiConsentService
 from app.application.decisions import DecisionService
 from app.application.plate_intake import PlateIntake
 from app.application.ports import (
@@ -57,6 +58,7 @@ class MealPhotoService:
         clock: Clock,
         uow: UnitOfWork,
         daily_quota: int,
+        consent: AiConsentService,
     ) -> None:
         self._photos = photos
         self._objects = objects
@@ -66,6 +68,7 @@ class MealPhotoService:
         self._clock = clock
         self._uow = uow
         self._daily_quota = daily_quota
+        self._consent = consent
 
     async def create(self, user_id: str, content_type: str) -> tuple[MealPhoto, str]:
         if content_type.lower() not in _IMAGE_TYPES:
@@ -89,6 +92,8 @@ class MealPhotoService:
     async def analyze(
         self, user_id: str, photo_id: str
     ) -> tuple[MealPhoto, tuple[RecognizedItem, ...]]:
+        # The photo goes to the AI provider, which the user has to have agreed to.
+        await self._consent.require(user_id)
         now = self._clock.now()
         today = now.date()
         if await self._photos.analyses_on(user_id, today) >= self._daily_quota:

@@ -2,16 +2,28 @@ from dataclasses import replace
 from datetime import UTC, date, datetime
 
 import aiosqlite
+import pytest
 from httpx import AsyncClient
 
 import app.api.deps as deps
 from app.adapters.sqlite.rows import to_iso
+from app.application.ai_consent import AiConsentService
 from app.config import settings
 from app.domain.decisions import DecisionResult
 from app.domain.meal_photos import EstimatedFood, Recognition, foods_for_prompt
 from app.domain.models import Nutrients
 from tests import factories
 from tests.factories import seeded_food_id
+
+
+@pytest.fixture(autouse=True)
+def ai_consent_given(monkeypatch) -> None:
+    """Recognition is what these test; asking for consent first is in test_ai_consent.py."""
+
+    async def given(self, user_id: str) -> None:
+        return None
+
+    monkeypatch.setattr(AiConsentService, "require", given)
 
 
 class FakeStorage:

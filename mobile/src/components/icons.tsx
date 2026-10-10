@@ -14,6 +14,7 @@ import {
   Drumstick,
   Dumbbell,
   Eye,
+  FileChartColumn,
   Footprints,
   GripVertical,
   Leaf,
@@ -89,3 +90,4 @@ export const CopyIcon = icon(Copy);
 export const LogOutIcon = icon(LogOut);
 export const GripIcon = icon(GripVertical);
 export const PawIcon = icon(PawPrint);
+export const ReportIcon = icon(FileChartColumn);

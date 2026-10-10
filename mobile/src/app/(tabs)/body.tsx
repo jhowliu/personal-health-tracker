@@ -1,32 +1,47 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { ChevronIcon, ReportIcon } from '@/components/icons';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Text } from '@/components/text';
 import { TrendChart } from '@/components/TrendChart';
-import { Card, Rows, Screen, SectionHeading, Title } from '@/components/ui';
+import { VolumeChart } from '@/components/VolumeChart';
+import { Card, HeaderIconButton, Rows, Screen, SectionHeading } from '@/components/ui';
 import { color } from '@/theme/tokens';
 
 type Summary = Schema<'BodySummaryOut'>;
 type Log = Schema<'BodyLogOut'>;
+type Volume = Schema<'VolumeTrendOut'>;
 
 const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
 
 export default function BodyScreen() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
+  const [volume, setVolume] = useState<Volume | null>(null);
+  // The charts already tell the story; the raw list stays folded until asked for.
+  const [showLogs, setShowLogs] = useState(false);
+  // A week whose report has not been read yet puts a dot on the report button.
+  const [newReport, setNewReport] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [fresh, history] = await Promise.all([
+      const [fresh, history, weeks] = await Promise.all([
         api.get('/body-logs/summary'),
         api.get('/body-logs'),
+        api.get('/progress/volume'),
       ]);
       setSummary(fresh);
       setLogs([...history].reverse());
+      setVolume(weeks);
+      api
+        .get('/progress/weekly/pending')
+        .then((pending) => setNewReport(pending !== null))
+        // Only the dot depends on it.
+        .catch(() => {});
     } catch (error) {
       Alert.alert('讀不到紀錄', error instanceof ApiError ? error.message : '請稍後再試');
     }
@@ -50,7 +65,17 @@ export default function BodyScreen() {
 
   return (
     <Screen footerSafeArea={false}>
-      <Title>進度</Title>
+      <View className="flex-row items-center justify-between">
+        <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
+          進度
+        </Text>
+        <HeaderIconButton
+          icon={ReportIcon}
+          accessibilityLabel={newReport ? '週報，有新的一週' : '週報'}
+          badge={newReport}
+          onPress={() => router.push('/progress/weeks')}
+        />
+      </View>
 
       <Card>
         <MonthCalendar refreshKey={logs} />
@@ -75,12 +100,33 @@ export default function BodyScreen() {
 
       <TrendChart title="體重" unit="kg，近 30 天" points={summary.weight_series} />
       <TrendChart title="腰圍" unit="cm，近 30 天" points={summary.waist_series} />
+      {volume ? <VolumeChart trend={volume} /> : null}
 
-      <SectionHeading>紀錄</SectionHeading>
-      <Card className="py-0">
-        {logs.length === 0 ? (
-          <Text className="py-6 text-center text-base text-muted">還沒有紀錄</Text>
-        ) : (
+      <SectionHeading
+        action={
+          logs.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showLogs }}
+              accessibilityLabel={showLogs ? '收起紀錄' : `展開 ${logs.length} 筆紀錄`}
+              onPress={() => setShowLogs((open) => !open)}
+              hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+              className="flex-row items-center gap-1 active:opacity-70"
+            >
+              <Text className="text-base text-muted">{showLogs ? '收起' : `${logs.length} 筆`}</Text>
+              <ChevronIcon direction={showLogs ? 'up' : 'down'} size={16} tint={color.muted} />
+            </Pressable>
+          ) : null
+        }
+      >
+        紀錄
+      </SectionHeading>
+      {logs.length === 0 ? (
+        <Card>
+          <Text className="py-2 text-center text-base text-muted">還沒有紀錄</Text>
+        </Card>
+      ) : showLogs ? (
+        <Card className="py-0">
           <Rows>
             {logs.map((log) => {
               const parsed = new Date(`${log.date}T00:00:00`);
@@ -104,8 +150,8 @@ export default function BodyScreen() {
               );
             })}
           </Rows>
-        )}
-      </Card>
+        </Card>
+      ) : null}
     </Screen>
   );
 }

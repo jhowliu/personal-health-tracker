@@ -9,12 +9,14 @@ from fastapi import Depends, Header, HTTPException, status
 from app.adapters.ai.claude import ClaudeImageRecognizer
 from app.adapters.ai.jev import JevDecisionEngine
 from app.adapters.ai.openai import OpenAIImageRecognizer
+from app.adapters.ai.weekly_advice import ClaudeWeeklyAdvisor
 from app.adapters.auth.identities import OidcIdentityVerifier
 from app.adapters.auth.passwords import Argon2Hasher
 from app.adapters.auth.tokens import JwtTokenIssuer
 from app.adapters.clock import SystemClock
 from app.adapters.push.expo import ExpoPushSender
 from app.adapters.sqlite.accounts import SqliteAccountStore
+from app.adapters.sqlite.ai_consent import SqliteAiConsentStore
 from app.adapters.sqlite.body import SqliteBodyStore
 from app.adapters.sqlite.days import SqliteDayStore
 from app.adapters.sqlite.foods import SqliteFoodStore
@@ -27,6 +29,7 @@ from app.adapters.sqlite.unit_of_work import SqliteUnitOfWork
 from app.adapters.sqlite.workout_execution import SqliteWorkoutExecutionStore
 from app.adapters.storage.s3 import S3MealPhotoStorage
 from app.application.accounts import AccountService
+from app.application.ai_consent import AiConsentService
 from app.application.body import BodyTrackingService
 from app.application.daily_flow import DailyFlowService
 from app.application.decisions import DecisionService
@@ -39,6 +42,7 @@ from app.application.profiles import ProfileService
 from app.application.progress import ProgressService
 from app.application.reminders import ReminderService
 from app.application.training import TrainingService
+from app.application.weekly_advice import WeeklyAdviceService
 from app.application.workout_execution import WorkoutExecutionService
 from app.config import settings
 from app.db import db_dep
@@ -134,8 +138,39 @@ def profiles(conn: DbConn) -> ProfileService:
     return ProfileService(SqliteAccountStore(conn), clock())
 
 
+@lru_cache(maxsize=1)
+def weekly_advisor() -> ClaudeWeeklyAdvisor:
+    return ClaudeWeeklyAdvisor(
+        settings.anthropic_api_key,
+        settings.anthropic_advice_model,
+        settings.anthropic_advice_effort,
+    )
+
+
+def weekly_advice(conn: DbConn) -> WeeklyAdviceService:
+    return WeeklyAdviceService(
+        progress(conn),
+        SqliteProgressStore(conn),
+        SqliteAccountStore(conn),
+        SqliteBodyStore(conn),
+        daily_flow(conn),
+        day_store(conn),
+        SqliteWorkoutExecutionStore(conn),
+        ai_consent(conn),
+        weekly_advisor(),
+        clock(),
+        SqliteUnitOfWork(conn),
+    )
+
+
+def ai_consent(conn: DbConn) -> AiConsentService:
+    return AiConsentService(SqliteAiConsentStore(conn), clock())
+
+
 def progress(conn: DbConn) -> ProgressService:
-    return ProgressService(SqliteProgressStore(conn), SqliteBodyStore(conn), clock())
+    return ProgressService(
+        SqliteProgressStore(conn), SqliteBodyStore(conn), day_store(conn), clock()
+    )
 
 
 def body_tracking(conn: DbConn) -> BodyTrackingService:
@@ -197,6 +232,7 @@ def meal_photos(conn: DbConn) -> MealPhotoService:
         clock(),
         SqliteUnitOfWork(conn),
         settings.daily_ai_image_quota,
+        ai_consent(conn),
     )
 
 
@@ -216,6 +252,8 @@ Accounts = Annotated[AccountService, Depends(accounts)]
 Profiles = Annotated[ProfileService, Depends(profiles)]
 BodyTracking = Annotated[BodyTrackingService, Depends(body_tracking)]
 Progress = Annotated[ProgressService, Depends(progress)]
+AiConsent = Annotated[AiConsentService, Depends(ai_consent)]
+WeeklyAdvice = Annotated[WeeklyAdviceService, Depends(weekly_advice)]
 Training = Annotated[TrainingService, Depends(training)]
 DailyFlow = Annotated[DailyFlowService, Depends(daily_flow)]
 WorkoutExecution = Annotated[WorkoutExecutionService, Depends(workout_execution)]

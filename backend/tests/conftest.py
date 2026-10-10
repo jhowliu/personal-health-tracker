@@ -1,8 +1,11 @@
 from collections.abc import AsyncIterator
+from datetime import date
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.adapters.clock import SystemClock
+from app.api import deps
 from app.config import settings
 from app.main import app
 from scripts.migrate import apply
@@ -106,3 +109,21 @@ async def with_meals(with_foods: AsyncClient) -> AsyncClient:
         )
         assert response.status_code == 201, response.text
     return with_foods
+
+
+class _FixedClock(SystemClock):
+    def __init__(self, today: date) -> None:
+        self._today = today
+
+    def today(self, timezone: str) -> date:
+        return self._today
+
+
+@pytest.fixture
+def today(monkeypatch):
+    """Pins the server's today, for rules that depend on the day: `today(date(...))`."""
+
+    def pin(day: date) -> None:
+        monkeypatch.setattr(deps, "clock", lambda: _FixedClock(day))
+
+    return pin

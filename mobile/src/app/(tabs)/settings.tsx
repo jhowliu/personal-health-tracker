@@ -1,5 +1,6 @@
 import { Pressable } from 'react-native';
 
+import { PrivacySettings } from '@/ai/PrivacySettings';
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
@@ -170,6 +171,8 @@ export default function SettingsScreen() {
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
         </Rows>
       </Card>
+
+      <PrivacySettings />
 
       <SectionHeading>帳號</SectionHeading>
       <Card className="py-0">
