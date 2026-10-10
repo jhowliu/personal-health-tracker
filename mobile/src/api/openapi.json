@@ -559,6 +559,113 @@
         }
       }
     },
+    "/users/me/ai-consent": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Read Ai Consent",
+        "operationId": "read_ai_consent_users_me_ai_consent_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConsentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Set Ai Consent",
+        "description": "Agree to AI analysis, or withdraw; the AI features ask again once it is withdrawn.",
+        "operationId": "set_ai_consent_users_me_ai_consent_put",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiConsentIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiConsentOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/users/me": {
       "delete": {
         "tags": [
@@ -4179,10 +4286,332 @@
           }
         }
       }
+    },
+    "/progress/weekly/pending": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Pending Week",
+        "description": "The report to pop up once: the last finished week, or this one on a Sunday whose flow is\ndone. null when it was already shown or the week held nothing.",
+        "operationId": "pending_week_progress_weekly_pending_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WeeklyReviewOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Pending Week Progress Weekly Pending Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/weekly/{week}/seen": {
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Week Seen",
+        "description": "The report of the week `week` falls in was shown, so it does not pop up again.",
+        "operationId": "week_seen_progress_weekly__week__seen_post",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/weeks": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Weeks",
+        "description": "Weeks with anything logged and a report to read, newest first.",
+        "operationId": "weeks_progress_weeks_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WeekSummaryOut"
+                  },
+                  "title": "Response Weeks Progress Weeks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/weekly/{week}/advice": {
+      "post": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Week Advice",
+        "description": "The AI review of the week `week` falls in, written on the first call and kept.\n\n428 until the user agrees to AI analysis; null for a week with nothing logged.",
+        "operationId": "week_advice_progress_weekly__week__advice_post",
+        "parameters": [
+          {
+            "name": "week",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WeeklyAdviceOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Week Advice Progress Weekly  Week  Advice Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/volume": {
+      "get": {
+        "tags": [
+          "progress"
+        ],
+        "summary": "Volume Trend",
+        "description": "Weight × reps per week for the last `weeks` weeks, this one included, oldest first.",
+        "operationId": "volume_trend_progress_volume_get",
+        "parameters": [
+          {
+            "name": "weeks",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 52,
+              "minimum": 4,
+              "default": 12,
+              "title": "Weeks"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VolumeTrendOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AiConsentIn": {
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent"
+        ],
+        "title": "AiConsentIn"
+      },
+      "AiConsentOut": {
+        "properties": {
+          "consent": {
+            "type": "boolean",
+            "title": "Consent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "consent"
+        ],
+        "title": "AiConsentOut",
+        "description": "Whether meal photos and weekly logs may be sent to the AI provider."
+      },
       "BodyLogIn": {
         "properties": {
           "weight_kg": {
@@ -7228,6 +7657,108 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VolumeTrendOut": {
+        "properties": {
+          "this_week": {
+            "type": "string",
+            "format": "date",
+            "title": "This Week"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/WeekVolumeOut"
+            },
+            "type": "array",
+            "title": "Weeks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "this_week",
+          "weeks"
+        ],
+        "title": "VolumeTrendOut",
+        "description": "Training volume week by week, for the chart on 進度. The last week is this one, so far."
+      },
+      "WeekSummaryOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "days_complete": {
+            "type": "integer",
+            "title": "Days Complete"
+          },
+          "workouts": {
+            "type": "integer",
+            "title": "Workouts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "days_complete",
+          "workouts"
+        ],
+        "title": "WeekSummaryOut",
+        "description": "One past week in the list on 進度."
+      },
+      "WeekVolumeOut": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "volume_kg": {
+            "type": "number",
+            "title": "Volume Kg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "volume_kg"
+        ],
+        "title": "WeekVolumeOut"
+      },
+      "WeeklyAdviceOut": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "diet": {
+            "type": "string",
+            "title": "Diet"
+          },
+          "training": {
+            "type": "string",
+            "title": "Training"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "diet",
+          "training",
+          "body"
+        ],
+        "title": "WeeklyAdviceOut",
+        "description": "The AI's look back at a week and its plan for the next, shown under the numbers."
       },
       "WeeklyReviewOut": {
         "properties": {

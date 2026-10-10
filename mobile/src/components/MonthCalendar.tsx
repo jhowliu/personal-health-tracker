@@ -1,6 +1,6 @@
 /**
- * One month of days: a complete day gets a paw-print stamp, any other stays plain. A small
- * dumbbell in the corner says the workout was done.
+ * One month of days: a complete day gets a paw-print stamp and a trained day a dumbbell, side
+ * by side under a small date; a day with neither stays a plain number.
  *
  * Loads its own month from /progress/calendar and steps between months with the arrows. Tapping
  * a day is optional; without `onSelect` the days are read-only.
@@ -138,7 +138,7 @@ export function MonthCalendar({
             <Text className="text-xs text-muted">完成</Text>
           </View>
           <View className="flex-row items-center gap-1">
-            <DumbbellIcon size={12} tint={color.good} />
+            <DumbbellIcon size={13} tint={color.good} />
             <Text className="text-xs text-muted">訓練</Text>
           </View>
         </View>
@@ -162,34 +162,32 @@ function DayCell({
   onPress?: () => void;
 }) {
   const complete = day.mark === 'complete';
+  const trained = day.workout === 'done';
   const date = Number(day.date.slice(8));
   const state = complete ? '完成' : '未完成';
 
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : 'text'}
-      accessibilityLabel={`${date} 日，${future ? '還沒到' : state}${day.workout === 'done' ? '，有訓練' : ''}`}
+      accessibilityLabel={`${date} 日，${future ? '還沒到' : state}${trained ? '，有訓練' : ''}`}
       disabled={!onPress}
       onPress={onPress}
-      className={`relative h-12 flex-1 items-center justify-center rounded-control ${
+      className={`h-12 flex-1 items-center justify-center rounded-control ${
         today ? 'border-[1.5px] border-primary' : ''
       } ${onPress ? 'active:opacity-70' : ''}`}
     >
-      {complete ? (
-        // A stamped day: the date goes small above its paw print.
+      {complete || trained ? (
+        // A stamped day: the date goes small above its stamps, which share one line.
         <>
           <Text className="text-[10px] leading-3 text-muted">{date}</Text>
-          <PawIcon size={17} tint={color.primary} />
+          <View className="flex-row items-center gap-0.5">
+            {complete ? <PawIcon size={16} tint={color.primary} /> : null}
+            {trained ? <DumbbellIcon size={14} tint={color.good} /> : null}
+          </View>
         </>
       ) : (
         <Text className={`text-sm ${future ? 'text-disabled' : 'text-ink'}`}>{date}</Text>
       )}
-      {day.workout === 'done' ? (
-        // A corner badge, so it never crowds the stamp or the date.
-        <View className="absolute right-0.5 top-0.5">
-          <DumbbellIcon size={11} tint={color.good} />
-        </View>
-      ) : null}
     </Pressable>
   );
 }

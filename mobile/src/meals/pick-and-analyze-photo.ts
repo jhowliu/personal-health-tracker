@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 
+import { ensureAiConsent } from '@/ai/consent';
 import { ApiError } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { analyzeMealPhoto } from '@/meals/analyze-photo';
@@ -26,6 +27,8 @@ function choosePhotoSource(): Promise<PhotoSource | null> {
 }
 
 export async function pickAndAnalyzeMealPhoto(onPicked?: (uri: string) => void) {
+  // The photo goes to the AI provider, so the user agrees to that before choosing one.
+  if (!(await ensureAiConsent())) return null;
   const source = await choosePhotoSource();
   if (!source) return null;
 

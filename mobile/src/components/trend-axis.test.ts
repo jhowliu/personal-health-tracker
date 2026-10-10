@@ -1,4 +1,4 @@
-import { daysBetween, valueAxis } from '@/components/trend-axis';
+import { daysBetween, valueAxis, zeroAxis } from '@/components/trend-axis';
 
 describe('valueAxis', () => {
   it('keeps a small wobble small by drawing at least the minimum span', () => {
@@ -25,4 +25,15 @@ describe('valueAxis', () => {
 it('counts calendar days, across a month end', () => {
   expect(daysBetween('2026-09-28', '2026-10-02')).toBe(4);
   expect(daysBetween('2026-10-02', '2026-10-02')).toBe(0);
+});
+
+describe('zeroAxis', () => {
+  it('rounds the top up to a whole step with at most three gaps', () => {
+    expect(zeroAxis(4820)).toEqual({ max: 6000, ticks: [0, 2000, 4000, 6000] });
+    expect(zeroAxis(900)).toEqual({ max: 1000, ticks: [0, 500, 1000] });
+  });
+
+  it('has a scale even with nothing to draw', () => {
+    expect(zeroAxis(0).max).toBeGreaterThan(0);
+  });
 });

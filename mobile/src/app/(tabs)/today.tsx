@@ -29,6 +29,7 @@ import { stepCache } from '@/today/step-cache';
 import { syncWeighInReminder } from '@/notifications/reminder';
 import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
+import { checkWeeklyReport } from '@/progress/weekly-popup';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color } from '@/theme/tokens';
 import { rowsFromLogs, toRecords, type RecordRow } from '@/workouts/record';
@@ -145,6 +146,14 @@ export default function TodayScreen() {
       void load();
     }, [load]),
   );
+
+  // The weekly report pops up from today: when it opens, and again as its flow moves on, since
+  // finishing a Sunday brings that week's report forward.
+  const onToday = day?.date === today;
+  const flowStep = day?.flow.current;
+  useEffect(() => {
+    if (onToday) void checkWeeklyReport();
+  }, [onToday, flowStep]);
 
   if (!day) {
     return (

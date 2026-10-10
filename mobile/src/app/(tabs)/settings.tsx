@@ -1,5 +1,6 @@
 import { Pressable } from 'react-native';
 
+import { PrivacySettings } from '@/ai/PrivacySettings';
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
@@ -83,9 +84,15 @@ export default function SettingsScreen() {
         onPress: async () => {
           try {
             await api.delete('/users/me');
-          } finally {
-            await signOut();
+          } catch (error) {
+            // The account is still there (its photos go first), so stay signed in to try again.
+            // An expired session cannot be helped from here: sign out as before.
+            if (!(error instanceof ApiError) || error.status !== 401) {
+              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+              return;
+            }
           }
+          await signOut();
         },
       },
     ]);
@@ -170,6 +177,8 @@ export default function SettingsScreen() {
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
         </Rows>
       </Card>
+
+      <PrivacySettings />
 
       <SectionHeading>帳號</SectionHeading>
       <Card className="py-0">

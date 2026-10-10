@@ -1,8 +1,11 @@
 from collections.abc import AsyncIterator
+from datetime import date
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.adapters.clock import SystemClock
+from app.api import deps
 from app.config import settings
 from app.main import app
 from scripts.migrate import apply
@@ -15,6 +18,23 @@ def isolate_ai_settings(monkeypatch) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", "")
     monkeypatch.setattr(settings, "openai_api_key", "")
     monkeypatch.setattr(settings, "jev_api_key", "")
+
+
+class RecordingStorage:
+    """Stands in for S3 where a test does not bring its own; remembers whose photos it deleted."""
+
+    def __init__(self) -> None:
+        self.deleted_users: list[str] = []
+
+    async def delete_user_objects(self, user_id: str) -> None:
+        self.deleted_users.append(user_id)
+
+
+@pytest.fixture(autouse=True)
+def photo_storage(monkeypatch) -> RecordingStorage:
+    storage = RecordingStorage()
+    monkeypatch.setattr(deps, "object_storage", lambda: storage)
+    return storage
 
 
 @pytest.fixture
@@ -106,3 +126,21 @@ async def with_meals(with_foods: AsyncClient) -> AsyncClient:
         )
         assert response.status_code == 201, response.text
     return with_foods
+
+
+class _FixedClock(SystemClock):
+    def __init__(self, today: date) -> None:
+        self._today = today
+
+    def today(self, timezone: str) -> date:
+        return self._today
+
+
+@pytest.fixture
+def today(monkeypatch):
+    """Pins the server's today, for rules that depend on the day: `today(date(...))`."""
+
+    def pin(day: date) -> None:
+        monkeypatch.setattr(deps, "clock", lambda: _FixedClock(day))
+
+    return pin
