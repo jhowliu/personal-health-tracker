@@ -274,6 +274,89 @@ export const zhTW = {
     },
   },
 
+  onboarding: {
+    offer: {
+      title: "第一次使用嗎？",
+      body: "跟著畫面完成量身形與早餐紀錄，大約 2 分鐘。你可以隨時離開，之後也能從設定重新觀看。",
+      start: "開始導覽",
+      later: "稍後再說",
+      skip: "略過導覽",
+    },
+    progress: "步驟 %{current} / %{total}",
+    actions: {
+      back: "上一步",
+      next: "下一步",
+      exit: "離開導覽",
+    },
+    waiting: "正在準備下一個步驟…",
+    complete: {
+      title: "完成新手導覽",
+      body: "你已經學會記錄身形、手動加入食物，也知道如何使用照片辨識。",
+      done: "開始使用",
+    },
+    replay: {
+      label: "新手導覽",
+      value: "重新觀看",
+      accessibilityLabel: "重新觀看新手導覽",
+    },
+    steps: {
+      bodyReview: {
+        title: "今天的身形已記錄",
+        body: "體重和腰圍會用來顯示每週趨勢。之後可以從「量身形」更新今天的紀錄。",
+      },
+      bodyWeight: {
+        title: "先記錄體重",
+        body: "輸入今天的體重，讓每週平均與變化更準確。",
+      },
+      bodyWaist: {
+        title: "腰圍可以選填",
+        body: "腰圍能補充體重以外的變化；現在不方便量也可以留空。",
+      },
+      bodySave: {
+        title: "儲存今天的身形",
+        body: "點選「儲存紀錄」。成功後會自動前往早餐。",
+        action: "儲存紀錄",
+      },
+      mealAdd: {
+        title: "加入早餐內容",
+        body: "點選「加入食物」，開始記錄今天吃的早餐。",
+        action: "加入食物",
+      },
+      mealLibrary: {
+        title: "先從食物庫加入",
+        body: "食物庫適合逐項記錄食物與實際份量。",
+        action: "從食物庫加入",
+      },
+      foodSearch: {
+        title: "搜尋或使用分類",
+        body: "可以輸入食物名稱或別名，也可以用下方分類快速縮小範圍。",
+      },
+      foodResult: {
+        title: "選擇一項食物",
+        body: "點選最符合你實際吃的食物。",
+        action: "選擇第一項食物",
+      },
+      foodPortion: {
+        title: "確認實際份量",
+        body: "系統會先帶入常用份量。調整後，熱量與營養素會自動重新計算。",
+      },
+      foodAdd: {
+        title: "加入早餐",
+        body: "確認食物與份量後，把它加入今天的早餐。",
+        action: "加入這項食物",
+      },
+      foodPhoto: {
+        title: "也可以用照片辨識",
+        body: "拍照或從相簿選擇後，系統會辨識多個食物；送出前仍能修改品項與份量。這一步不會開啟相機。",
+      },
+      foodDone: {
+        title: "完成早餐記錄",
+        body: "回到早餐後，可以繼續加入食物或標記這餐已吃完。",
+        action: "完成並回到早餐",
+      },
+    },
+  },
+
   settings: {
     title: "設定",
     personalDetails: "個人資料",

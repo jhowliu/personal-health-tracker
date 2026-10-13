@@ -1,6 +1,6 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, type ScrollView } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
@@ -18,6 +18,8 @@ import { amountToGrams, describeFood, gramsToAmount, portionUnit, readableAmount
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { photoDraft } from '@/meals/photo-draft';
 import { backOrReplace } from '@/navigation/back';
+import { useOnboarding } from '@/onboarding/OnboardingProvider';
+import { SpotlightTarget } from '@/onboarding/SpotlightTarget';
 import { color } from '@/theme/tokens';
 
 type Food = Schema<'FoodOut'>;
@@ -27,6 +29,7 @@ const NO_FOODS: Food[] = [];
 
 export default function AddFood() {
   const { t } = useI18n();
+  const tour = useOnboarding();
   const { category, meal_id, destination = 'meal', date, slot } = useLocalSearchParams<{
     category?: string;
     meal_id?: string;
@@ -47,6 +50,7 @@ export default function AddFood() {
   // Foods put in on this visit. A meal is several foods, so adding one stays here for the next.
   const [added, setAdded] = useState<string[]>([]);
   const searchVersion = useRef(0);
+  const scrollRef = useRef<ScrollView>(null);
 
   const parentRoute =
     destination === 'day'
@@ -98,6 +102,7 @@ export default function AddFood() {
     setPicked(food);
     // Default to the usual portion, which is what the spec says a fresh pick starts at.
     setAmount(readableAmount(gramsToAmount(food, food.usual_grams)));
+    tour.actionCompleted('food-result');
   };
 
   const addFood = async (food: Food, portion: number) => {
@@ -116,6 +121,7 @@ export default function AddFood() {
       setAdded((current) => [...current, food.name]);
       setPicked(null);
       setAmount('');
+      tour.actionCompleted('food-add');
     } catch (error) {
       Alert.alert(t('common.errors.addFailed'), error instanceof ApiError ? error.message : error instanceof Error ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
@@ -180,8 +186,21 @@ export default function AddFood() {
   const ordered = useMemo(() => foods && byCategoryOrder(foods, categories), [foods, categories]);
   const { visible, remaining, showMore } = usePaged(ordered ?? NO_FOODS, ordered);
 
+  useEffect(() => {
+    if (tour.phase !== 'running' || tour.step?.id !== 'food-photo') return;
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+    const timer = setTimeout(tour.refreshTarget, 350);
+    return () => clearTimeout(timer);
+  }, [tour.phase, tour.step, tour.refreshTarget]);
+
+  const finish = () => {
+    tour.actionCompleted('food-done');
+    backOrReplace(parentRoute);
+  };
+
   return (
     <Screen
+      scrollRef={scrollRef}
       footer={
         picked ? (
           <>
@@ -194,17 +213,21 @@ export default function AddFood() {
               </View>
               <Text className="text-2xl text-ink">{kcal} {t('common.units.kcal')}</Text>
             </View>
-            <Field
-              label={t('common.labels.portion')}
-              value={amount}
-              onChangeText={setAmount}
-              suffix={unit.label}
-              keyboardType="decimal-pad"
-            />
+            <SpotlightTarget id="food-portion">
+              <Field
+                label={t('common.labels.portion')}
+                value={amount}
+                onChangeText={setAmount}
+                suffix={unit.label}
+                keyboardType="decimal-pad"
+              />
+            </SpotlightTarget>
             {unit.gramsPerUnit === 1 || !pickedGrams ? null : <Hint>{t('today.meal.approximateGrams', { grams: readableAmount(pickedGrams) })}</Hint>}
-            <PrimaryButton onPress={add} disabled={!Number(amount) || photoBusy} busy={busy}>
-              {busy ? t('common.states.adding') : snack ? t('meals.addFood.recordSnack') : t('meals.addFood.addNamed', { name: picked.name })}
-            </PrimaryButton>
+            <SpotlightTarget id="food-add" activate={!Number(amount) || photoBusy || busy ? undefined : add}>
+              <PrimaryButton onPress={add} disabled={!Number(amount) || photoBusy} busy={busy}>
+                {busy ? t('common.states.adding') : snack ? t('meals.addFood.recordSnack') : t('meals.addFood.addNamed', { name: picked.name })}
+              </PrimaryButton>
+            </SpotlightTarget>
           </>
         ) : added.length ? (
           <>
@@ -214,9 +237,11 @@ export default function AddFood() {
                 {t('meals.addFood.addedItems', { count: added.length, names: added.join(', ') })}
               </Text>
             </View>
-            <PrimaryButton onPress={() => backOrReplace(parentRoute)} disabled={photoBusy}>
-              {t('meals.addFood.doneReturn', { destination: parentLabel })}
-            </PrimaryButton>
+            <SpotlightTarget id="food-done" activate={photoBusy ? undefined : finish}>
+              <PrimaryButton onPress={finish} disabled={photoBusy}>
+                {t('meals.addFood.doneReturn', { destination: parentLabel })}
+              </PrimaryButton>
+            </SpotlightTarget>
           </>
         ) : undefined
       }
@@ -229,12 +254,16 @@ export default function AddFood() {
 
       <Title sub={snack ? t('meals.addFood.snackSubtitle') : undefined}>{heading}</Title>
 
-      <PrimaryButton tone="plain" onPress={addFromPhoto} disabled={busy} busy={photoBusy}>
-        {photoBusy ? t('common.states.recognizing') : t('meals.addFood.photoAction')}
-      </PrimaryButton>
+      <SpotlightTarget id="food-photo">
+        <PrimaryButton tone="plain" onPress={addFromPhoto} disabled={busy} busy={photoBusy}>
+          {photoBusy ? t('common.states.recognizing') : t('meals.addFood.photoAction')}
+        </PrimaryButton>
+      </SpotlightTarget>
       <Hint>{t('meals.addFood.photoHint')}</Hint>
 
-      <Field value={query} onChangeText={setQuery} placeholder={t('meals.addFood.searchPlaceholder')} />
+      <SpotlightTarget id="food-search">
+        <Field value={query} onChangeText={setQuery} placeholder={t('meals.addFood.searchPlaceholder')} />
+      </SpotlightTarget>
 
       <View className="flex-row flex-wrap gap-2">
         <Chip label={t('common.labels.all')} selected={filter === 'all'} onPress={() => setFilter('all')} />
@@ -266,15 +295,27 @@ export default function AddFood() {
       ) : (
         <Card className="px-0 py-0">
           <Rows>
-            {visible.map((food) => (
-            <FoodOptionRow
-              key={food.id}
-              name={food.name}
-              detail={describeFood(food)}
-              badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: categoryTone(food.category_id) }]}
-              selected={picked?.id === food.id}
-              onPress={() => choose(food)}
-            />
+            {visible.map((food, index) => (
+              index === 0 ? (
+                <SpotlightTarget key={food.id} id="food-result" activate={() => choose(food)}>
+                  <FoodOptionRow
+                    name={food.name}
+                    detail={describeFood(food)}
+                    badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: categoryTone(food.category_id) }]}
+                    selected={picked?.id === food.id}
+                    onPress={() => choose(food)}
+                  />
+                </SpotlightTarget>
+              ) : (
+                <FoodOptionRow
+                  key={food.id}
+                  name={food.name}
+                  detail={describeFood(food)}
+                  badges={[{ label: categories.find((c) => c.id === food.category_id)?.name ?? '', tone: categoryTone(food.category_id) }]}
+                  selected={picked?.id === food.id}
+                  onPress={() => choose(food)}
+                />
+              )
             ))}
           </Rows>
         </Card>

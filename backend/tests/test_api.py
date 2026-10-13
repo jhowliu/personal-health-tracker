@@ -48,6 +48,17 @@ async def test_protected_route_needs_a_token(api: AsyncClient):
     assert (await api.get("/users/me/profile")).status_code == 401
 
 
+async def test_onboarding_progress_is_versioned_and_monotonic(signed_in: AsyncClient):
+    assert (await signed_in.get("/users/me/onboarding")).json() == {"version": 0}
+
+    completed = await signed_in.put("/users/me/onboarding", json={"version": 1})
+    assert completed.status_code == 200
+    assert completed.json() == {"version": 1}
+
+    older_client = await signed_in.put("/users/me/onboarding", json={"version": 0})
+    assert older_client.json() == {"version": 1}
+
+
 async def test_targets_match_the_spec_example(with_profile: AsyncClient):
     targets = (await with_profile.get("/users/me/profile")).json()["targets"]
 

@@ -81,6 +81,22 @@ class SqliteAccountStore:
             (user_id,),
         )
 
+    async def onboarding_version(self, user_id: str) -> int:
+        async with self._conn.execute(
+            "SELECT onboarding_version_seen FROM users WHERE id = ?", (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+        return int(row["onboarding_version_seen"]) if row else 0
+
+    async def set_onboarding_version(self, user_id: str, version: int) -> int:
+        await self._conn.execute(
+            "UPDATE users"
+            " SET onboarding_version_seen = MAX(onboarding_version_seen, ?)"
+            " WHERE id = ?",
+            (version, user_id),
+        )
+        return await self.onboarding_version(user_id)
+
     async def load_profile(self, user_id: str) -> Profile | None:
         async with self._conn.execute(
             "SELECT * FROM profiles WHERE user_id = ?", (user_id,)

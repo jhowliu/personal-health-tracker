@@ -14,6 +14,7 @@ import { PhoneFrame } from '@/components/PhoneFrame';
 import { I18nProvider } from '@/i18n/runtime';
 import { draft } from '@/meals/draft';
 import { ReminderSync } from '@/notifications/ReminderSync';
+import { OnboardingProvider } from '@/onboarding/OnboardingProvider';
 import { color } from '@/theme/tokens';
 import { photoDraft } from '@/meals/photo-draft';
 import { stepCache } from '@/today/step-cache';
@@ -37,12 +38,14 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <I18nProvider>
             <SessionProvider onSignedOut={clearUserState}>
-              <StatusBar style="dark" />
-              <ReminderSync />
-              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
-              <NumericDoneBar />
-              <AiConsentHost />
-              <AlertHost />
+              <OnboardingProvider>
+                <StatusBar style="dark" />
+                <ReminderSync />
+                <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+                <NumericDoneBar />
+                <AiConsentHost />
+                <AlertHost />
+              </OnboardingProvider>
             </SessionProvider>
           </I18nProvider>
         </SafeAreaProvider>

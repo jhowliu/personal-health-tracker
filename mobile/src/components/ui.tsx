@@ -4,6 +4,7 @@ import {
   Fragment,
   type ComponentType,
   type ReactNode,
+  type Ref,
   useContext,
   useId,
   useRef,
@@ -18,6 +19,7 @@ import {
   View,
   useWindowDimensions,
   type KeyboardTypeOptions,
+  type ScrollView as ScrollViewType,
   type TextInputProps,
   type ViewProps,
 } from 'react-native';
@@ -48,11 +50,14 @@ export function Screen({
   footer,
   footerSafeArea = true,
   scrollEnabled = true,
+  scrollRef,
 }: {
   children: ReactNode;
   scroll?: boolean;
   /** Off while something on the screen is being dragged, so the page does not scroll with it. */
   scrollEnabled?: boolean;
+  /** Optional handle for flows that need to reveal a highlighted control. */
+  scrollRef?: Ref<ScrollViewType>;
   /** Fixed above the scroll area for controls that must remain available while browsing. */
   pinnedHeader?: ReactNode;
   /** Pinned below the scroll area — for a running total the user needs while editing. */
@@ -73,6 +78,7 @@ export function Screen({
         {pinnedHeader ? <View className="gap-3 bg-bg px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
         {scroll ? (
           <ScrollView
+            ref={scrollRef}
             className="flex-1"
             scrollEnabled={scrollEnabled}
             contentContainerClassName="px-5 pb-8 pt-2 gap-4"
