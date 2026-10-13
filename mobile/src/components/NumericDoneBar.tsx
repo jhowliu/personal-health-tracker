@@ -9,9 +9,11 @@
 import { InputAccessoryView, Keyboard, Platform, Pressable, View } from 'react-native';
 
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
 import { NUMERIC_ACCESSORY_ID } from '@/components/ui';
 
 export function NumericDoneBar() {
+  const { t } = useI18n();
   if (Platform.OS !== 'ios') return null;
 
   return (
@@ -22,7 +24,7 @@ export function NumericDoneBar() {
           onPress={Keyboard.dismiss}
           className="min-h-[44px] justify-center px-4"
         >
-          <Text className="text-base text-primary">完成</Text>
+          <Text className="text-base text-primary">{t('common.actions.done')}</Text>
         </Pressable>
       </View>
     </InputAccessoryView>

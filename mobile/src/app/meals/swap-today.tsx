@@ -13,20 +13,25 @@ import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
-import { color } from '@/theme/tokens';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { backOrReplace } from '@/navigation/back';
+import { color } from '@/theme/tokens';
 
 type Exchange = Schema<'ExchangeOut'>;
 type Category = Schema<'FoodCategoryOut'>;
 
-const BASIS_LABEL: Record<string, string> = {
-  carb: '等碳水',
-  protein: '等蛋白質',
-  kcal: '等熱量',
-};
+const basisLabel = (basis: string) => translate(
+  basis === 'carb'
+    ? 'meals.substitution.equalCarbs'
+    : basis === 'protein'
+      ? 'meals.substitution.equalProtein'
+      : 'meals.substitution.equalCalories',
+);
 
 export default function SwapToday() {
+  const { t } = useI18n();
   const params = useLocalSearchParams<{
     date: string;
     slot: string;
@@ -45,11 +50,11 @@ export default function SwapToday() {
 
   useEffect(() => {
     if (!params.date || !params.slot || !params.item || !params.food || !params.grams) {
-      Alert.alert('找不到今日餐點', '請回到今日流程重新選擇要替換的食物。', [
-        { text: '返回今天', onPress: () => router.replace('/today') },
+      Alert.alert(t('meals.substitution.missingTodayTitle'), t('meals.substitution.missingTodayBody'), [
+        { text: t('meals.photo.returnToToday'), onPress: () => router.replace('/today') },
       ]);
     }
-  }, [params.date, params.food, params.grams, params.item, params.slot]);
+  }, [params.date, params.food, params.grams, params.item, params.slot, t]);
 
   useEffect(() => {
     (async () => {
@@ -80,9 +85,9 @@ export default function SwapToday() {
       );
       if (version === loadVersion.current) setOptions(result);
     } catch (error) {
-      Alert.alert('讀不到替換選項', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.substitution.loadOptionsFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     }
-  }, [params.food, params.grams, basis, defaultBasis]);
+  }, [params.food, params.grams, basis, defaultBasis, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -101,7 +106,7 @@ export default function SwapToday() {
       });
       backOrReplace('/today');
     } catch (error) {
-      Alert.alert('換不了', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.substitution.replaceFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
       setBusy(false);
     }
@@ -122,28 +127,30 @@ export default function SwapToday() {
               <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>
             </View>
             <PrimaryButton onPress={confirm} busy={busy}>
-              {busy ? '處理中…' : '換成這個'}
+              {busy ? t('common.states.processing') : t('meals.substitution.replaceThis')}
             </PrimaryButton>
           </>
         ) : undefined
       }
     >
-      <BackLink label="今天" onPress={() => backOrReplace('/today')} disabled={busy} />
+      <BackLink label={t('common.labels.today')} onPress={() => backOrReplace('/today')} disabled={busy} />
 
-      <Title sub={`只換${params.date ? dayWord(params.date) : '今天'}這一次，不會改到原本的餐點`}>換一樣食物</Title>
+      <Title sub={t('meals.substitution.oneDayOnly', { day: params.date ? dayWord(params.date) : t('common.labels.today') })}>
+        {t('meals.substitution.titleToday')}
+      </Title>
 
       {choices.length ? (
         <View className="gap-1">
-          <Text className="text-sm text-muted">換算方式</Text>
+          <Text className="text-sm text-muted">{t('meals.substitution.conversionMethod')}</Text>
           <Segmented
             value={active}
             onChange={setBasis}
-            options={choices.map((b) => ({ value: b, label: BASIS_LABEL[b] }))}
+            options={choices.map((b) => ({ value: b, label: basisLabel(b) }))}
           />
         </View>
       ) : null}
 
-      <Hint>同分類的食物，克數已自動換算</Hint>
+      <Hint>{t('meals.substitution.autoConvertedHint')}</Hint>
 
       {options === null ? (
         <ActivityIndicator color={color.primary} />
@@ -159,13 +166,15 @@ export default function SwapToday() {
                 {
                   label:
                     Math.round(option.delta.kcal) === 0
-                      ? '熱量相同'
-                      : `熱量 ${option.delta.kcal > 0 ? '+' : ''}${Math.round(option.delta.kcal)} 大卡`,
+                      ? t('meals.substitution.caloriesSame')
+                      : t('meals.substitution.calorieDifference', {
+                          amount: `${option.delta.kcal > 0 ? '+' : ''}${Math.round(option.delta.kcal)}`,
+                        }),
                   tone: option.delta.kcal > 0 ? 'warm' : 'good',
                 },
               ]}
               badgesBelow
-              note={option.capped ? '已到常見份量上限' : undefined}
+              note={option.capped ? t('meals.substitution.capped') : undefined}
               selected={picked?.food.id === option.food.id}
               onPress={() => setPicked(option)}
             />
@@ -175,7 +184,7 @@ export default function SwapToday() {
       )}
 
       {categories.length === 0 ? null : (
-        <Hint>想永久替換，到「餐點」分頁編輯這道餐點。</Hint>
+        <Hint>{t('meals.substitution.permanentHint')}</Hint>
       )}
     </Screen>
   );

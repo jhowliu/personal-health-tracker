@@ -11,6 +11,7 @@ import { SessionProvider } from '@/auth/session';
 import { AlertHost } from '@/components/alert';
 import { NumericDoneBar } from '@/components/NumericDoneBar';
 import { PhoneFrame } from '@/components/PhoneFrame';
+import { I18nProvider } from '@/i18n/runtime';
 import { draft } from '@/meals/draft';
 import { ReminderSync } from '@/notifications/ReminderSync';
 import { color } from '@/theme/tokens';
@@ -34,14 +35,16 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <PhoneFrame>
         <SafeAreaProvider>
-          <SessionProvider onSignedOut={clearUserState}>
-            <StatusBar style="dark" />
-            <ReminderSync />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
-            <NumericDoneBar />
-            <AiConsentHost />
-            <AlertHost />
-          </SessionProvider>
+          <I18nProvider>
+            <SessionProvider onSignedOut={clearUserState}>
+              <StatusBar style="dark" />
+              <ReminderSync />
+              <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }} />
+              <NumericDoneBar />
+              <AiConsentHost />
+              <AlertHost />
+            </SessionProvider>
+          </I18nProvider>
         </SafeAreaProvider>
       </PhoneFrame>
     </GestureHandlerRootView>

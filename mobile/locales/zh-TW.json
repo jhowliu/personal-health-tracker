@@ -1,0 +1,18 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "每日減脂計畫",
+    "NSCameraUsageDescription": "拍下餐點照片，辨識吃了哪些食物與大約份量。",
+    "NSPhotoLibraryUsageDescription": "從相簿選擇餐點照片來辨識食物。",
+    "Localizable.strings": {
+      "WEIGH_IN_NOTIFICATION_TITLE": "早安，先量一下",
+      "WEIGH_IN_NOTIFICATION_BODY": "起床、上完廁所、還沒吃喝前量最準。",
+      "REST_FINISHED_NOTIFICATION_TITLE": "休息結束"
+    }
+  },
+  "android": {
+    "app_name": "每日減脂計畫",
+    "WEIGH_IN_NOTIFICATION_TITLE": "早安，先量一下",
+    "WEIGH_IN_NOTIFICATION_BODY": "起床、上完廁所、還沒吃喝前量最準。",
+    "REST_FINISHED_NOTIFICATION_TITLE": "休息結束"
+  }
+}

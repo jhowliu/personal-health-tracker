@@ -111,6 +111,24 @@ def image_recognizer() -> ClaudeImageRecognizer | OpenAIImageRecognizer:
 DbConn = Annotated[aiosqlite.Connection, Depends(db_dep)]
 
 
+def request_locale(
+    accept_language: Annotated[
+        str | None, Header(alias="Accept-Language", include_in_schema=False)
+    ] = None,
+) -> str:
+    """Resolve the first supported language from a standard Accept-Language header."""
+    for candidate in (accept_language or "").split(","):
+        language = candidate.split(";", 1)[0].strip().lower()
+        if language == "en" or language.startswith("en-"):
+            return "en"
+        if language == "zh" or language.startswith("zh-"):
+            return "zh-TW"
+    return "zh-TW"
+
+
+RequestLocale = Annotated[str, Depends(request_locale)]
+
+
 async def current_user_id(authorization: Annotated[str | None, Header()] = None) -> str:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "缺少存取權杖")
@@ -123,10 +141,10 @@ async def current_user_id(authorization: Annotated[str | None, Header()] = None)
 CurrentUserId = Annotated[str, Depends(current_user_id)]
 
 
-def accounts(conn: DbConn) -> AccountService:
+def accounts(conn: DbConn, locale: RequestLocale) -> AccountService:
     return AccountService(
         SqliteAccountStore(conn),
-        SqliteFoodStore(conn),
+        SqliteFoodStore(conn, locale),
         hasher(),
         token_issuer(),
         identity_verifier(),
@@ -148,14 +166,14 @@ def weekly_advisor() -> ClaudeWeeklyAdvisor:
     )
 
 
-def weekly_advice(conn: DbConn) -> WeeklyAdviceService:
+def weekly_advice(conn: DbConn, locale: RequestLocale) -> WeeklyAdviceService:
     return WeeklyAdviceService(
-        progress(conn),
+        progress(conn, locale),
         SqliteProgressStore(conn),
         SqliteAccountStore(conn),
         SqliteBodyStore(conn),
-        daily_flow(conn),
-        day_store(conn),
+        daily_flow(conn, locale),
+        day_store(conn, locale),
         SqliteWorkoutExecutionStore(conn),
         ai_consent(conn),
         weekly_advisor(),
@@ -168,9 +186,9 @@ def ai_consent(conn: DbConn) -> AiConsentService:
     return AiConsentService(SqliteAiConsentStore(conn), clock())
 
 
-def progress(conn: DbConn) -> ProgressService:
+def progress(conn: DbConn, locale: RequestLocale) -> ProgressService:
     return ProgressService(
-        SqliteProgressStore(conn), SqliteBodyStore(conn), day_store(conn), clock()
+        SqliteProgressStore(conn), SqliteBodyStore(conn), day_store(conn, locale), clock()
     )
 
 
@@ -178,27 +196,27 @@ def body_tracking(conn: DbConn) -> BodyTrackingService:
     return BodyTrackingService(SqliteBodyStore(conn), clock())
 
 
-def training(conn: DbConn) -> TrainingService:
-    return TrainingService(SqliteTrainingStore(conn), decisions())
+def training(conn: DbConn, locale: RequestLocale) -> TrainingService:
+    return TrainingService(SqliteTrainingStore(conn, locale), decisions())
 
 
-def day_store(conn: DbConn) -> SqliteDayStore:
-    return SqliteDayStore(conn, SqliteFoodStore(conn))
+def day_store(conn: DbConn, locale: RequestLocale) -> SqliteDayStore:
+    return SqliteDayStore(conn, SqliteFoodStore(conn, locale))
 
 
-def meal_store(conn: DbConn) -> SqliteMealStore:
-    return SqliteMealStore(conn, SqliteFoodStore(conn))
+def meal_store(conn: DbConn, locale: RequestLocale) -> SqliteMealStore:
+    return SqliteMealStore(conn, SqliteFoodStore(conn, locale))
 
 
-def daily_flow(conn: DbConn) -> DailyFlowService:
+def daily_flow(conn: DbConn, locale: RequestLocale) -> DailyFlowService:
     return DailyFlowService(
-        day_store(conn), SqliteAccountStore(conn), SqliteWorkoutExecutionStore(conn), clock()
+        day_store(conn, locale), SqliteAccountStore(conn), SqliteWorkoutExecutionStore(conn), clock()
     )
 
 
-def workout_execution(conn: DbConn) -> WorkoutExecutionService:
+def workout_execution(conn: DbConn, locale: RequestLocale) -> WorkoutExecutionService:
     return WorkoutExecutionService(
-        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock(), training(conn)
+        SqliteWorkoutExecutionStore(conn), SqliteAccountStore(conn), clock(), training(conn, locale)
     )
 
 
@@ -206,29 +224,29 @@ def reminders(conn: DbConn) -> ReminderService:
     return ReminderService(SqliteReminderStore(conn), push_sender(), clock())
 
 
-def foods(conn: DbConn) -> FoodCatalogService:
-    return FoodCatalogService(SqliteFoodStore(conn))
+def foods(conn: DbConn, locale: RequestLocale) -> FoodCatalogService:
+    return FoodCatalogService(SqliteFoodStore(conn, locale))
 
 
-def meals(conn: DbConn) -> MealService:
-    return MealService(meal_store(conn), SqliteFoodStore(conn))
+def meals(conn: DbConn, locale: RequestLocale) -> MealService:
+    return MealService(meal_store(conn, locale), SqliteFoodStore(conn, locale))
 
 
-def daily_plan(conn: DbConn) -> DailyPlanService:
+def daily_plan(conn: DbConn, locale: RequestLocale) -> DailyPlanService:
     return DailyPlanService(
-        day_store(conn),
-        meal_store(conn),
-        SqliteFoodStore(conn),
-        plate_intake(conn),
+        day_store(conn, locale),
+        meal_store(conn, locale),
+        SqliteFoodStore(conn, locale),
+        plate_intake(conn, locale),
     )
 
 
-def meal_photos(conn: DbConn) -> MealPhotoService:
+def meal_photos(conn: DbConn, locale: RequestLocale) -> MealPhotoService:
     return MealPhotoService(
         SqliteMealPhotoStore(conn),
         object_storage(),
         image_recognizer(),
-        SqliteFoodStore(conn),
+        SqliteFoodStore(conn, locale),
         decisions(),
         clock(),
         SqliteUnitOfWork(conn),
@@ -237,12 +255,12 @@ def meal_photos(conn: DbConn) -> MealPhotoService:
     )
 
 
-def plate_intake(conn: DbConn) -> PlateIntake:
-    return PlateIntake(SqliteFoodStore(conn), SqliteMealPhotoStore(conn))
+def plate_intake(conn: DbConn, locale: RequestLocale) -> PlateIntake:
+    return PlateIntake(SqliteFoodStore(conn, locale), SqliteMealPhotoStore(conn))
 
 
-def extras(conn: DbConn) -> ExtrasService:
-    return ExtrasService(day_store(conn), plate_intake(conn))
+def extras(conn: DbConn, locale: RequestLocale) -> ExtrasService:
+    return ExtrasService(day_store(conn, locale), plate_intake(conn, locale))
 
 
 def decisions() -> DecisionService:

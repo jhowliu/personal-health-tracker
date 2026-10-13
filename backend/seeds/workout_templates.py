@@ -178,6 +178,21 @@ TEMPLATES = (
     ),
 )
 
+ENGLISH_NAMES = {
+    "beginner-full-body-a": "Beginner Full Body A",
+    "beginner-full-body-b": "Beginner Full Body B",
+    "beginner-full-body-c": "Beginner Full Body C",
+    "push-day": "Push Day",
+    "pull-day": "Pull Day",
+    "leg-day": "Leg Day",
+    "pull-day-no-barbell": "Pull Day (No Barbell)",
+    "leg-day-no-barbell": "Leg Day (No Barbell)",
+    "glute-day": "Glute Day (Gym)",
+    "posture-day": "Posture Improvement (Gym)",
+    "glute-day-bodyweight": "Glute Day (Bodyweight)",
+    "posture-day-bodyweight": "Posture Improvement (Bodyweight)",
+}
+
 
 async def seed() -> int:
     async with get_conn() as conn:
@@ -198,6 +213,20 @@ async def seed() -> int:
             [
                 (template.id, template.name, template.location, template.duration_min)
                 for template in TEMPLATES
+            ],
+        )
+        await conn.executemany(
+            """
+            INSERT INTO translations (key, locale, text) VALUES (?, ?, ?)
+            ON CONFLICT (key, locale) DO UPDATE SET text = excluded.text
+            """,
+            [
+                translation
+                for template in TEMPLATES
+                for translation in (
+                    (f"workout_template.{template.id}.name", "zh-TW", template.name),
+                    (f"workout_template.{template.id}.name", "en", ENGLISH_NAMES[template.id]),
+                )
             ],
         )
         template_ids = tuple(template.id for template in TEMPLATES)

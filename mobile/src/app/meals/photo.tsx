@@ -6,6 +6,7 @@ import { Alert } from '@/components/alert';
 import { CameraIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { draft } from '@/meals/draft';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { photoDraft } from '@/meals/photo-draft';
@@ -13,6 +14,7 @@ import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 export default function MealPhotoCapture() {
+  const { t } = useI18n();
   const { destination = 'today', meal_id, date, slot } = useLocalSearchParams<{
     destination?: 'meal' | 'day' | 'today';
     meal_id?: string;
@@ -28,19 +30,23 @@ export default function MealPhotoCapture() {
     : destination === 'day'
       ? '/today'
       : '/meals';
-  const parentLabel = destination === 'meal' ? '編輯餐點' : destination === 'day' ? '今天' : '餐點';
+  const parentLabel = destination === 'meal'
+    ? t('meals.addFood.editMeal')
+    : destination === 'day'
+      ? t('common.labels.today')
+      : t('navigation.meals');
 
   useEffect(() => {
     if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
-      Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。', [
-        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      Alert.alert(t('meals.photo.missingDraftTitle'), t('meals.addFood.missingDraftBody'), [
+        { text: t('meals.photo.returnToMeals'), onPress: () => router.replace('/meals') },
       ]);
     } else if (destination === 'day' && (!date || !slot)) {
-      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。', [
-        { text: '返回今天', onPress: () => router.replace('/today') },
+      Alert.alert(t('meals.photo.missingSlotTitle'), t('meals.addFood.missingSlotBody'), [
+        { text: t('meals.photo.returnToToday'), onPress: () => router.replace('/today') },
       ]);
     }
-  }, [date, destination, meal_id, slot]);
+  }, [date, destination, meal_id, slot, t]);
 
   const choose = async () => {
     setPreview(null);
@@ -54,7 +60,7 @@ export default function MealPhotoCapture() {
         params: { destination, meal_id, date, slot, analysis_id: analysis.id },
       });
     } catch (error) {
-      Alert.alert('無法辨識餐點', photoErrorMessage(error));
+      Alert.alert(t('meals.photo.recognitionFailed'), photoErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -64,12 +70,12 @@ export default function MealPhotoCapture() {
     <Screen
       footer={
         <PrimaryButton onPress={choose} disabled={busy} busy={analyzing}>
-          {analyzing ? '辨識中…' : '選擇餐點照片'}
+          {analyzing ? t('common.states.recognizing') : t('meals.photo.chooseMealPhoto')}
         </PrimaryButton>
       }
     >
       <BackLink label={parentLabel} onPress={() => backOrReplace(parentRoute)} disabled={busy} />
-      <Title sub="拍一張清楚、光線足夠的餐點照，我們會找出食物與估計份量。">辨識餐點照片</Title>
+      <Title sub={t('meals.photo.subtitle')}>{t('meals.photo.title')}</Title>
 
       {preview ? (
         <Image source={{ uri: preview }} className="h-64 w-full rounded-card bg-fill" resizeMode="cover" />
@@ -77,7 +83,7 @@ export default function MealPhotoCapture() {
         // The empty frame is where the photo goes, so tapping it picks one, like the button below.
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="選擇餐點照片"
+          accessibilityLabel={t('meals.photo.chooseMealPhoto')}
           accessibilityState={{ disabled: busy }}
           disabled={busy}
           onPress={choose}
@@ -86,8 +92,8 @@ export default function MealPhotoCapture() {
           <View className="h-16 w-16 items-center justify-center rounded-full bg-primary-soft">
             <CameraIcon size={32} />
           </View>
-          <Text className="text-base text-primary">點這裡拍照或選照片</Text>
-          <Hint>不會自動儲存成餐點，確認後才會加入。</Hint>
+          <Text className="text-base text-primary">{t('meals.photo.tapToChoose')}</Text>
+          <Hint>{t('meals.photo.notSavedAutomatically')}</Hint>
         </Pressable>
       )}
 
@@ -95,8 +101,8 @@ export default function MealPhotoCapture() {
         <Card className="flex-row items-center gap-3">
           <ActivityIndicator color={color.primary} />
           <View className="flex-1 gap-0.5">
-            <Text className="text-base text-ink">正在辨識照片</Text>
-            <Hint>正在縮小、上傳並分析餐點。</Hint>
+            <Text className="text-base text-ink">{t('meals.photo.recognizingPhoto')}</Text>
+            <Hint>{t('meals.photo.recognizingDetail')}</Hint>
           </View>
         </Card>
       ) : null}

@@ -3,25 +3,26 @@ import * as ImagePicker from 'expo-image-picker';
 import { ensureAiConsent } from '@/ai/consent';
 import { ApiError } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { translate } from '@/i18n/translator';
 import { analyzeMealPhoto } from '@/meals/analyze-photo';
 
 /** What to tell the user when picking or recognizing a meal photo fails. */
 export function photoErrorMessage(error: unknown) {
   return error instanceof ApiError && error.status >= 500
-    ? '辨識服務目前未設定或暫時無法使用，請改用手動加入食物。'
+    ? translate('meals.photo.serviceUnavailable')
     : error instanceof Error
       ? error.message
-      : '照片辨識失敗，請稍後再試。';
+      : translate('meals.photo.recognitionFailed');
 }
 
 type PhotoSource = 'camera' | 'library';
 
 function choosePhotoSource(): Promise<PhotoSource | null> {
   return new Promise((resolve) => {
-    Alert.alert('選擇照片來源', undefined, [
-      { text: '拍照', onPress: () => resolve('camera') },
-      { text: '從相簿選擇', onPress: () => resolve('library') },
-      { text: '取消', style: 'cancel', onPress: () => resolve(null) },
+    Alert.alert(translate('meals.photo.chooseSourceTitle'), undefined, [
+      { text: translate('meals.photo.takePhoto'), onPress: () => resolve('camera') },
+      { text: translate('meals.photo.chooseLibrary'), onPress: () => resolve('library') },
+      { text: translate('common.actions.cancel'), style: 'cancel', onPress: () => resolve(null) },
     ]);
   });
 }
@@ -38,8 +39,8 @@ export async function pickAndAnalyzeMealPhoto(onPicked?: (uri: string) => void) 
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
     Alert.alert(
-      '需要照片權限',
-      source === 'camera' ? '請允許相機權限以拍攝食物。' : '請允許相簿權限以選擇食物照片。',
+      translate('meals.photo.permissionTitle'),
+      translate(source === 'camera' ? 'meals.photo.cameraPermissionBody' : 'meals.photo.libraryPermissionBody'),
     );
     return null;
   }

@@ -8,6 +8,8 @@ import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Rows, Screen, TextAction, Title } from '@/components/ui';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { draft } from '@/meals/draft';
 import { photoDraft, type RecognizedFood, type RecognizedItem } from '@/meals/photo-draft';
 import { describeFood } from '@/meals/portion';
@@ -25,11 +27,7 @@ type MacroField = 'protein_per_100g' | 'carb_per_100g' | 'fat_per_100g';
 const today = () => new Date().toLocaleDateString('en-CA');
 const kcalFromMacros = (protein: number, carbs: number, fat: number) =>
   protein * 4 + carbs * 4 + fat * 9;
-const SLOT_LABEL: Record<string, string> = {
-  breakfast: '早餐',
-  lunch: '午餐',
-  dinner: '晚餐',
-};
+const SLOT_IDS = ['breakfast', 'lunch', 'dinner'] as const;
 const libraryPick = (food: Food): RecognizedFood => ({
   food_id: food.id,
   category_id: food.category_id,
@@ -37,6 +35,7 @@ const libraryPick = (food: Food): RecognizedFood => ({
 });
 
 export default function MealPhotoResults() {
+  const { t } = useI18n();
   const {
     destination = 'today',
     meal_id,
@@ -88,8 +87,8 @@ export default function MealPhotoResults() {
   if (!analysis) {
     return (
       <Screen>
-        <Title>找不到辨識結果</Title>
-        <Hint>請先選擇餐點照片再進行辨識。</Hint>
+        <Title>{t('meals.photo.missingResults')}</Title>
+        <Hint>{t('meals.photo.missingResultsBody')}</Hint>
         <PrimaryButton
           onPress={() =>
             router.replace({
@@ -98,7 +97,7 @@ export default function MealPhotoResults() {
             })
           }
         >
-          選擇照片
+          {t('meals.photo.choosePhoto')}
         </PrimaryButton>
       </Screen>
     );
@@ -125,7 +124,13 @@ export default function MealPhotoResults() {
     (item) => !item.skipped && (item.selected || item.estimate) && item.grams > 0,
   );
   const totalKcal = included.reduce((sum, item) => sum + ((kcalPer100g(item) ?? 0) * item.grams) / 100, 0);
-  const slotLabel = slot ? SLOT_LABEL[slot] ?? '目前餐次' : '目前餐次';
+  const slotLabel = slot === 'breakfast'
+    ? t('common.mealTimes.breakfast')
+    : slot === 'lunch'
+      ? t('common.mealTimes.lunch')
+      : slot === 'dinner'
+        ? t('common.mealTimes.dinner')
+        : t('common.mealTimes.current');
 
   const resolveIncludedFoods = async () => {
     const resolved: { item: ReviewItem; food: Food }[] = [];
@@ -161,7 +166,7 @@ export default function MealPhotoResults() {
         const selected = libraryPick(food);
         update(index, { selected, alternatives: [selected, ...item.alternatives], confirmed: true });
       }
-      if (!food) throw new Error(`找不到「${label}」；請改用手動加入食物。`);
+      if (!food) throw new Error(t('meals.photo.foodNotFound', { name: label }));
       resolved.push({ item, food });
     }
     return resolved;
@@ -169,7 +174,7 @@ export default function MealPhotoResults() {
 
   const addToMeal = async () => {
     if (!meal_id || !draft.has(meal_id)) {
-      Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。');
+      Alert.alert(t('meals.photo.missingDraftTitle'), t('meals.addFood.missingDraftBody'));
       return;
     }
     setBusy(true);
@@ -179,7 +184,7 @@ export default function MealPhotoResults() {
       photoDraft.clear(analysisId);
       router.dismissTo({ pathname: '/meals/[id]', params: { id: meal_id } });
     } catch (error) {
-      Alert.alert('加入餐點失敗', error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試。');
+      Alert.alert(t('meals.photo.addToMealFailed'), error instanceof ApiError ? error.message : error instanceof Error ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -187,7 +192,7 @@ export default function MealPhotoResults() {
 
   const recordToday = async () => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(recordDate)) {
-      Alert.alert('日期格式不正確', '請輸入 YYYY-MM-DD，例如 2026-09-23。');
+      Alert.alert(t('meals.photo.invalidDateTitle'), t('meals.photo.invalidDateBody'));
       return;
     }
     setBusy(true);
@@ -203,19 +208,19 @@ export default function MealPhotoResults() {
         ),
       );
       photoDraft.clear(analysisId);
-      Alert.alert('已記錄', `已將 ${included.length} 項食物記錄到 ${recordDate}。`, [
-        { text: '好', onPress: () => router.dismissTo('/today') },
+      Alert.alert(t('meals.photo.recordedTitle'), t('meals.photo.recordedBody', { count: included.length, date: recordDate }), [
+        { text: t('common.actions.okay'), onPress: () => router.dismissTo('/today') },
       ]);
     } catch (error) {
-      Alert.alert('記錄失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('meals.photo.recordFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
   };
 
   const addToDay = async () => {
-    if (!dayDate || !slot || !SLOT_LABEL[slot]) {
-      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。');
+    if (!dayDate || !slot || !SLOT_IDS.includes(slot as (typeof SLOT_IDS)[number])) {
+      Alert.alert(t('meals.photo.missingSlotTitle'), t('meals.addFood.missingSlotBody'));
       return;
     }
     setBusy(true);
@@ -236,12 +241,12 @@ export default function MealPhotoResults() {
       router.dismissTo('/today');
     } catch (error) {
       Alert.alert(
-        addedToDay.current ? '已加入，但沒有標記吃完' : '加入餐次失敗',
+        addedToDay.current ? t('meals.photo.addedButNotEaten') : t('meals.photo.addSlotFailed'),
         error instanceof ApiError
           ? error.message
           : error instanceof Error
             ? error.message
-            : '請稍後再試。',
+            : t('common.errors.tryAgain'),
       );
     } finally {
       setBusy(false);
@@ -271,32 +276,36 @@ export default function MealPhotoResults() {
         <View className="gap-2">
           <View className="flex-row items-baseline justify-between">
             <Text className="text-sm text-muted">
-              {destination === 'today' ? `${recordDate}・` : ''}已選 {included.length} 項
+              {destination === 'today'
+                ? t('meals.photo.selectedSummaryWithDate', { date: recordDate, count: included.length })
+                : t('meals.photo.selectedSummary', { count: included.length })}
             </Text>
-            <Text className="text-sm text-muted">約 {Math.round(totalKcal).toLocaleString()} 大卡</Text>
+            <Text className="text-sm text-muted">
+              {t('meals.foodEditor.approximateCalories', { calories: formatNumber(Math.round(totalKcal)) })}
+            </Text>
           </View>
           {destination === 'meal' ? (
             <PrimaryButton onPress={addToMeal} disabled={included.length === 0} busy={busy}>
-              {busy ? '加入中…' : `加入目前餐點 (${included.length})`}
+              {busy ? t('common.states.adding') : t('meals.photo.addCurrentMeal', { count: included.length })}
             </PrimaryButton>
           ) : destination === 'day' ? (
             <PrimaryButton onPress={addToDay} disabled={included.length === 0} busy={busy}>
               {busy
-                ? '記錄中…'
+                ? t('common.states.recording')
                 : finish === '1'
-                  ? `記錄${slotLabel}並標記吃完`
-                  : `加入${slotLabel} (${included.length})`}
+                  ? t('meals.photo.recordAndFinish', { meal: slotLabel })
+                  : t('meals.photo.addToSlot', { meal: slotLabel, count: included.length })}
             </PrimaryButton>
           ) : (
             <PrimaryButton onPress={recordToday} disabled={included.length === 0} busy={busy}>
-              {busy ? '記錄中…' : `只記錄這一天 (${included.length})`}
+              {busy ? t('common.states.recording') : t('meals.photo.recordThisDayOnly', { count: included.length })}
             </PrimaryButton>
           )}
         </View>
       }
     >
       <BackLink
-        label="重新選照片"
+        label={t('meals.photo.chooseAgain')}
         onPress={() => {
           photoDraft.clear(analysisId);
           router.replace({
@@ -306,19 +315,19 @@ export default function MealPhotoResults() {
         }}
         disabled={busy}
       />
-      <Title sub="份量不對就直接改；認錯的食物，點「換成其他食物」。">辨識結果</Title>
+      <Title sub={t('meals.photo.resultsSubtitle')}>{t('meals.photo.resultsTitle')}</Title>
 
       {destination === 'today' ? (
         <View className="gap-2">
           <Field
-            label="記錄日期"
+            label={t('meals.photo.recordDate')}
             value={recordDate}
             onChangeText={setRecordDate}
             placeholder="YYYY-MM-DD"
           />
           <View className="flex-row">
             <Chip
-              label="今天"
+              label={t('common.labels.today')}
               selected={recordDate === today()}
               onPress={() => setRecordDate(today())}
             />
@@ -326,7 +335,7 @@ export default function MealPhotoResults() {
         </View>
       ) : null}
 
-      {items.length === 0 ? <Hint>沒有辨識到可加入的食物，請改用手動加入。</Hint> : null}
+      {items.length === 0 ? <Hint>{t('meals.photo.noRecognizedFood')}</Hint> : null}
       <Card className="px-4 py-0">
         <Rows>
           {items.map((item, index) => (
@@ -344,18 +353,18 @@ export default function MealPhotoResults() {
         </Rows>
       </Card>
       {destination === 'today' ? (
-        <Hint>「只記錄這一天」會新增每日額外食物，不會建立或覆寫命名餐點。</Hint>
+        <Hint>{t('meals.photo.dayOnlyHint')}</Hint>
       ) : destination === 'day' ? (
-        <Hint>確認後會加入今天的{slotLabel}，不會修改原本的命名餐點。</Hint>
+        <Hint>{t('meals.photo.todaySlotHint', { meal: slotLabel })}</Hint>
       ) : null}
 
-      <Sheet visible={searching !== null} title="換成其他食物" onClose={() => setSearching(null)}>
-        <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
+      <Sheet visible={searching !== null} title={t('meals.photo.replaceFood')} onClose={() => setSearching(null)}>
+        <Field value={query} onChangeText={setQuery} placeholder={t('meals.addFood.searchPlaceholder')} />
         <ScrollView style={{ maxHeight: 360 }} keyboardShouldPersistTaps="handled">
           {library === null ? (
             <ActivityIndicator color={color.primary} />
           ) : orderedHits.length === 0 ? (
-            <Hint>找不到符合的食物。換個關鍵字，或到食物庫新增自訂食物。</Hint>
+            <Hint>{t('meals.photo.noLibraryMatch')}</Hint>
           ) : (
             <Card className="px-0 py-0">
               <Rows>
@@ -397,6 +406,7 @@ function ReviewRow({
   onEstimate: (field: MacroField, value: number) => void;
   onSearch: () => void;
 }) {
+  const { t } = useI18n();
   // A row with nothing it could record starts open, since it cannot be saved as it is.
   const [open, setOpen] = useState(!item.selected && !item.estimate);
   const confidence = item.selected
@@ -414,36 +424,39 @@ function ReviewRow({
           <Text className="text-base text-ink">{item.selected?.label ?? item.label}</Text>
           {/* Shows the pairing, so "豬肉片 → 梅花豬(熟)" can be checked at a glance. */}
           {item.selected && bareName(item.selected.label) !== bareName(item.label) ? (
-            <Text className="text-sm text-muted">看起來是：{item.label}</Text>
+            <Text className="text-sm text-muted">{t('meals.photo.looksLike', { name: item.label })}</Text>
           ) : null}
           {item.selected && (item.confirmed || confidence >= 0.8) ? null : (
             <View className="flex-row flex-wrap gap-2">
-              {item.selected ? null : <Chip label="AI 估算營養" tone="warm" />}
+              {item.selected ? null : <Chip label={t('meals.photo.aiNutrition')} tone="warm" />}
               {item.confirmed || confidence >= 0.8 ? null : <Confidence confidence={confidence} />}
             </View>
           )}
         </View>
-        <TextAction label={item.skipped ? '恢復' : '略過'} onPress={() => onChange({ skipped: !item.skipped })} />
+        <TextAction
+          label={item.skipped ? t('meals.photo.restore') : t('common.actions.skip')}
+          onPress={() => onChange({ skipped: !item.skipped })}
+        />
       </View>
       <View className="flex-row items-end gap-3">
         <DecimalField
-          label="份量"
+          label={t('common.labels.portion')}
           value={item.grams}
           onChange={(grams) => onChange({ grams })}
           suffix="g"
           editable={!item.skipped}
         />
         <View className="h-11 w-24 items-end justify-center">
-          <Text className="text-base text-ink">{kcal === null ? '—' : `${kcal} 大卡`}</Text>
+          <Text className="text-base text-ink">{kcal === null ? '—' : `${kcal} ${t('common.units.kcal')}`}</Text>
         </View>
       </View>
-      <TextAction label={open ? '收起' : '換成其他食物'} onPress={() => setOpen(!open)} />
+      <TextAction label={open ? t('common.actions.collapse') : t('meals.photo.replaceFood')} onPress={() => setOpen(!open)} />
 
       {open ? (
         <View className="gap-3 rounded-tile border-[1.5px] border-edge p-3">
           {item.alternatives.length ? (
             <View className="gap-2">
-              <Text className="text-sm text-muted">可能是</Text>
+              <Text className="text-sm text-muted">{t('meals.photo.possibleMatch')}</Text>
               <View className="flex-row flex-wrap gap-2">
                 {item.alternatives.map((option) => (
                   <Chip
@@ -459,19 +472,19 @@ function ReviewRow({
 
           {item.selected ? (
             item.estimate ? (
-              <TextAction label="改回 AI 估算" onPress={() => onChange({ selected: null })} />
+              <TextAction label={t('meals.photo.useAiEstimate')} onPress={() => onChange({ selected: null })} />
             ) : null
           ) : item.estimate ? (
             <>
               <Field
-                label="食物名稱"
+                label={t('meals.foodEditor.foodName')}
                 value={item.label}
                 onChangeText={(label) => onChange({ label })}
                 editable={!item.skipped}
               />
               {named.length ? (
                 <View className="gap-2">
-                  <Text className="text-sm text-muted">食物庫裡的</Text>
+                  <Text className="text-sm text-muted">{t('meals.photo.libraryFood')}</Text>
                   <View className="flex-row flex-wrap gap-2">
                     {named.map((food) => (
                       <Chip key={food.id} label={food.name} onPress={() => pick(libraryPick(food))} />
@@ -479,17 +492,17 @@ function ReviewRow({
                   </View>
                 </View>
               ) : null}
-              <Hint>食物庫找不到的話，會用下面 AI 估算的營養素新增到你的食物庫。</Hint>
+              <Hint>{t('meals.photo.createEstimateHint')}</Hint>
               <View className="flex-row gap-2">
                 <DecimalField
-                  label="蛋白質"
+                  label={t('common.labels.protein')}
                   value={item.estimate.protein_per_100g}
                   onChange={(value) => onEstimate('protein_per_100g', value)}
                   suffix="g"
                   editable={!item.skipped}
                 />
                 <DecimalField
-                  label="碳水"
+                  label={t('common.labels.carbs')}
                   value={item.estimate.carb_per_100g}
                   onChange={(value) => onEstimate('carb_per_100g', value)}
                   suffix="g"
@@ -497,20 +510,20 @@ function ReviewRow({
                 />
               </View>
               <DecimalField
-                label="脂肪"
+                label={t('common.labels.fat')}
                 value={item.estimate.fat_per_100g}
                 onChange={(value) => onEstimate('fat_per_100g', value)}
                 suffix="g"
                 editable={!item.skipped}
               />
-              <Hint>每 100 g 約 {Math.round(item.estimate.kcal_per_100g)} 大卡</Hint>
+              <Hint>{t('meals.photo.estimatePerHundred', { calories: Math.round(item.estimate.kcal_per_100g) })}</Hint>
             </>
           ) : (
-            <Hint>食物庫找不到這一項，請搜尋食物庫，或略過。</Hint>
+            <Hint>{t('meals.photo.mustChooseOrSkip')}</Hint>
           )}
 
           <PrimaryButton tone="plain" onPress={onSearch}>
-            搜尋食物庫
+            {t('meals.photo.searchLibrary')}
           </PrimaryButton>
         </View>
       ) : null}
@@ -563,6 +576,11 @@ function DecimalField({
 }
 
 function Confidence({ confidence }: { confidence: number }) {
-  const state = confidence >= 0.8 ? ['信心高', 'good'] : confidence >= 0.5 ? ['需確認', 'warm'] : ['信心低', 'neutral'];
+  const { t } = useI18n();
+  const state = confidence >= 0.8
+    ? [t('meals.photo.confidenceHigh'), 'good']
+    : confidence >= 0.5
+      ? [t('meals.photo.confidenceReview'), 'warm']
+      : [t('meals.photo.confidenceLow'), 'neutral'];
   return <Chip label={`${state[0]} ${Math.round(confidence * 100)}%`} tone={state[1] as 'good' | 'warm' | 'neutral'} />;
 }

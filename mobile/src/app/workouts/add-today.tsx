@@ -9,23 +9,25 @@ import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/c
 import { Text } from '@/components/text';
 import { BackLink, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Workout = Schema<'WorkoutExecutionOut'>;
 
 export default function AddTodayWorkout() {
+  const { t } = useI18n();
   // from=focus: opened mid-workout from focus mode, which is where Back returns to.
   const { date, from } = useLocalSearchParams<{ date: string; from?: string }>();
-  const backLabel = from === 'focus' ? '回到訓練' : '今天';
+  const backLabel = from === 'focus' ? t('workouts.addToday.backToWorkout') : t('common.labels.today');
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [busy, setBusy] = useState(false);
-  const word = date ? dayWord(date) : '今天';
+  const word = date ? dayWord(date) : t('common.labels.today');
 
   useEffect(() => {
     if (!date) {
-      Alert.alert('找不到日期', '請回到今日流程重新操作。', [
-        { text: '返回今天', onPress: () => backOrReplace('/today') },
+      Alert.alert(t('workouts.addToday.missingDateTitle'), t('workouts.addToday.missingDateBody'), [
+        { text: t('meals.photo.returnToToday'), onPress: () => backOrReplace('/today') },
       ]);
       return;
     }
@@ -36,14 +38,14 @@ export default function AddTodayWorkout() {
         if (live) setWorkout(result);
       })
       .catch((error) =>
-        Alert.alert(`讀不到${dayWord(date)}的訓練`, error instanceof ApiError ? error.message : '請稍後再試。', [
-          { text: '返回今天', onPress: () => backOrReplace('/today') },
+        Alert.alert(t('workouts.focus.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'), [
+          { text: t('meals.photo.returnToToday'), onPress: () => backOrReplace('/today') },
         ]),
       );
     return () => {
       live = false;
     };
-  }, [date]);
+  }, [date, t]);
 
   // An exercise can be in today's workout only once, so the ones already there are not offered again.
   const addedIds = useMemo(
@@ -61,7 +63,7 @@ export default function AddTodayWorkout() {
       });
       setWorkout((await api.get(`/days/${date}/workout`)) as Workout);
     } catch (error) {
-      Alert.alert('加不了動作', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.addToday.addFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
       setBusy(false);
     }
@@ -72,7 +74,7 @@ export default function AddTodayWorkout() {
       footer={
         <View className="flex-row items-center justify-between gap-3">
           <Text className="text-base text-ink">
-            {word}共 <Text className="text-2xl text-primary">{workout?.items.length ?? 0}</Text> 個動作
+            {t('workouts.addToday.dayTotal', { day: word, count: workout?.items.length ?? 0 })}
           </Text>
           <Pressable
             accessibilityRole="button"
@@ -82,15 +84,21 @@ export default function AddTodayWorkout() {
               busy ? 'opacity-40' : 'active:opacity-80'
             }`}
           >
-            <Text className="text-sm text-white">{from === 'focus' ? '回到訓練' : `查看${word}的訓練`}</Text>
+            <Text className="text-sm text-white">
+              {from === 'focus' ? t('workouts.addToday.backToWorkout') : t('workouts.addToday.viewDayWorkout', { day: word })}
+            </Text>
             <ChevronIcon direction="right" size={16} tint={color.surface} />
           </Pressable>
         </View>
       }
     >
       <BackLink label={backLabel} onPress={() => backOrReplace('/today')} disabled={busy} />
-      <Title sub={`只會加入${word}的訓練，不會修改原本課表。`}>加入動作</Title>
-      <ExerciseLibrary onSelect={add} selectLabel={busy ? '加入中…' : `加入${word}`} addedIds={addedIds} />
+      <Title sub={t('workouts.addToday.subtitle', { day: word })}>{t('workouts.addToday.title')}</Title>
+      <ExerciseLibrary
+        onSelect={add}
+        selectLabel={busy ? t('common.states.adding') : t('workouts.addToday.addToDay', { day: word })}
+        addedIds={addedIds}
+      />
     </Screen>
   );
 }

@@ -28,6 +28,7 @@ import { FrameHostContext } from '@/components/frame-host';
 import { ChevronIcon, PlusIcon, type IconProps } from '@/components/icons';
 import { Text, TextInput } from '@/components/text';
 import { color } from '@/theme/tokens';
+import { useI18n } from '@/i18n/runtime';
 
 /**
  * nativeID of the accessory bar rendered once in the root layout.
@@ -362,17 +363,20 @@ export function AddRow({ label, onPress, disabled }: { label: string; onPress: (
  */
 export function BackLink({
   label,
+  accessibilityLabel,
   onPress,
   disabled,
 }: {
   label: string;
+  accessibilityLabel?: string;
   onPress: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`返回${label}`}
+      accessibilityLabel={accessibilityLabel ?? t('common.accessibility.goBackTo', { label })}
       onPress={onPress}
       disabled={disabled}
       hitSlop={{ top: 10, bottom: 10, left: 8, right: 24 }}
@@ -504,6 +508,7 @@ const TIP_ARROW = 12;
  * tapping anywhere else closes it.
  */
 export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
+  const { t } = useI18n();
   const button = useRef<View>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
     null,
@@ -568,7 +573,7 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
       <Pressable
         ref={button}
         accessibilityRole="button"
-        accessibilityLabel={`${label}說明`}
+      accessibilityLabel={t('common.accessibility.explainNamed', { name: label })}
         hitSlop={12}
         onPress={show}
         className="h-[18px] w-[18px] items-center justify-center rounded-full border border-muted"

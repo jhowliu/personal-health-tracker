@@ -4,7 +4,10 @@ import aiosqlite
 
 from app.domain.models import Food, FoodCategory, FoodState, Nutrients, SwapBasis
 
-_NAME = "f.name"
+_NAME = (
+    "COALESCE(CASE WHEN f.template_id IS NOT NULL AND f.name = ft.name "
+    "THEN tn.text END, f.name)"
+)
 
 _COLUMNS = f"""
     f.id, f.category_id, {_NAME} AS name, f.state,
@@ -13,7 +16,12 @@ _COLUMNS = f"""
     f.template_id
 """
 
-_FROM = "FROM foods f"
+_FROM = """
+    FROM foods f
+    LEFT JOIN food_templates ft ON ft.id = f.template_id
+    LEFT JOIN translations tn
+      ON tn.key = 'food.' || f.template_id || '.name' AND tn.locale = ?
+"""
 _VISIBLE = "f.user_id = ? AND f.archived_at IS NULL"
 
 
@@ -83,7 +91,7 @@ class SqliteFoodStore:
         self, user_id: str, query: str | None, category_id: str | None
     ) -> tuple[Food, ...]:
         clauses = [_VISIBLE]
-        params: list[object] = [user_id]
+        params: list[object] = [self._locale, user_id]
 
         if category_id:
             clauses.append("f.category_id = ?")
@@ -107,7 +115,7 @@ class SqliteFoodStore:
     async def load(self, user_id: str, food_id: str) -> Food | None:
         async with self._conn.execute(
             f"SELECT {_COLUMNS} {_FROM} WHERE f.id = ? AND {_VISIBLE}",
-            (food_id, user_id),
+            (self._locale, food_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
         return (await self._foods([row]))[0] if row else None
@@ -116,7 +124,7 @@ class SqliteFoodStore:
         """Existing meals and day snapshots retain foods archived from the picker."""
         async with self._conn.execute(
             f"SELECT {_COLUMNS} {_FROM} WHERE f.id = ? AND f.user_id = ?",
-            (food_id, user_id),
+            (self._locale, food_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
         return (await self._foods([row]))[0] if row else None

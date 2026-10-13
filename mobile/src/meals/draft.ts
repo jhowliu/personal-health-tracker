@@ -10,6 +10,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { Schema } from '@/api/client';
+import { translate } from '@/i18n/translator';
 
 type Food = Schema<'FoodOut'>;
 type Meal = Schema<'MealOut'>;
@@ -45,7 +46,7 @@ function get(key: string): Draft {
 
 function requireDraft(key: string): Draft {
   const current = drafts.get(key);
-  if (!current) throw new Error('找不到目前餐點草稿，請回到餐點頁重新開啟。');
+  if (!current) throw new Error(translate('meals.addFood.missingCurrentDraft'));
   return current;
 }
 

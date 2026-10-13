@@ -13,6 +13,23 @@ async def test_categories_carry_their_swap_rule(with_foods: AsyncClient):
     assert categories["staple"]["name"] == "主食"
 
 
+async def test_builtin_foods_and_categories_follow_accept_language(with_foods: AsyncClient):
+    categories = {
+        category["id"]: category
+        for category in (
+            await with_foods.get("/food-categories", headers={"Accept-Language": "en-AU"})
+        ).json()
+    }
+    foods = (
+        await with_foods.get(
+            "/foods?category=staple", headers={"Accept-Language": "en-AU,en;q=0.9"}
+        )
+    ).json()
+
+    assert categories["staple"]["name"] == "Staples"
+    assert next(food for food in foods if food["template_id"] == "toast")["name"] == "Toast"
+
+
 async def test_browsing_by_category(with_foods: AsyncClient):
     foods = (await with_foods.get("/foods?category=protein")).json()
 

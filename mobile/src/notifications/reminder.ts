@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 
 import { api, type Schema } from '@/api/client';
 import { color } from '@/theme/tokens';
+import { translate } from '@/i18n/translator';
 
 import { localDateISO, reminderDates } from './reminder-plan';
 
@@ -76,7 +77,7 @@ export function syncWeighInReminder(
 
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
-        name: '每天早上提醒',
+        name: translate('reminders.channel'),
         importance: Notifications.AndroidImportance.DEFAULT,
         lightColor: color.primary,
       });
@@ -86,8 +87,8 @@ export function syncWeighInReminder(
     for (const date of dates) {
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: '早安，先量一下',
-          body: '起床、上完廁所、還沒吃喝前量最準。',
+          title: translate('reminders.title'),
+          body: translate('reminders.body'),
           data: { kind: KIND },
         },
         trigger: {

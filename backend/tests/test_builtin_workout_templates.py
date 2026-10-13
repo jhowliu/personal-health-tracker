@@ -89,3 +89,16 @@ async def test_builtin_template_can_be_copied_without_becoming_account_data(
     assert (await with_profile.delete("/users/me")).status_code == 204
     with_profile.headers["Authorization"] = f"Bearer {registered.json()['access_token']}"
     assert len((await with_profile.get("/workout-templates")).json()) == len(TEMPLATES)
+
+
+async def test_builtin_templates_follow_accept_language(with_profile: AsyncClient):
+    await seed_exercises()
+    await seed_workout_templates()
+
+    templates = (
+        await with_profile.get("/workout-templates", headers={"Accept-Language": "en-US"})
+    ).json()
+    beginner = next(template for template in templates if template["id"] == "beginner-full-body-a")
+
+    assert beginner["name"] == "Beginner Full Body A"
+    assert beginner["items"][0]["exercise_name"] == "Barbell Back Squat"

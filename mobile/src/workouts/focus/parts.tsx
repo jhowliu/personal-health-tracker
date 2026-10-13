@@ -4,6 +4,8 @@ import { Pressable, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 
 /** Timers and weights must not jitter as digits change. */
@@ -24,7 +26,9 @@ export const kg = (value: number) => (Number.isInteger(value) ? String(value) : 
 export function spokenDuration(totalSec: number) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return m ? `${m} 分 ${s} 秒` : `${s} 秒`;
+  return m
+    ? translate('workouts.focus.spokenMinutesSeconds', { minutes: m, seconds: s })
+    : translate('workouts.focus.spokenSeconds', { seconds: s });
 }
 
 /** − value + ; holding a button keeps stepping, the way a gym machine's pin is moved. */
@@ -39,18 +43,19 @@ export function Stepper({
   unit: string;
   onStep: (direction: 1 | -1) => void;
 }) {
+  const { t } = useI18n();
   return (
     <View className="flex-row items-center justify-between py-1.5">
       <Text className="text-base text-muted">{label}</Text>
       <View className="flex-row items-center gap-1">
-        <HoldButton label={`減少${label}`} symbol="−" onStep={() => onStep(-1)} />
+        <HoldButton label={t('common.accessibility.decreaseNamed', { name: label })} symbol="−" onStep={() => onStep(-1)} />
         <View className="min-w-[110px] flex-row items-baseline justify-center">
           <Text className="text-[38px] text-ink" style={tabular}>
             {value}
           </Text>
           <Text className="ml-1 text-sm text-muted">{unit}</Text>
         </View>
-        <HoldButton label={`增加${label}`} symbol="+" onStep={() => onStep(1)} />
+        <HoldButton label={t('common.accessibility.increaseNamed', { name: label })} symbol="+" onStep={() => onStep(1)} />
       </View>
     </View>
   );
@@ -91,11 +96,12 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 /** The rest countdown: the ring shrinks as the rest runs out (spec §3 D). */
 export function RestRing({ leftSec, totalSec }: { leftSec: number; totalSec: number }) {
+  const { t } = useI18n();
   const fraction = totalSec > 0 ? Math.min(1, leftSec / totalSec) : 0;
   return (
     <View
       accessible
-      accessibilityLabel={`休息剩餘 ${spokenDuration(leftSec)}`}
+      accessibilityLabel={t('workouts.focus.restRemaining', { duration: spokenDuration(leftSec) })}
       className="items-center justify-center self-center"
       style={{ width: RING, height: RING }}
     >
@@ -114,7 +120,7 @@ export function RestRing({ leftSec, totalSec }: { leftSec: number; totalSec: num
           transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
         />
       </Svg>
-      <Text className="text-sm text-primary">休息中</Text>
+      <Text className="text-sm text-primary">{t('workouts.focus.resting')}</Text>
       <Text className="text-[52px] font-extrabold text-ink" style={tabular}>
         {clock(leftSec)}
       </Text>

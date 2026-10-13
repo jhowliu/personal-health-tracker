@@ -234,6 +234,6 @@ export function SessionProvider({ children, onSignedOut }: SessionProviderProps)
 
 export function useSession(): Session {
   const session = use(SessionContext);
-  if (!session) throw new Error('useSession 必須放在 SessionProvider 底下');
+  if (!session) throw new Error('useSession must be used inside SessionProvider');
   return session;
 }

@@ -1,0 +1,18 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Daily Fat Loss Plan",
+    "NSCameraUsageDescription": "Take a meal photo to identify foods and estimate portions.",
+    "NSPhotoLibraryUsageDescription": "Choose a meal photo from your library to identify foods.",
+    "Localizable.strings": {
+      "WEIGH_IN_NOTIFICATION_TITLE": "Good morning — time to weigh in",
+      "WEIGH_IN_NOTIFICATION_BODY": "For the best consistency, weigh yourself after using the bathroom and before eating or drinking.",
+      "REST_FINISHED_NOTIFICATION_TITLE": "Rest finished"
+    }
+  },
+  "android": {
+    "app_name": "Daily Fat Loss Plan",
+    "WEIGH_IN_NOTIFICATION_TITLE": "Good morning — time to weigh in",
+    "WEIGH_IN_NOTIFICATION_BODY": "For the best consistency, weigh yourself after using the bathroom and before eating or drinking.",
+    "REST_FINISHED_NOTIFICATION_TITLE": "Rest finished"
+  }
+}

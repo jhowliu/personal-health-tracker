@@ -7,11 +7,13 @@ import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { BackLink, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { safeReturnTo } from '@/navigation/return-to';
 
 export default function Register() {
   const { signIn } = useSession();
+  const { locale, t } = useI18n();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,10 +22,13 @@ export default function Register() {
   const submit = async () => {
     setBusy(true);
     try {
-      await signIn('/auth/register', { email, password });
+      await signIn('/auth/register', { email, password, locale });
       router.replace(safeReturnTo(returnTo));
     } catch (error) {
-      Alert.alert('註冊失敗', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('auth.register.failed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
     } finally {
       setBusy(false);
     }
@@ -33,15 +38,15 @@ export default function Register() {
     <Screen>
       <View className="gap-6 pt-16">
         <BackLink
-          label="登入"
+          label={t('auth.register.backToLogin')}
           onPress={() => backOrReplace({ pathname: '/login', params: { returnTo } })}
         />
 
-        <Title sub="建立帳號後，下一步填個人資料算出每日目標。">註冊新帳號</Title>
+        <Title sub={t('auth.register.subtitle')}>{t('auth.register.title')}</Title>
 
         <View className="gap-3">
           <Field
-            label="Email"
+            label={t('common.labels.email')}
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
@@ -49,23 +54,23 @@ export default function Register() {
             keyboardType="email-address"
           />
           <Field
-            label="密碼"
+            label={t('common.labels.password')}
             value={password}
             onChangeText={setPassword}
-            placeholder="至少 8 個字"
+            placeholder={t('auth.register.passwordPlaceholder')}
             secureTextEntry
           />
-          <Hint>密碼至少 8 個字。</Hint>
+          <Hint>{t('auth.register.passwordHint')}</Hint>
         </View>
 
         <PrimaryButton onPress={submit} disabled={busy || password.length < 8 || !email}>
-          {busy ? '建立中…' : '建立帳號'}
+          {busy ? t('auth.register.creating') : t('auth.register.action')}
         </PrimaryButton>
 
         <Text className="text-center text-sm text-muted">
-          建立帳號即表示同意{' '}
+          {t('auth.register.agreementPrefix')}{' '}
           <Link href="/privacy" className="text-primary underline">
-            隱私權政策
+            {t('auth.register.privacyPolicy')}
           </Link>
         </Text>
       </View>

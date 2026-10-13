@@ -18,6 +18,9 @@ import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';
 import { todayISO } from '@/dates';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 import { RestRing, Segments, SetDots, Stepper, clock, kg, tabular } from '@/workouts/focus/parts';
 import { buzz, cancelRestAlarm, ensureRestAlarmPermission, scheduleRestAlarm } from '@/workouts/focus/rest-alarm';
@@ -52,19 +55,15 @@ import { clearSession, loadSession, saveSession } from '@/workouts/focus/storage
 
 type Workout = Schema<'WorkoutExecutionOut'>;
 
-const EFFORTS: { id: Effort; label: string }[] = [
-  { id: 'easy', label: '輕鬆' },
-  { id: 'appropriate', label: '剛好' },
-  { id: 'hard', label: '吃力' },
-];
-const EFFORT_WORD: Record<Effort, string> = { easy: '輕鬆', appropriate: '剛好', hard: '吃力' };
+const EFFORTS: Effort[] = ['easy', 'appropriate', 'hard'];
 /** A second tap within this window is the same tap, not a second set (spec §6). */
 const DOUBLE_TAP_MS = 300;
 
 export default function FocusWorkout() {
+  const { t } = useI18n();
   const { date } = useLocalSearchParams<{ date: string }>();
   const [session, setSession] = useState<Session | null>(null);
-  const [title, setTitle] = useState('今天的訓練');
+  const [title, setTitle] = useState(() => t('workouts.focus.todayWorkout'));
   const [phase, setPhase] = useState<'focus' | 'summary'>('focus');
   const [sheet, setSheet] = useState<'list' | 'exit' | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -103,7 +102,7 @@ export default function FocusWorkout() {
         try {
           const workout = (await api.get(`/days/${date}/workout`)) as Workout;
           if (!active) return;
-          setTitle(workout.template?.name ?? '今天的訓練');
+          setTitle(workout.template?.name ?? t('workouts.focus.todayWorkout'));
           const at = Date.now();
           const fresh = fromWorkout(workout, at);
           const base = live.current ?? (await loadSession(date));
@@ -115,14 +114,14 @@ export default function FocusWorkout() {
             if (!(await ensureRestAlarmPermission())) setNotifyHint(true);
           }
         } catch (error) {
-          Alert.alert('讀不到今天的訓練', error instanceof ApiError ? error.message : '請稍後再試。');
+          Alert.alert(t('workouts.focus.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
           router.back();
         }
       })();
       return () => {
         active = false;
       };
-    }, [date]),
+    }, [date, t]),
   );
 
   // Leaving the screen by any way out — the back gesture, Android's back button, the browser's
@@ -155,18 +154,18 @@ export default function FocusWorkout() {
         setSession(settleRest(current, at));
         void cancelRestAlarm(current.date);
         buzz();
-        showToast('休息結束，開始下一組');
+        showToast(t('workouts.focus.restFinishedToast'));
       }
       const timer = cardioRef.current;
       const exercise = current?.exercises[current.currentIndex];
       if (timer.since !== null && exercise?.kind === 'time' && timer.spentMs + at - timer.since >= exercise.minutes * 60000) {
         setCardio({ since: null, spentMs: exercise.minutes * 60000 });
         buzz();
-        showToast('時間到');
+        showToast(t('workouts.focus.timeUpToast'));
       }
     }, 500);
     return () => clearInterval(id);
-  }, [showToast]);
+  }, [showToast, t]);
 
   // Back from the background: the notification already told them, so just catch up quietly.
   useEffect(() => {
@@ -195,11 +194,11 @@ export default function FocusWorkout() {
 
   const restBody = (next: Session) => {
     const coming = next.exercises[next.currentIndex];
-    if (next.rest?.nextIsNewExercise) return `下一個：${coming.name}`;
+    if (next.rest?.nextIsNewExercise) return t('workouts.focus.nextExercise', { name: coming.name });
     const warm = currentWarmup(coming);
     return warm
-      ? `熱身第 ${warm.number} 組：${kg(warm.set.weightKg)} kg × ${warm.set.reps}`
-      : `開始第 ${coming.logs.length + 1} 組`;
+      ? t('workouts.focus.warmupNext', { number: warm.number, weight: kg(warm.set.weightKg), reps: warm.set.reps })
+      : t('workouts.focus.nextSet', { number: coming.logs.length + 1 });
   };
 
   const complete = async () => {
@@ -222,7 +221,7 @@ export default function FocusWorkout() {
           incline_pct: log.inclinePct,
         });
       } catch (error) {
-        Alert.alert('這組沒有記錄到', error instanceof ApiError ? error.message : '請確認網路後再按一次。');
+        Alert.alert(t('workouts.focus.setSaveFailed'), error instanceof ApiError ? error.message : t('workouts.focus.setSaveFailedBody'));
         return;
       } finally {
         setBusy(false);
@@ -287,7 +286,7 @@ export default function FocusWorkout() {
       });
       setSession((current) => (current ? setFeedback(current, target.itemId, effort) : current));
     } catch (error) {
-      Alert.alert('回饋沒有存到', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('workouts.focus.feedbackSaveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
   };
 
@@ -322,7 +321,7 @@ export default function FocusWorkout() {
       await clearSession(date);
       router.back();
     } catch (error) {
-      Alert.alert('儲存失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('workouts.focus.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -360,21 +359,24 @@ export default function FocusWorkout() {
       <View className="flex-row items-center justify-between px-3.5 pt-2">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="離開訓練"
+          accessibilityLabel={t('workouts.focus.leaveAccessibility')}
           onPress={() => setSheet('exit')}
           className="h-[46px] w-[46px] items-center justify-center rounded-full border-2 border-edge bg-surface"
         >
           <CloseIcon size={20} tint={color.ink} />
         </Pressable>
         <View className="items-center">
-          <Text className="text-xs text-muted">訓練時間</Text>
+          <Text className="text-xs text-muted">{t('workouts.focus.workoutTime')}</Text>
           <Text className="text-xl text-ink" style={tabular}>
             {clock(elapsedMs(session, now) / 1000)}
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`動作清單，目前第 ${session.currentIndex + 1} 個，共 ${session.exercises.length} 個`}
+          accessibilityLabel={t('workouts.focus.exerciseListAccessibility', {
+            current: session.currentIndex + 1,
+            total: session.exercises.length,
+          })}
           onPress={() => setSheet('list')}
           className="h-[46px] flex-row items-center rounded-full border-2 border-edge bg-surface px-3.5"
         >
@@ -391,23 +393,26 @@ export default function FocusWorkout() {
       <ScrollView className="flex-1" contentContainerClassName="gap-1 px-[18px] pb-4 pt-3">
         {notifyHint ? (
           <Pressable onPress={() => setNotifyHint(false)} className="mb-2 rounded-card bg-warm-soft p-3">
-            <Text className="text-sm text-warm">開啟通知後，休息結束時手機會提醒你。到系統設定開啟，或點這裡關閉提示。</Text>
+            <Text className="text-sm text-warm">{t('workouts.focus.notificationHint')}</Text>
           </Pressable>
         ) : null}
         {resting ? (
           <Text className="text-sm text-primary">
             {session.rest?.nextIsNewExercise
-              ? '下一個動作'
+              ? t('workouts.focus.nextExerciseLabel')
               : warmup
-                ? `下一組 · 熱身 ${warmup.number} / ${warmup.total}`
-                : `下一組 · 第 ${setNumber} / ${exercise.plannedSets} 組`}
+                ? t('workouts.focus.nextWarmup', { current: warmup.number, total: warmup.total })
+                : t('workouts.focus.nextWorkingSet', { current: setNumber, total: exercise.plannedSets })}
           </Text>
         ) : null}
         <Text className="text-[30px] leading-tight text-ink">{exercise.name}</Text>
         <Text className="text-[15px] text-muted">
           {exercise.kind === 'time'
-            ? `目標 ${exercise.targetMin} 分鐘`
-            : `目標 ${exercise.plannedSets} 組${exercise.repsLabel ? ` × ${exercise.repsLabel} 下` : ''}`}
+            ? t('workouts.focus.targetMinutes', { minutes: exercise.targetMin })
+            : t('workouts.focus.targetSets', {
+                sets: exercise.plannedSets,
+                reps: exercise.repsLabel ? t('workouts.focus.repSuffix', { reps: exercise.repsLabel }) : '',
+              })}
         </Text>
 
         {resting && session.rest ? (
@@ -431,7 +436,11 @@ export default function FocusWorkout() {
               className="h-[50px] justify-center rounded-button border-2 border-edge bg-surface px-5"
             >
               <Text className="text-base text-ink">
-                {cardio.since !== null ? '暫停' : cardio.spentMs > 0 ? '繼續計時' : '開始計時'}
+                {cardio.since !== null
+                  ? t('workouts.focus.pause')
+                  : cardio.spentMs > 0
+                    ? t('workouts.focus.resumeTimer')
+                    : t('workouts.focus.startTimer')}
               </Text>
             </Pressable>
           </View>
@@ -440,24 +449,24 @@ export default function FocusWorkout() {
           <View className="gap-0.5 pb-1.5 pt-4">
             <View className="flex-row items-baseline gap-1.5">
               <Text className="text-[52px] font-extrabold text-warm" style={tabular}>
-                熱身 {warmup.number}
+                {t('workouts.focus.warmup', { number: warmup.number })}
               </Text>
-              <Text className="text-[17px] text-muted">/ {warmup.total} 組</Text>
+              <Text className="text-[17px] text-muted">{t('workouts.focus.setCounter', { total: warmup.total })}</Text>
             </View>
             <Text className="text-[26px] text-ink" style={tabular}>
-              {kg(warmup.set.weightKg)} kg × {warmup.set.reps} 下
+              {t('workouts.focus.weightReps', { weight: kg(warmup.set.weightKg), reps: warmup.set.reps })}
             </Text>
             <Text className="text-[13px] text-muted">
-              依正式組 {kg(exercise.weightKg ?? 0)} kg 計算，改下面的重量會跟著變
+              {t('workouts.focus.warmupExplanation', { weight: kg(exercise.weightKg ?? 0) })}
             </Text>
           </View>
         ) : (
           <View className="flex-row items-center justify-between pb-1.5 pt-4">
             <View className="flex-row items-baseline gap-1.5">
               <Text className="text-[52px] font-extrabold text-primary" style={tabular}>
-                第 {setNumber}
+                {t('workouts.focus.setNumber', { number: setNumber })}
               </Text>
-              <Text className="text-[17px] text-muted">/ {exercise.plannedSets} 組</Text>
+              <Text className="text-[17px] text-muted">{t('workouts.focus.setCounter', { total: exercise.plannedSets })}</Text>
             </View>
             <SetDots done={exercise.logs.length} total={exercise.plannedSets} />
           </View>
@@ -469,29 +478,29 @@ export default function FocusWorkout() {
         {exercise.kind === 'time' ? (
           <>
             <Stepper
-              label="實際時間"
+              label={t('common.labels.actualTime')}
               value={String(exercise.minutes)}
-              unit="分鐘"
+              unit={t('common.units.minute')}
               onStep={(direction) => setSession(step(session, 'minutes', direction))}
             />
             {exercise.treadmill ? (
               <>
                 <Stepper
-                  label="速度"
+                  label={t('common.labels.speed')}
                   value={exercise.speedKmh === null ? '—' : kg(exercise.speedKmh)}
                   unit="km/h"
                   onStep={(direction) => setSession(step(session, 'speed', direction))}
                 />
                 <Stepper
-                  label="坡度"
+                  label={t('common.labels.incline')}
                   value={exercise.inclinePct === null ? '—' : kg(exercise.inclinePct)}
                   unit="%"
                   onStep={(direction) => setSession(step(session, 'incline', direction))}
                 />
                 <Text className="text-[13px] text-muted">
                   {exercise.speedKmh === null
-                    ? '選填：填了速度和坡度，熱量會照實際走或跑的強度算。'
-                    : '熱量會照這個速度和坡度算。'}
+                    ? t('workouts.focus.cardioOptionalHint')
+                    : t('workouts.focus.cardioHint')}
                 </Text>
               </>
             ) : null}
@@ -500,16 +509,16 @@ export default function FocusWorkout() {
           <>
             {exercise.weightKg !== null ? (
               <Stepper
-                label={warmup ? '正式組重量' : '重量'}
+                label={warmup ? t('workouts.focus.workingWeight') : t('common.labels.weight')}
                 value={kg(exercise.weightKg)}
                 unit="kg"
                 onStep={(direction) => setSession(step(session, 'weight', direction))}
               />
             ) : null}
             <Stepper
-              label={warmup ? '正式組次數' : '次數'}
+              label={warmup ? t('workouts.focus.workingReps') : t('common.labels.reps')}
               value={String(exercise.reps)}
-              unit="下"
+              unit={t('common.units.rep')}
               onStep={(direction) => setSession(step(session, 'reps', direction))}
             />
           </>
@@ -520,7 +529,7 @@ export default function FocusWorkout() {
             {warmedUp.map((set, index) => (
               <View key={index} className="rounded-full bg-warm-soft px-2.5 py-1.5">
                 <Text className="text-[13px] text-warm" style={tabular}>
-                  ✓ 熱身 {kg(set.weightKg)} × {set.reps}
+                  {t('workouts.focus.completedWarmup', { weight: kg(set.weightKg), reps: set.reps })}
                 </Text>
               </View>
             ))}
@@ -532,7 +541,10 @@ export default function FocusWorkout() {
             {exercise.logs.map((log, index) => (
               <View key={index} className="rounded-full bg-good-soft px-2.5 py-1.5">
                 <Text className="text-[13px] text-good" style={tabular}>
-                  ✓ 第 {index + 1} 組 {log.weightKg !== null ? `${kg(log.weightKg)} × ${log.reps}` : `× ${log.reps}`}
+                  {t('workouts.focus.completedSet', {
+                    number: index + 1,
+                    result: log.weightKg !== null ? `${kg(log.weightKg)} × ${log.reps}` : `× ${log.reps}`,
+                  })}
                 </Text>
               </View>
             ))}
@@ -543,14 +555,14 @@ export default function FocusWorkout() {
       <View className="gap-2 px-[18px] pb-2 pt-2">
         {resting ? (
           <View className="flex-row gap-2.5">
-            <DockButton label={`−${REST_STEP_SEC} 秒`} onPress={() => nudgeRest(-REST_STEP_SEC)} />
-            <DockButton label={`+${REST_STEP_SEC} 秒`} onPress={() => nudgeRest(REST_STEP_SEC)} />
+            <DockButton label={t('workouts.focus.decreaseRest', { seconds: REST_STEP_SEC })} onPress={() => nudgeRest(-REST_STEP_SEC)} />
+            <DockButton label={t('workouts.focus.increaseRest', { seconds: REST_STEP_SEC })} onPress={() => nudgeRest(REST_STEP_SEC)} />
             <Pressable
               accessibilityRole="button"
               onPress={endRest}
               className="h-16 flex-1 items-center justify-center rounded-[18px] border-2 border-primary bg-surface/60"
             >
-              <Text className="text-[17px] text-primary">略過休息</Text>
+              <Text className="text-[17px] text-primary">{t('workouts.focus.skipRest')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -558,10 +570,13 @@ export default function FocusWorkout() {
             {finalSet ? (
               <Text className="text-center text-[13px] text-muted">
                 {after !== -1
-                  ? `${exercise.kind === 'time' ? '做完這個動作' : '做完這組'}，下一個：${session.exercises[after].name}`
+                  ? t('workouts.focus.afterSetNextExercise', {
+                      action: t(exercise.kind === 'time' ? 'workouts.focus.finishExercise' : 'workouts.focus.finishSet'),
+                      name: session.exercises[after].name,
+                    })
                   : exercise.kind === 'time'
-                    ? '這是今天最後一個動作'
-                    : '這是今天最後一組'}
+                    ? t('workouts.focus.lastExercise')
+                    : t('workouts.focus.lastSet')}
               </Text>
             ) : null}
             <Pressable
@@ -572,14 +587,14 @@ export default function FocusWorkout() {
             >
               <Text className="text-[19px] text-white">
                 {busy
-                  ? '記錄中…'
+                  ? t('common.states.recording')
                   : warmup
-                    ? `完成熱身第 ${warmup.number} 組`
+                    ? t('workouts.focus.finishWarmup', { number: warmup.number })
                     : exercise.kind === 'time'
-                      ? '完成這個動作'
+                      ? t('workouts.focus.finishThisExercise')
                       : lastOfDay
-                        ? '完成最後一組'
-                        : `完成第 ${setNumber} 組`}
+                        ? t('workouts.focus.finishLastSet')
+                        : t('workouts.focus.finishSetNumber', { number: setNumber })}
               </Text>
             </Pressable>
             {warmup ? (
@@ -588,7 +603,7 @@ export default function FocusWorkout() {
                 onPress={endWarmup}
                 className="min-h-[44px] items-center justify-center"
               >
-                <Text className="text-base text-primary">略過熱身，直接做正式組</Text>
+                <Text className="text-base text-primary">{t('workouts.focus.skipWarmup')}</Text>
               </Pressable>
             ) : null}
           </>
@@ -601,18 +616,18 @@ export default function FocusWorkout() {
         </View>
       ) : null}
 
-      <Sheet visible={sheet === 'list'} title="今天的動作" onClose={() => setSheet(null)}>
-        <Hint>器材被占用時，可以先換別的動作做。</Hint>
+      <Sheet visible={sheet === 'list'} title={t('workouts.focus.exerciseListTitle')} onClose={() => setSheet(null)}>
+        <Hint>{t('workouts.focus.occupiedHint')}</Hint>
         {session.exercises.map((candidate, index) => {
           const done = isDone(candidate);
           const current = index === session.currentIndex;
           const status = done
-            ? '✓ 完成'
+            ? t('workouts.item.completed')
             : current
-              ? '目前'
+              ? t('common.states.current')
               : candidate.logs.length
-                ? `${candidate.logs.length} / ${candidate.plannedSets} 組`
-                : '未開始';
+                ? t('workouts.item.setProgress', { done: candidate.logs.length, total: candidate.plannedSets })
+                : t('common.states.notStarted');
           // Only an exercise not yet started can be swapped, so its sets never mix two exercises.
           const swappable = !done && candidate.logs.length === 0;
           return (
@@ -624,7 +639,7 @@ export default function FocusWorkout() {
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`改做${candidate.name}`}
+                accessibilityLabel={t('workouts.focus.changeToNamed', { name: candidate.name })}
                 disabled={done || current}
                 onPress={() => switchTo(index)}
                 className="min-h-14 flex-1 flex-row items-center justify-between gap-2"
@@ -641,30 +656,30 @@ export default function FocusWorkout() {
               {swappable ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`把${candidate.name}換成其他動作`}
+                  accessibilityLabel={t('workouts.focus.replaceNamed', { name: candidate.name })}
                   onPress={() => openElsewhere(replacePath(candidate))}
                   className="min-h-[36px] justify-center rounded-full border border-primary bg-surface px-3"
                 >
-                  <Text className="text-sm text-primary">換動作</Text>
+                  <Text className="text-sm text-primary">{t('workouts.item.changeExercise')}</Text>
                 </Pressable>
               ) : null}
             </View>
           );
         })}
         <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => openElsewhere(`/workouts/add-today?date=${date}&from=focus`)}>
-          加入動作
+          {t('workouts.addToday.title')}
         </PrimaryButton>
       </Sheet>
 
-      <Sheet visible={sheet === 'exit'} title="要離開訓練嗎？" onClose={() => setSheet(null)}>
-        <Hint>已完成的組數都已經記下來了。</Hint>
-        <PrimaryButton onPress={() => setSheet(null)}>繼續訓練</PrimaryButton>
+      <Sheet visible={sheet === 'exit'} title={t('workouts.focus.leaveTitle')} onClose={() => setSheet(null)}>
+        <Hint>{t('workouts.focus.leaveBody')}</Hint>
+        <PrimaryButton onPress={() => setSheet(null)}>{t('workouts.focus.continueWorkout')}</PrimaryButton>
         <PrimaryButton tone="plain" onPress={leave}>
-          暫停並離開，稍後再繼續
+          {t('workouts.focus.pauseAndLeave')}
         </PrimaryButton>
         {anyLogged ? (
           <Pressable accessibilityRole="button" onPress={finishEarly} className="min-h-[44px] items-center justify-center">
-            <Text className="text-base text-primary">結束並儲存</Text>
+            <Text className="text-base text-primary">{t('workouts.focus.finishAndSave')}</Text>
           </Pressable>
         ) : null}
       </Sheet>
@@ -674,17 +689,24 @@ export default function FocusWorkout() {
 
 /** Where the stepper values came from: today's last set, an earlier day, or the plan. */
 function carriedNote(exercise: FocusExercise) {
-  if (exercise.kind === 'time') return `課表 ${exercise.targetMin} 分鐘，已帶入`;
-  if (exercise.logs.length) return '沿用上一組，可以再調整';
+  if (exercise.kind === 'time') return translate('workouts.focus.prefillTime', { minutes: exercise.targetMin });
+  if (exercise.logs.length) return translate('workouts.focus.prefillPreviousSet');
   const last = exercise.last;
-  if (!last) return '照課表帶入';
-  const feeling = last.effort ? `（${EFFORT_WORD[last.effort]}）` : '';
-  if (last.weightKg === null) return `上次 ${last.reps ?? '-'} 下${feeling}，已帶入`;
+  if (!last) return translate('workouts.focus.prefillPlan');
+  const feeling = last.effort ? ` (${translate(`common.effort.${last.effort}`)})` : '';
+  if (last.weightKg === null) {
+    return translate('workouts.focus.prefillBodyweight', { reps: last.reps ?? '-', feeling });
+  }
   const suggested =
     exercise.suggestedWeightKg !== null && exercise.suggestedWeightKg !== last.weightKg
-      ? `，建議 ${kg(exercise.suggestedWeightKg)} kg`
+      ? translate('workouts.focus.suggestedWeight', { weight: kg(exercise.suggestedWeightKg) })
       : '';
-  return `上次 ${kg(last.weightKg)} kg × ${last.reps ?? '-'}${feeling}${suggested}，已帶入`;
+  return translate('workouts.focus.prefillWeighted', {
+    weight: kg(last.weightKg),
+    reps: last.reps ?? '-',
+    feeling,
+    suggestion: suggested,
+  });
 }
 
 function DockButton({ label, onPress }: { label: string; onPress: () => void }) {
@@ -703,20 +725,21 @@ function DockButton({ label, onPress }: { label: string; onPress: () => void }) 
 
 /** Asked once a whole exercise is done; optional, so the next set never waits on it. */
 function FeedbackAsk({ exercise, onPick }: { exercise: FocusExercise; onPick: (exercise: FocusExercise, effort: Effort) => void }) {
+  const { t } = useI18n();
   return (
     <View className="gap-2 rounded-tile border-[1.5px] border-edge bg-surface p-3">
       <Text className="text-sm text-ink">
-        「{exercise.name}」感覺如何？
+        {t('workouts.focus.feedbackQuestion', { name: exercise.name })}
         {/* Only a weight has a next step to suggest; bodyweight work just keeps the note. */}
-        {exercise.weightKg !== null ? '下次會依這個調整重量。' : ''}
+        {exercise.weightKg !== null ? ` ${t('workouts.focus.feedbackHint')}` : ''}
       </Text>
       <View className="flex-row gap-2">
         {EFFORTS.map((effort) => (
           <Chip
-            key={effort.id}
-            label={effort.label}
-            selected={exercise.feedback === effort.id}
-            onPress={() => onPick(exercise, effort.id)}
+            key={effort}
+            label={t(`common.effort.${effort}`)}
+            selected={exercise.feedback === effort}
+            onPress={() => onPick(exercise, effort)}
           />
         ))}
       </View>
@@ -739,6 +762,7 @@ function Summary({
   onFeedback: (exercise: FocusExercise, effort: Effort) => void;
   onSave: () => void;
 }) {
+  const { t } = useI18n();
   const totals = summary(session);
   const asking = awaitingFeedback(session);
   // Keep a just-answered exercise on screen until save, so the chip shows what was picked.
@@ -747,17 +771,17 @@ function Summary({
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-bg">
       <ScrollView className="flex-1" contentContainerClassName="gap-3 px-[18px] pb-6 pt-6">
         <View>
-          <Text className="text-[32px] font-extrabold text-ink">今天練完了</Text>
+          <Text className="text-[32px] font-extrabold text-ink">{t('workouts.focus.completeTitle')}</Text>
           <Text className="text-sm text-muted">
-            {title} · {session.exercises.length} 個動作
+            {t('workouts.focus.completeSubtitle', { name: title, count: session.exercises.length })}
           </Text>
         </View>
         <View className="flex-row gap-2">
-          <Stat value={clock(elapsedSec)} label="訓練時間" />
-          <Stat value={String(totals.sets)} label="完成組數" />
+          <Stat value={clock(elapsedSec)} label={t('workouts.focus.workoutTime')} />
+          <Stat value={String(totals.sets)} label={t('workouts.focus.completedSets')} />
           {/* Bodyweight and timed work lift nothing; a 0 kg total reads as a mistake. */}
           {totals.volumeKg > 0 ? (
-            <Stat value={Math.round(totals.volumeKg).toLocaleString('en-US')} label="總量 kg" />
+            <Stat value={formatNumber(Math.round(totals.volumeKg))} label={t('workouts.focus.totalVolume')} />
           ) : null}
         </View>
 
@@ -774,7 +798,7 @@ function Summary({
                 <Text className="flex-1 text-base text-ink">{exercise.name}</Text>
                 {newRecord ? (
                   <View className="rounded-full bg-primary-soft px-2.5 py-0.5">
-                    <Text className="text-xs text-primary">新紀錄</Text>
+                    <Text className="text-xs text-primary">{t('workouts.focus.personalRecord')}</Text>
                   </View>
                 ) : null}
               </View>
@@ -782,18 +806,20 @@ function Summary({
                 {exercise.kind === 'time'
                   ? exercise.timeDone
                     ? [
-                        `${exercise.minutes} 分鐘`,
+                        `${exercise.minutes} ${t('common.units.minute')}`,
                         exercise.speedKmh !== null ? `${kg(exercise.speedKmh)} km/h` : null,
-                        exercise.speedKmh !== null && exercise.inclinePct !== null ? `坡度 ${kg(exercise.inclinePct)}%` : null,
+                        exercise.speedKmh !== null && exercise.inclinePct !== null
+                          ? t('workouts.focus.inclineSummary', { value: kg(exercise.inclinePct) })
+                          : null,
                       ]
                         .filter(Boolean)
                         .join(' · ')
-                    : '未完成'
+                    : t('workouts.focus.incomplete')
                   : exercise.logs.length
                     ? exercise.logs
                         .map((log) => (log.weightKg !== null ? `${kg(log.weightKg)} × ${log.reps}` : `× ${log.reps}`))
                         .join(' · ')
-                    : '未完成'}
+                    : t('workouts.focus.incomplete')}
               </Text>
             </View>
           ))}
@@ -806,7 +832,9 @@ function Summary({
           onPress={onSave}
           className={`h-16 items-center justify-center rounded-[18px] bg-primary ${busy ? 'opacity-60' : ''}`}
         >
-          <Text className="text-[19px] text-white">{busy ? '儲存中…' : '完成並儲存'}</Text>
+          <Text className="text-[19px] text-white">
+            {busy ? t('common.states.saving') : t('workouts.focus.completeAndSave')}
+          </Text>
         </Pressable>
       </View>
     </SafeAreaView>

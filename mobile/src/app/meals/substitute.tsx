@@ -7,6 +7,8 @@ import { Alert } from '@/components/alert';
 import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { Text } from '@/components/text';
 import { BackLink, Card, Hint, PrimaryButton, Rows, Screen, Segmented, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { draft } from '@/meals/draft';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
@@ -14,21 +16,20 @@ import { color } from '@/theme/tokens';
 type Exchange = Schema<'ExchangeOut'>;
 type Food = Schema<'FoodOut'>;
 
-const BASIS_LABEL: Record<string, string> = {
-  carb: '等碳水',
-  protein: '等蛋白質',
-  kcal: '等熱量',
-};
+const basisLabel = (basis: string) => translate(
+  basis === 'carb'
+    ? 'meals.substitution.equalCarbs'
+    : basis === 'protein'
+      ? 'meals.substitution.equalProtein'
+      : 'meals.substitution.equalCalories',
+);
 
-const CATEGORY_LABEL: Record<string, string> = {
-  staple: '主食',
-  protein: '蛋白質',
-  vegetable: '蔬菜',
-  fruit: '水果',
-  fat_sauce: '油脂與醬料',
-};
+const categoryLabel = (category: string) => translate(
+  `common.foodCategories.${category === 'fat_sauce' ? 'fatSauce' : category}` as 'common.foodCategories.staple',
+);
 
 export default function Substitute() {
+  const { t } = useI18n();
   const { meal_id: mealId, key, food: foodId, grams } = useLocalSearchParams<{
     meal_id: string;
     key: string;
@@ -46,11 +47,11 @@ export default function Substitute() {
 
   useEffect(() => {
     if (!mealId || !key || !foodId || !grams || !draft.has(mealId)) {
-      Alert.alert('找不到餐點草稿', '請回到餐點頁重新選擇要替換的食物。', [
-        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      Alert.alert(t('meals.substitution.missingDraftTitle'), t('meals.substitution.missingDraftBody'), [
+        { text: t('meals.photo.returnToMeals'), onPress: () => router.replace('/meals') },
       ]);
     }
-  }, [foodId, grams, key, mealId]);
+  }, [foodId, grams, key, mealId, t]);
 
   useEffect(() => {
     (async () => {
@@ -81,9 +82,9 @@ export default function Substitute() {
       const result = await api.get(`/foods/${foodId}/exchanges?grams=${grams}&match=${chosen}`);
       if (version === loadVersion.current) setOptions(result);
     } catch (error) {
-      Alert.alert('讀不到替換選項', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.substitution.loadOptionsFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     }
-  }, [foodId, grams, basis, defaultBasis]);
+  }, [foodId, grams, basis, defaultBasis, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -111,41 +112,41 @@ export default function Substitute() {
               </Text>
               <Text className="text-base text-muted">{Math.round(picked.grams)} g</Text>
             </View>
-            <PrimaryButton onPress={confirm}>確認替換</PrimaryButton>
+            <PrimaryButton onPress={confirm}>{t('meals.substitution.confirm')}</PrimaryButton>
           </>
         ) : undefined
       }
     >
-      <BackLink label="編輯餐點" onPress={() => backOrReplace(parentRoute)} />
+      <BackLink label={t('meals.editor.editTitle')} onPress={() => backOrReplace(parentRoute)} />
 
-      <Title>替換{source ? CATEGORY_LABEL[source.category_id] ?? '食物' : '食物'}</Title>
+      <Title>{t('meals.substitution.title', { category: source ? categoryLabel(source.category_id) : t('meals.substitution.foodFallback') })}</Title>
 
       {source ? (
         <Card className="gap-1 bg-warm-soft">
-          <Text className="text-sm text-muted">目前</Text>
+          <Text className="text-sm text-muted">{t('meals.substitution.current')}</Text>
           <View className="flex-row items-baseline justify-between">
             <Text className="text-base text-ink">{source.name}</Text>
             <Text className="text-base text-ink">{Math.round(Number(grams))} g</Text>
           </View>
           <Hint>
-            蛋白質 {Math.round((source.per_100g.protein_g * Number(grams)) / 100)} g,
-            {Math.round((source.per_100g.kcal * Number(grams)) / 100)} 大卡
+            {t('common.labels.protein')} {Math.round((source.per_100g.protein_g * Number(grams)) / 100)} g,{' '}
+            {Math.round((source.per_100g.kcal * Number(grams)) / 100)} {t('common.units.kcal')}
           </Hint>
         </Card>
       ) : null}
 
       {alternatives.length > 1 ? (
         <View className="gap-1">
-          <Text className="text-sm text-muted">換算方式</Text>
+          <Text className="text-sm text-muted">{t('meals.substitution.conversionMethod')}</Text>
           <Segmented
             value={active}
             onChange={setBasis}
-            options={alternatives.map((b) => ({ value: b, label: BASIS_LABEL[b] }))}
+            options={alternatives.map((b) => ({ value: b, label: basisLabel(b) }))}
           />
         </View>
       ) : null}
 
-      <Hint>同分類的食物，克數已自動換算</Hint>
+      <Hint>{t('meals.substitution.autoConvertedHint')}</Hint>
 
       {options === null ? (
         <ActivityIndicator color={color.primary} />
@@ -161,7 +162,7 @@ export default function Substitute() {
               badgesBelow
               note={
                 option.capped
-                  ? `已到常見份量上限，${BASIS_LABEL[active].replace('等', '')}會比原本少`
+                  ? t('meals.substitution.capShortfall', { basis: basisLabel(active) })
                   : undefined
               }
               selected={picked?.food.id === option.food.id}
@@ -181,17 +182,26 @@ function badgesFor(option: Exchange, basis: string) {
   const badges: { label: string; tone: 'neutral' | 'primary' | 'good' | 'warm' }[] = [];
 
   if (basis !== 'kcal') {
-    const nutrient = basis === 'protein' ? '蛋白質' : '碳水';
+    const nutrient = translate(basis === 'protein' ? 'common.labels.protein' : 'common.labels.carbs');
     badges.push(
       Math.abs(matched) < 1
-        ? { label: `${nutrient} 相同`, tone: 'primary' }
-        : { label: `${nutrient} ${matched < 0 ? '少' : '多'} ${Math.abs(Math.round(matched))} g`, tone: 'warm' },
+        ? { label: translate('meals.substitution.nutrientSame', { nutrient }), tone: 'primary' }
+        : {
+            label: translate('meals.substitution.nutrientDifference', {
+              amount: Math.abs(Math.round(matched)),
+              direction: translate(matched < 0 ? 'meals.substitution.less' : 'meals.substitution.more'),
+              nutrient,
+            }),
+            tone: 'warm',
+          },
     );
   }
 
   const kcal = Math.round(option.delta.kcal);
   badges.push({
-    label: kcal === 0 ? '熱量相同' : `熱量 ${kcal > 0 ? '+' : ''}${kcal} 大卡`,
+    label: kcal === 0
+      ? translate('meals.substitution.caloriesSame')
+      : translate('meals.substitution.calorieDifference', { amount: `${kcal > 0 ? '+' : ''}${kcal}` }),
     tone: kcal > 0 ? 'warm' : 'good',
   });
 

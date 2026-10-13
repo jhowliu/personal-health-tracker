@@ -5,11 +5,13 @@ import { ActivityIndicator, View } from 'react-native';
 import { useSession } from '@/auth/session';
 import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { safeReturnTo } from '@/navigation/return-to';
 import { color } from '@/theme/tokens';
 
 function SessionPending() {
   const { status, reload, signOut } = useSession();
+  const { t } = useI18n();
   if (status === 'loading') {
     return (
       <View className="flex-1 items-center justify-center bg-bg">
@@ -19,13 +21,17 @@ function SessionPending() {
   }
   return (
     <View className="flex-1 items-center justify-center gap-4 bg-bg px-6">
-      <Text className="text-center text-base text-muted">目前連不上服務，登入資料仍保留在這台裝置。</Text>
+      <Text className="text-center text-base text-muted">
+        {t('common.errors.offlineSessionKept')}
+      </Text>
       <View className="w-full">
-        <PrimaryButton onPress={() => void reload().catch(() => {})}>重新連線</PrimaryButton>
+        <PrimaryButton onPress={() => void reload().catch(() => {})}>
+          {t('common.actions.reconnect')}
+        </PrimaryButton>
       </View>
       <View className="w-full">
         <PrimaryButton tone="plain" onPress={() => void signOut()}>
-          登出
+          {t('common.actions.signOut')}
         </PrimaryButton>
       </View>
     </View>

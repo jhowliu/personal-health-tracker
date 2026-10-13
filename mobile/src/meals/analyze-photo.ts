@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 import { api } from '@/api/client';
+import { translate } from '@/i18n/translator';
 import type { PhotoAnalysis } from '@/meals/photo-draft';
 
 type PhotoCreate = { id: string; upload_url: string };
@@ -26,7 +27,7 @@ export async function analyzeMealPhoto(
     sessionType: FileSystem.FileSystemSessionType.FOREGROUND,
   });
   if (upload.status < 200 || upload.status >= 300) {
-    throw new Error(`照片上傳失敗 (${upload.status})，請確認網路後再試。`);
+    throw new Error(translate('meals.photo.uploadFailed', { status: upload.status }));
   }
   return api.post(`/meal-photos/${photo.id}/analyze`);
 }

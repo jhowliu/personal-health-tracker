@@ -20,6 +20,8 @@ import { Pressable, View } from 'react-native';
 import type { Schema } from '@/api/client';
 import { ChevronIcon, RunIcon } from '@/components/icons';
 import { Text } from '@/components/text';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -71,21 +73,26 @@ export function DaySummary({
   eaten: Nutrients;
   targets: Targets;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(expanded);
   const kcal = Math.round(eaten.kcal);
   const remaining = targets.kcal - kcal;
   const over = remaining < 0;
   const added = targets.exercise_kcal;
-  const addedLabel = '訓練加回';
+  const addedLabel = t('daySummary.workoutAdded');
 
   const toggle = () => {
     expanded = !open;
     setOpen(expanded);
   };
 
-  const spoken = `${over ? '超出' : '還可以吃'} ${Math.abs(remaining).toLocaleString()} 大卡，已吃 ${kcal.toLocaleString()}，目標 ${targets.kcal.toLocaleString()} 大卡${
-    added > 0 ? `，含${addedLabel} ${added.toLocaleString()}` : ''
-  }`;
+  const spoken = t('daySummary.spoken', {
+    status: over ? t('daySummary.over') : t('daySummary.remaining'),
+    remaining: formatNumber(Math.abs(remaining)),
+    eaten: formatNumber(kcal),
+    target: formatNumber(targets.kcal),
+    workout: added > 0 ? t('daySummary.spokenWorkout', { calories: formatNumber(added) }) : '',
+  });
 
   return (
     <View className="gap-3 rounded-[18px] border-[2.5px] border-edge bg-warm-soft px-4 py-3.5">
@@ -93,16 +100,18 @@ export function DaySummary({
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={spoken}
-        accessibilityHint={open ? '收起營養素細節' : '展開營養素細節'}
+        accessibilityHint={open ? t('daySummary.collapseNutrients') : t('daySummary.expandNutrients')}
         onPress={toggle}
         className="gap-3"
       >
         <View className="flex-row items-center justify-between">
-          <Text className={`text-sm ${over ? 'text-warm' : 'text-ink'}`}>{over ? '超出目標' : '還可以吃'}</Text>
+          <Text className={`text-sm ${over ? 'text-warm' : 'text-ink'}`}>
+            {over ? t('daySummary.overTarget') : t('daySummary.remaining')}
+          </Text>
           <View className="flex-row items-center gap-1.5">
             <Text className={`text-[22px] ${over ? 'text-warm' : 'text-ink'}`}>
-              {Math.abs(remaining).toLocaleString()}
-              <Text className="text-xs text-muted"> 大卡</Text>
+              {formatNumber(Math.abs(remaining))}
+              <Text className="text-xs text-muted"> {t('common.units.kcal')}</Text>
             </Text>
             <ChevronIcon direction={open ? 'up' : 'down'} size={16} tint={color.ink} />
           </View>
@@ -110,14 +119,17 @@ export function DaySummary({
 
         <View className="flex-row items-center justify-between gap-3">
           <Text className="flex-1 text-xs text-muted">
-            已吃 {kcal.toLocaleString()} / {targets.kcal.toLocaleString()} 大卡
+            {t('daySummary.eatenTarget', {
+              eaten: formatNumber(kcal),
+              target: formatNumber(targets.kcal),
+            })}
           </Text>
           {added > 0 ? (
             <View className="flex-row items-center gap-2 rounded-control bg-primary-soft px-3 py-1.5">
               <RunIcon size={17} tint={color.primary} />
               <View>
                 <Text className="text-xs text-primary">{addedLabel}</Text>
-                <Text className="text-sm text-primary">+{added.toLocaleString()} 大卡</Text>
+                <Text className="text-sm text-primary">+{formatNumber(added)} {t('common.units.kcal')}</Text>
               </View>
             </View>
           ) : null}
@@ -129,14 +141,18 @@ export function DaySummary({
       {open ? (
         <View className="gap-3 border-t border-line pt-3">
           <View className="flex-row gap-4">
-            <MacroColumn label="蛋白質" value={eaten.protein_g} target={targets.protein_g} tone={color.good} />
-            <MacroColumn label="脂肪" value={eaten.fat_g} target={targets.fat_g} tone={color.warmFill} />
-            <MacroColumn label="碳水" value={eaten.carb_g} target={targets.carb_g} tone={color.primary} />
+            <MacroColumn label={t('common.labels.protein')} value={eaten.protein_g} target={targets.protein_g} tone={color.good} />
+            <MacroColumn label={t('common.labels.fat')} value={eaten.fat_g} target={targets.fat_g} tone={color.warmFill} />
+            <MacroColumn label={t('common.labels.carbs')} value={eaten.carb_g} target={targets.carb_g} tone={color.primary} />
           </View>
           {added > 0 ? (
             <View className="flex-row justify-between">
-              <Text className="text-xs text-muted">原目標 {targets.base_kcal.toLocaleString()} 大卡</Text>
-              <Text className="text-xs text-muted">+ 訓練 {added.toLocaleString()} 大卡</Text>
+              <Text className="text-xs text-muted">
+                {t('daySummary.originalTarget', { calories: formatNumber(targets.base_kcal) })}
+              </Text>
+              <Text className="text-xs text-muted">
+                {t('daySummary.workoutCalories', { calories: formatNumber(added) })}
+              </Text>
             </View>
           ) : null}
         </View>

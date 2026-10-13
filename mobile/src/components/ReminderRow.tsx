@@ -11,6 +11,7 @@ import { Text } from '@/components/text';
 import { LabelWithTip } from '@/components/ui';
 import { formatReminderTime, parseReminderTime } from '@/notifications/reminder-plan';
 import { color } from '@/theme/tokens';
+import { useI18n } from '@/i18n/runtime';
 
 const DEFAULT_TIME = '07:30';
 /** Wait for the user to stop tapping before saving, so one adjustment is one request. */
@@ -24,6 +25,7 @@ export function ReminderRow({
   value: string | null;
   onSave: (next: string | null) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState(value);
   const [open, setOpen] = useState(false);
   const [seen, setSeen] = useState(value);
@@ -71,7 +73,7 @@ export function ReminderRow({
   return (
     <View className="py-3">
       <View className="flex-row items-center justify-between">
-        <LabelWithTip label="早上提醒量體重" tip="今天已經量過，就不會再提醒。" />
+        <LabelWithTip label={t('reminders.settingLabel')} tip={t('reminders.settingTip')} />
         <Switch
           value={draft !== null}
           onValueChange={(on) => setDraft(on ? DEFAULT_TIME : null)}
@@ -81,18 +83,18 @@ export function ReminderRow({
       {draft ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="更改提醒時間"
+          accessibilityLabel={t('reminders.changeTime')}
           onPress={edit}
           className="min-h-[44px] flex-row items-center justify-between"
         >
-          <Text className="text-base text-ink">提醒時間</Text>
+          <Text className="text-base text-ink">{t('reminders.time')}</Text>
           <View className="min-w-[118px] rounded-field border border-line bg-warm-soft px-3 py-2">
             <Text className="text-right text-base text-ink">{draft}</Text>
           </View>
         </Pressable>
       ) : null}
       {/* Saving is debounced as before, so the sheet needs no confirm button. */}
-      <Sheet visible={open} title="提醒時間" onClose={() => setOpen(false)}>
+      <Sheet visible={open} title={t('reminders.time')} onClose={() => setOpen(false)}>
         <View className="items-center pb-4">
           <DateTimePicker
             value={pickerValue}

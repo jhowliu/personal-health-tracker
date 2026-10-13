@@ -11,6 +11,8 @@ import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import type { Schema } from '@/api/client';
 import { FONT_FAMILY, Text } from '@/components/text';
 import { zeroAxis } from '@/components/trend-axis';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 type Trend = Schema<'VolumeTrendOut'>;
@@ -23,6 +25,7 @@ const thousands = (value: number) => String(Math.round(value)).replace(/\B(?=(\d
 const shortDate = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8))}`;
 
 export function VolumeChart({ trend }: { trend: Trend }) {
+  const { t } = useI18n();
   const [width, setWidth] = useState(0);
   const weeks = trend.weeks;
   const lastWeek = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
@@ -38,18 +41,22 @@ export function VolumeChart({ trend }: { trend: Trend }) {
 
   const summary =
     lastWeek && thisWeek
-      ? `訓練量，近 ${weeks.length} 週，上週 ${thousands(lastWeek.volume_kg)} 公斤，本週目前 ${thousands(thisWeek.volume_kg)} 公斤`
+      ? t('charts.volumeAccessibility', {
+          weeks: weeks.length,
+          last: formatNumber(lastWeek.volume_kg),
+          current: formatNumber(thisWeek.volume_kg),
+        })
       : undefined;
 
   return (
     <View className="gap-2 rounded-card border-2 border-edge bg-surface p-4">
       <View className="flex-row items-baseline justify-between">
-        <Text className="text-base text-ink">訓練量</Text>
+        <Text className="text-base text-ink">{t('charts.volumeTitle')}</Text>
         <Text className="text-sm text-muted">
           {trained && lastWeek ? (
-            <Text className="text-base text-ink">上週 {thousands(lastWeek.volume_kg)} </Text>
+            <Text className="text-base text-ink">{t('common.labels.lastWeek')} {thousands(lastWeek.volume_kg)} </Text>
           ) : null}
-          kg，近 {weeks.length} 週
+          {t('charts.volumePeriod', { weeks: weeks.length })}
         </Text>
       </View>
 
@@ -118,12 +125,12 @@ export function VolumeChart({ trend }: { trend: Trend }) {
               fill={color.muted}
               textAnchor="middle"
             >
-              本週
+              {t('common.labels.thisWeek')}
             </SvgText>
           </Svg>
         ) : !trained ? (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-center text-sm text-muted">還沒有訓練紀錄</Text>
+            <Text className="text-center text-sm text-muted">{t('charts.noWorkouts')}</Text>
           </View>
         ) : null}
       </View>

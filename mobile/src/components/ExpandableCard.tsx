@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { ChevronIcon, type IconProps } from '@/components/icons';
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 export type CardAction = {
@@ -36,12 +37,15 @@ export function ExpandableCard({
   details: ReactNode;
   actions: CardAction[];
 }) {
+  const { t } = useI18n();
   return (
     <View className="overflow-hidden rounded-tile border-[1.5px] border-edge bg-surface">
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded, disabled: Boolean(busy) }}
-        accessibilityLabel={`${expanded ? '收起' : '展開'}${name}`}
+        accessibilityLabel={expanded
+          ? t('common.accessibility.collapseNamed', { name })
+          : t('common.accessibility.expandNamed', { name })}
         disabled={busy}
         onPress={onToggle}
         className={`min-h-[104px] flex-row items-start gap-3 px-4 py-3 active:bg-warm-soft ${

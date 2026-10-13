@@ -8,9 +8,11 @@ import { Alert } from '@/components/alert';
 import { ChevronIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { Card, Rows, SectionHeading } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 export function PrivacySettings() {
+  const { t } = useI18n();
   // null until read; the switch waits for it rather than showing a guess.
   const [consent, setConsent] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,7 +38,7 @@ export function PrivacySettings() {
       // without seeing what is sent.
       setConsent(on ? await ensureAiConsent() : await setAiConsent(false));
     } catch {
-      Alert.alert('無法儲存設定', '請稍後再試');
+      Alert.alert(t('privacy.saveFailed'), t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -44,16 +46,16 @@ export function PrivacySettings() {
 
   return (
     <>
-      <SectionHeading>隱私</SectionHeading>
+      <SectionHeading>{t('privacy.settingsSection')}</SectionHeading>
       <Card className="py-0">
         <Rows>
           <View className="min-h-[52px] flex-row items-center justify-between gap-3 py-3">
             <View className="flex-1 gap-0.5">
-              <Text className="text-base text-ink">AI 分析</Text>
-              <Text className="text-sm text-muted">拍照辨識與週報建議</Text>
+              <Text className="text-base text-ink">{t('privacy.aiAnalysis')}</Text>
+              <Text className="text-sm text-muted">{t('privacy.aiAnalysisSummary')}</Text>
             </View>
             <Switch
-              accessibilityLabel="AI 分析"
+              accessibilityLabel={t('privacy.aiAnalysis')}
               value={consent ?? false}
               disabled={consent === null || busy}
               onValueChange={toggle}
@@ -65,7 +67,7 @@ export function PrivacySettings() {
             onPress={() => router.push('/privacy')}
             className="min-h-[52px] flex-row items-center justify-between py-3 active:opacity-70"
           >
-            <Text className="text-base text-ink">隱私權政策</Text>
+            <Text className="text-base text-ink">{t('privacy.policy')}</Text>
             <ChevronIcon direction="right" size={16} tint={color.muted} />
           </Pressable>
         </Rows>

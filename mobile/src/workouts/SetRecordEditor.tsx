@@ -8,13 +8,14 @@ import type { Schema } from '@/api/client';
 import { CloseIcon, PlusIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { Chip, Field, Hint, TextAction } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 import { isTimed, isTreadmill, nextRow, prescribedRows, type Effort, type RecordRow } from '@/workouts/record';
 
-const EFFORTS: readonly (readonly [Effort, string, 'good' | 'primary' | 'warm'])[] = [
-  ['easy', '輕鬆', 'good'],
-  ['appropriate', '剛好', 'primary'],
-  ['hard', '吃力', 'warm'],
+const EFFORTS: readonly (readonly [Effort, 'common.effort.easy' | 'common.effort.appropriate' | 'common.effort.hard', 'good' | 'primary' | 'warm'])[] = [
+  ['easy', 'common.effort.easy', 'good'],
+  ['appropriate', 'common.effort.appropriate', 'primary'],
+  ['hard', 'common.effort.hard', 'warm'],
 ];
 
 export function SetRecordEditor({
@@ -26,6 +27,7 @@ export function SetRecordEditor({
   rows: RecordRow[];
   onChange: (rows: RecordRow[]) => void;
 }) {
+  const { t } = useI18n();
   const timed = isTimed(entry);
   const bodyweight = entry.item.equipment === 'bodyweight';
   const update = (index: number, change: Partial<RecordRow>) =>
@@ -38,21 +40,21 @@ export function SetRecordEditor({
       <View className="gap-2">
         <View className="flex-row items-end gap-2">
           <Field
-            label="實際時間"
-            suffix="分鐘"
+            label={t('common.labels.actualTime')}
+            suffix={t('common.units.minute')}
             value={rows[0].minutes}
             onChangeText={(minutes) => update(0, { minutes })}
             keyboardType="number-pad"
             selectTextOnFocus
           />
-          <RemoveButton label="清除時間" onPress={() => remove(0)} />
+          <RemoveButton label={t('workouts.record.clearTime')} onPress={() => remove(0)} />
         </View>
         {isTreadmill(entry) ? (
           <>
             {/* Lines up with the time field, clear of the remove button beside it. */}
             <View className="flex-row gap-2 pr-[52px]">
               <Field
-                label="速度（選填）"
+                label={t('workouts.record.speedOptional')}
                 suffix="km/h"
                 value={rows[0].speed}
                 onChangeText={(speed) => update(0, { speed })}
@@ -60,7 +62,7 @@ export function SetRecordEditor({
                 selectTextOnFocus
               />
               <Field
-                label="坡度（選填）"
+                label={t('workouts.record.inclineOptional')}
                 suffix="%"
                 placeholder="0"
                 value={rows[0].incline}
@@ -75,7 +77,7 @@ export function SetRecordEditor({
     ) : (
       <TextAction
         icon={PlusIcon}
-        label={`記錄時間（目標 ${Math.round((entry.item.duration_sec ?? 60) / 60)} 分鐘）`}
+        label={t('workouts.record.timeTarget', { minutes: Math.round((entry.item.duration_sec ?? 60) / 60) })}
         onPress={() => onChange(prescribedRows(entry))}
         className="min-h-[44px] justify-center self-start"
       />
@@ -86,9 +88,9 @@ export function SetRecordEditor({
     <View className="gap-2">
       {rows.length ? (
         <View className="flex-row items-center gap-2">
-          <Text className="w-8 text-xs text-muted">組數</Text>
-          <Text className="flex-1 text-xs text-muted">重量 kg</Text>
-          <Text className="flex-1 text-xs text-muted">次數</Text>
+          <Text className="w-8 text-xs text-muted">{t('common.labels.sets')}</Text>
+          <Text className="flex-1 text-xs text-muted">{t('workouts.record.weightHeader')}</Text>
+          <Text className="flex-1 text-xs text-muted">{t('common.labels.reps')}</Text>
           <View className="w-11" />
         </View>
       ) : null}
@@ -96,34 +98,34 @@ export function SetRecordEditor({
         <View key={index} className="flex-row items-center gap-2">
           <Text className="w-8 text-sm text-ink">{index + 1}</Text>
           <Field
-            accessibilityLabel={`第 ${index + 1} 組重量`}
-            placeholder={bodyweight ? '自重' : '選填'}
+            accessibilityLabel={t('workouts.record.setWeight', { number: index + 1 })}
+            placeholder={bodyweight ? t('workouts.record.bodyweight') : t('common.states.optional')}
             value={row.weight}
             onChangeText={(weight) => update(index, { weight })}
             keyboardType="decimal-pad"
             selectTextOnFocus
           />
           <Field
-            accessibilityLabel={`第 ${index + 1} 組次數`}
+            accessibilityLabel={t('workouts.record.setReps', { number: index + 1 })}
             value={row.reps}
             onChangeText={(reps) => update(index, { reps })}
             keyboardType="number-pad"
             selectTextOnFocus
           />
-          <RemoveButton label={`刪除第 ${index + 1} 組`} onPress={() => remove(index)} />
+          <RemoveButton label={t('workouts.record.deleteSet', { number: index + 1 })} onPress={() => remove(index)} />
         </View>
       ))}
 
       <View className="flex-row flex-wrap items-center gap-x-6">
         <TextAction
           icon={PlusIcon}
-          label="新增一組"
+          label={t('workouts.record.addSet')}
           onPress={() => onChange([...rows, nextRow(entry, rows)])}
           className="min-h-[44px] justify-center"
         />
         {rows.length === 0 && (entry.item.sets ?? 1) > 1 ? (
           <TextAction
-            label={`照目標填入 ${entry.item.sets} 組`}
+            label={t('workouts.record.fillTargetSets', { count: entry.item.sets ?? 1 })}
             onPress={() => onChange(prescribedRows(entry))}
             className="min-h-[44px] justify-center"
           />
@@ -132,12 +134,12 @@ export function SetRecordEditor({
 
       {last ? (
         <View className="gap-1">
-          <Hint>最後一組感覺如何？</Hint>
+          <Hint>{t('workouts.record.effortQuestion')}</Hint>
           <View className="flex-row gap-2">
-            {EFFORTS.map(([effort, label, tone]) => (
+            {EFFORTS.map(([effort, labelKey, tone]) => (
               <Chip
                 key={effort}
-                label={label}
+                label={t(labelKey)}
                 tone={tone}
                 selected={last.effort === effort}
                 onPress={() => update(rows.length - 1, { effort: last.effort === effort ? null : effort })}

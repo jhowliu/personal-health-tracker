@@ -19,10 +19,13 @@ import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/compon
 import { Sheet } from '@/components/Sheet';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ReorderList } from '@/components/ReorderList';
-import { STEP_LABEL, StepIndicator } from '@/components/StepIndicator';
+import { stepLabel, StepIndicator } from '@/components/StepIndicator';
 import { Text } from '@/components/text';
 import { AddRow, Card, Field, Hint, PrimaryButton, Screen, SectionHeading, TextAction, Title } from '@/components/ui';
 import { dayWord, shiftDay, todayISO } from '@/dates';
+import { formatDate, formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { FoodActions, FoodGroup, FoodItem, FoodMacros } from '@/meals/FoodGroup';
 import { photoDraft } from '@/meals/photo-draft';
 import { stepCache } from '@/today/step-cache';
@@ -61,18 +64,17 @@ type WorkoutItem = Schema<'WorkoutExecutionItemOut'>;
 type Workout = Schema<'WorkoutExecutionOut'>;
 type SetLogResult = { next_weight_kg: number | null };
 
-const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-
 /** Where finishing `step` leads: the first other step still to do, or 完成. */
 function stepAfter(day: Today, step: string) {
   const next = day.flow.waiting.find((waiting) => waiting !== step);
-  return STEP_LABEL[next ?? 'done'];
+  return stepLabel(next ?? 'done');
 }
 
 /** How far back the day switcher goes. */
 const MAX_DAYS_BACK = 30;
 
 export default function TodayScreen() {
+  const { t } = useI18n();
   const [day, setDay] = useState<Today | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
   const [weighIn, setWeighIn] = useState({ weight: '', waist: '' });
@@ -114,9 +116,9 @@ export default function TodayScreen() {
       stepCache.prefetch(date);
     } catch (error) {
       if (version !== loadVersion.current) return;
-      Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('today.loadDayFailed', { day: dayWord(date) }), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, [date, settle]);
+  }, [date, settle, t]);
 
   const refreshAt = useCallback(
     async (step: string) => {
@@ -127,10 +129,10 @@ export default function TodayScreen() {
         settle(fresh, step);
       } catch (error) {
         if (version !== loadVersion.current) return;
-        Alert.alert(`讀不到${dayWord(date)}的資料`, error instanceof ApiError ? error.message : '請稍後再試');
+        Alert.alert(t('today.loadDayFailed', { day: dayWord(date) }), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       }
     },
-    [date, settle],
+    [date, settle, t],
   );
 
   const goTo = (next: string) => {
@@ -254,6 +256,7 @@ function TodayHeader({
   /** The furthest back a day can be opened. */
   earliest: string;
 }) {
+  const { t } = useI18n();
   const [picking, setPicking] = useState(false);
   const parsed = new Date(`${day.date}T00:00:00`);
   const isToday = day.date === todayISO();
@@ -264,7 +267,7 @@ function TodayHeader({
       <View className="flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="前一天"
+          accessibilityLabel={t('today.previousDay')}
           disabled={!canGoBack}
           onPress={() => onShift(-1)}
           className="h-11 w-11 items-center justify-center"
@@ -273,21 +276,25 @@ function TodayHeader({
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="打開月曆選日期"
+          accessibilityLabel={t('today.openCalendar')}
           onPress={() => setPicking(true)}
           className="items-center active:opacity-70"
         >
           <Text className="text-center text-[21px] text-ink">
-            {parsed.getMonth() + 1} 月 {parsed.getDate()} 日 {WEEKDAY[parsed.getDay()]}
+            {t('today.dateHeading', {
+              weekday: formatDate(parsed, { weekday: 'short' }),
+              month: parsed.getMonth() + 1,
+              day: parsed.getDate(),
+            })}
           </Text>
           <Text className="text-xs text-muted">
             {dayWord(day.date)}
-            {day.streak > 0 ? ` · 連續 ${day.streak} 天` : ''}
+            {day.streak > 0 ? t('today.streakInline', { count: day.streak }) : ''}
           </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="後一天"
+          accessibilityLabel={t('today.nextDay')}
           disabled={!canGoForward}
           onPress={() => onShift(1)}
           className="h-11 w-11 items-center justify-center"
@@ -296,7 +303,7 @@ function TodayHeader({
         </Pressable>
       </View>
       {isToday ? null : (
-        <TextAction label="回到今天" onPress={onToday} className="min-h-[44px] justify-center self-center" />
+        <TextAction label={t('today.backToToday')} onPress={onToday} className="min-h-[44px] justify-center self-center" />
       )}
       <DaySummary eaten={day.flow.eaten} targets={day.targets} />
       <StepIndicator
@@ -308,9 +315,9 @@ function TodayHeader({
         onSelect={onSelect}
       />
       {canReturnToSummary ? (
-        <TextAction label={`回到${dayWord(day.date)}總結`} onPress={() => onSelect('done')} className="justify-center" />
+        <TextAction label={t('today.backToSummary', { day: dayWord(day.date) })} onPress={() => onSelect('done')} className="justify-center" />
       ) : null}
-      <Sheet visible={picking} title="選日期" onClose={() => setPicking(false)}>
+      <Sheet visible={picking} title={t('today.selectDate')} onClose={() => setPicking(false)}>
         <View className="pb-4">
           <MonthCalendar
             selectable={(date) => date >= earliest}
@@ -341,6 +348,7 @@ function WeighInStep({
   onChange: (value: { weight: string; waist: string }) => void;
   onSaved: () => void;
 }) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const { weight, waist } = value;
   const prefilled = useRef(false);
@@ -380,7 +388,7 @@ function WeighInStep({
       }
       onSaved();
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -391,17 +399,17 @@ function WeighInStep({
       <View className="gap-4">
         <View className="flex-row items-end justify-between gap-3">
           <View className="flex-1 gap-1">
-            <Hint>{word}的紀錄</Hint>
+            <Hint>{t('today.body.recordsFor', { day: word })}</Hint>
             <Text accessibilityRole="header" className="text-2xl text-ink">
-              量身形
+              {t('today.body.title')}
             </Text>
           </View>
-          {logged ? <StatusBadge label="已記錄" tone="good" /> : null}
+          {logged ? <StatusBadge label={t('today.body.logged')} tone="good" /> : null}
         </View>
 
         <Card className="gap-4">
           <Field
-            label="體重"
+            label={t('common.labels.weight')}
             suffix="kg"
             value={weight}
             onChangeText={(next) => onChange({ ...value, weight: next })}
@@ -409,14 +417,14 @@ function WeighInStep({
           />
           <View className="h-px bg-line" />
           <Field
-            label="腰圍　選填"
+            label={t('today.body.waistOptional')}
             suffix="cm"
             value={waist}
             onChangeText={(next) => onChange({ ...value, waist: next })}
             keyboardType="decimal-pad"
           />
           <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
-            {busy ? '儲存中…' : logged ? '更新紀錄' : '儲存紀錄'}
+            {busy ? t('common.states.saving') : logged ? t('today.body.updateRecord') : t('today.body.saveRecord')}
           </PrimaryButton>
         </Card>
 
@@ -428,6 +436,7 @@ function WeighInStep({
 
 /** This week's average, the change from last week and the latest waist, with a way to the trends. */
 function BodyStats() {
+  const { t } = useI18n();
   const [stats, setStats] = useState<Schema<'BodySummaryOut'> | null>(() => stepCache.get('body-summary'));
 
   useEffect(() => {
@@ -449,18 +458,18 @@ function BodyStats() {
   return (
     <View className="gap-3">
       <View className="flex-row">
-        <BodyStat label="本週平均" value={stats.week_avg_weight?.toFixed(1)} unit="kg" />
+        <BodyStat label={t('common.labels.weeklyAverage')} value={stats.week_avg_weight?.toFixed(1)} unit="kg" />
         <BodyStat
-          label="比上週"
+          label={t('common.labels.comparedWithLastWeek')}
           value={delta === null ? undefined : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta).toFixed(1)}`}
           unit="kg"
           tone={delta === null ? undefined : delta <= 0 ? 'text-good' : 'text-warm'}
         />
-        <BodyStat label="最近腰圍" value={stats.latest_waist?.toFixed(1)} unit="cm" />
+        <BodyStat label={t('common.labels.latestWaist')} value={stats.latest_waist?.toFixed(1)} unit="cm" />
       </View>
       <View className="h-px bg-line" />
       <TextAction
-        label="查看身形趨勢 ›"
+        label={t('today.body.viewTrends')}
         onPress={() => router.navigate('/body')}
         className="min-h-[44px] justify-center self-start"
       />
@@ -504,6 +513,7 @@ function MealStep({
   onStateChanged: () => void;
   onPlanChanged: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [plan, setPlan] = useState<DayPlan | null>(() => stepCache.get(`plan:${day.date}`));
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -519,9 +529,9 @@ function MealStep({
       stepCache.set(`plan:${day.date}`, fresh);
       setPlan(fresh);
     } catch (error) {
-      Alert.alert(`讀不到${dayWord(day.date)}的餐點`, error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('today.meal.loadFailed', { day: dayWord(day.date) }), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, [day.date]);
+  }, [day.date, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -555,7 +565,7 @@ function MealStep({
         params: { destination: 'day', date: day.date, slot: step, analysis_id: analysis.id, finish: '1' },
       });
     } catch (error) {
-      Alert.alert('無法辨識餐點', photoErrorMessage(error));
+      Alert.alert(t('today.meal.recognitionFailed'), photoErrorMessage(error));
     } finally {
       setPhotoBusy(false);
     }
@@ -568,7 +578,7 @@ function MealStep({
       await Promise.all([load(), refreshSummary ? onPlanChanged() : Promise.resolve()]);
       return true;
     } catch (error) {
-      Alert.alert('沒有成功', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('today.meal.operationFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       return false;
     } finally {
       setBusy(false);
@@ -597,11 +607,15 @@ function MealStep({
   };
 
   const removeItem = (item: PlannedMealItem) => {
-    const itemName = item.food?.name ?? item.custom_name ?? '這項食物';
-    Alert.alert('移除食物', `確定從${word}的${STEP_LABEL[step]}移除「${itemName}」？當天的統計也會一起更新。`, [
-      { text: '取消', style: 'cancel' },
+    const itemName = item.food?.name ?? item.custom_name ?? t('today.meal.thisFood');
+    Alert.alert(t('today.meal.removeTitle'), t('today.meal.removeBody', {
+      name: itemName,
+      day: word,
+      meal: stepLabel(step),
+    }), [
+      { text: t('common.actions.cancel'), style: 'cancel' },
       {
-        text: '移除',
+        text: t('common.actions.remove'),
         style: 'destructive',
         onPress: () => {
           void act(
@@ -630,12 +644,12 @@ function MealStep({
   };
 
   const addSheet = (
-    <Sheet visible={adding} title={`加入${STEP_LABEL[step]}`} onClose={() => setAdding(false)}>
+    <Sheet visible={adding} title={t('today.meal.addTo', { meal: stepLabel(step) })} onClose={() => setAdding(false)}>
       <PrimaryButton tone="plain" icon={BowlIcon} onPress={() => addFrom('meal')}>
-        從我的餐點選一道
+        {t('today.meal.chooseSavedMeal')}
       </PrimaryButton>
       <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => addFrom('food')}>
-        從食物庫加入
+        {t('today.meal.addFromLibrary')}
       </PrimaryButton>
     </Sheet>
   );
@@ -654,18 +668,18 @@ function MealStep({
     <View className="flex-row items-end justify-between gap-3">
       <View className="flex-1 gap-1">
         <Hint>
-          {word}的{STEP_LABEL[step]}
+          {t('today.meal.titleForDay', { day: word, meal: stepLabel(step) })}
         </Hint>
         <Text accessibilityRole="header" className="text-2xl text-ink">
-          {meal?.name || STEP_LABEL[step]}
+          {meal?.name || stepLabel(step)}
         </Text>
       </View>
       {meal?.skipped || (resolved && !meal?.items.length) ? (
-        <StatusBadge label="已略過" tone="warm" />
+        <StatusBadge label={t('common.states.skipped')} tone="warm" />
       ) : meal?.eaten ? (
-        <StatusBadge label="已吃完" tone="good" />
+        <StatusBadge label={t('today.meal.eaten')} tone="good" />
       ) : (
-        <StatusBadge label="還沒吃" tone="warm" />
+        <StatusBadge label={t('today.meal.notEaten')} tone="warm" />
       )}
     </View>
   );
@@ -680,19 +694,19 @@ function MealStep({
         footer={
           <>
             <PrimaryButton icon={CameraIcon} onPress={recordFromPhoto} disabled={busy} busy={photoBusy}>
-              {photoBusy ? '辨識中…' : '拍照記錄這餐'}
+              {photoBusy ? t('common.states.recognizing') : t('today.meal.photoAction')}
             </PrimaryButton>
             <View className="items-center">
               {resolved ? (
                 <TextAction
-                  label="改回未吃"
+                  label={t('today.meal.markNotEaten')}
                   disabled={busy}
                   onPress={() => setMealState('planned')}
                   className="min-h-[44px] justify-center"
                 />
               ) : (
                 <TextAction
-                  label="略過這餐"
+                  label={t('today.meal.skipMeal')}
                   disabled={busy || photoBusy}
                   onPress={() => setMealState('skipped')}
                   className="min-h-[44px] justify-center"
@@ -704,7 +718,7 @@ function MealStep({
       >
         <View className="gap-4">
           {title}
-          <AddRow label="加入食物" disabled={busy || photoBusy} onPress={() => setAdding(true)} />
+          <AddRow label={t('today.meal.addFood')} disabled={busy || photoBusy} onPress={() => setAdding(true)} />
         </View>
         {addSheet}
       </Screen>
@@ -715,29 +729,29 @@ function MealStep({
     <>
       {meal.skipped ? (
         <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
-          {busy ? '處理中…' : '仍要標記吃完'}
+          {busy ? t('common.states.processing') : t('today.meal.markEatenAnyway')}
         </PrimaryButton>
       ) : meal.eaten ? (
         <PrimaryButton onPress={() => setMealState('planned')} busy={busy}>
-          {busy ? '處理中…' : '改回未吃'}
+          {busy ? t('common.states.processing') : t('today.meal.markNotEaten')}
         </PrimaryButton>
       ) : (
         <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
-          {busy ? '處理中…' : '標記吃完'}
+          {busy ? t('common.states.processing') : t('today.meal.markEaten')}
         </PrimaryButton>
       )}
 
       <View className="items-center">
         {meal.skipped ? (
           <TextAction
-            label="改回未吃"
+            label={t('today.meal.markNotEaten')}
             disabled={busy}
             onPress={() => setMealState('planned')}
             className="min-h-[44px] justify-center"
           />
         ) : meal.eaten ? null : (
           <TextAction
-            label="略過這餐"
+            label={t('today.meal.skipMeal')}
             disabled={busy}
             onPress={() => setMealState('skipped')}
             className="min-h-[44px] justify-center"
@@ -755,10 +769,10 @@ function MealStep({
         {meal.skipped ? null : (
           <>
             <View className="flex-row items-center justify-between rounded-control border-[1.5px] border-edge bg-primary-soft px-4 py-2.5">
-              <Text className="text-xs text-ink">這份餐點</Text>
+              <Text className="text-xs text-ink">{t('today.meal.mealTotal')}</Text>
               <Text className="text-[22px] text-ink">
                 {Math.round(meal.nutrients.kcal)}
-                <Text className="text-xs text-muted"> 大卡</Text>
+                <Text className="text-xs text-muted"> {t('common.units.kcal')}</Text>
               </Text>
             </View>
 
@@ -770,7 +784,7 @@ function MealStep({
                   return (
                     <FoodItem
                       key={item.id}
-                      name={item.food?.name ?? item.custom_name ?? '未命名食物'}
+                      name={item.food?.name ?? item.custom_name ?? t('today.meal.unnamedFood')}
                       kcal={Math.round(item.nutrients.kcal)}
                       amount={formatPlanAmount(item)}
                       open={openItem === item.id}
@@ -783,11 +797,11 @@ function MealStep({
                         actions={[
                           ...(canEditGrams
                             ? [
-                                { label: '調整份量', onPress: () => editPortion(item) },
-                                { label: '替換', onPress: () => replaceItem(item) },
+                                { label: t('today.meal.adjustPortion'), onPress: () => editPortion(item) },
+                                { label: t('today.meal.replace'), onPress: () => replaceItem(item) },
                               ]
                             : []),
-                          { label: '移除', onPress: () => removeItem(item), danger: true },
+                          { label: t('common.actions.remove'), onPress: () => removeItem(item), danger: true },
                         ]}
                       />
                     </FoodItem>
@@ -795,11 +809,11 @@ function MealStep({
                 })}
               </FoodGroup>
             ))}
-            <AddRow label="加入食物" disabled={busy} onPress={() => setAdding(true)} />
+            <AddRow label={t('today.meal.addFood')} disabled={busy} onPress={() => setAdding(true)} />
             {meal.items.some((item) => item.food) ? (
               <View className="items-center">
                 <TextAction
-                  label="存成我的餐點"
+                  label={t('today.meal.saveAsMeal')}
                   disabled={busy}
                   onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
                   className="min-h-[44px] justify-center"
@@ -827,11 +841,11 @@ function MealStep({
 
 function groupPlanItems(items: PlannedMealItem[]) {
   const labels: Record<string, string> = {
-    staple: '主食',
-    protein: '蛋白質',
-    vegetable: '蔬菜',
-    fruit: '水果',
-    fat_sauce: '油脂與醬料',
+    staple: translate('common.foodCategories.staple'),
+    protein: translate('common.foodCategories.protein'),
+    vegetable: translate('common.foodCategories.vegetable'),
+    fruit: translate('common.foodCategories.fruit'),
+    fat_sauce: translate('common.foodCategories.fatSauce'),
   };
   const groups = new Map<string, PlannedMealItem[]>();
   for (const item of items) {
@@ -843,7 +857,7 @@ function groupPlanItems(items: PlannedMealItem[]) {
     .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
     .map(([category, groupedItems]) => ({
       category,
-      label: labels[category] ?? '其他',
+      label: labels[category] ?? translate('common.foodCategories.other'),
       items: groupedItems,
     }));
 }
@@ -877,6 +891,7 @@ function PortionEditor({
   onCancel: () => void;
   onSave: () => void;
 }) {
+  const { t } = useI18n();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -926,12 +941,12 @@ function PortionEditor({
             >
               {keyboardVisible ? (
                 <Text accessibilityRole="header" className="text-base text-ink">
-                  調整 {itemName} 的份量
+                  {t('today.meal.adjustNamedPortion', { name: itemName })}
                 </Text>
               ) : (
                 <View className="gap-1">
                   <Text accessibilityRole="header" className="text-2xl text-ink">
-                    調整份量
+                    {t('today.meal.adjustPortion')}
                   </Text>
                   <Text className="text-base text-muted">{itemName}</Text>
                 </View>
@@ -940,7 +955,7 @@ function PortionEditor({
                   collapses to a line. In a row the flex-1 is horizontal, and the height follows the input. */}
               <View className="flex-row">
                 <Field
-                  label="份量"
+                  label={t('common.labels.portion')}
                   value={value}
                   onChangeText={onChange}
                   suffix={unit.label}
@@ -950,22 +965,22 @@ function PortionEditor({
                 />
               </View>
               {unit.gramsPerUnit === 1 || !valid ? null : (
-                <Hint>約 {readableAmount(amount * unit.gramsPerUnit)} g</Hint>
+                <Hint>{t('today.meal.approximateGrams', { grams: readableAmount(amount * unit.gramsPerUnit) })}</Hint>
               )}
               {keyboardVisible ? (
                 <PrimaryButton tone="plain" onPress={Keyboard.dismiss} disabled={busy}>
-                  完成輸入
+                  {t('today.meal.finishInput')}
                 </PrimaryButton>
               ) : (
                 <View className="flex-row gap-3">
                   <View className="flex-1">
                     <PrimaryButton tone="plain" onPress={close} disabled={busy}>
-                      取消
+                      {t('common.actions.cancel')}
                     </PrimaryButton>
                   </View>
                   <View className="flex-1">
                     <PrimaryButton onPress={onSave} disabled={!valid} busy={busy}>
-                      {busy ? '儲存中…' : '儲存份量'}
+                      {busy ? t('common.states.saving') : t('today.meal.savePortion')}
                     </PrimaryButton>
                   </View>
                 </View>
@@ -997,6 +1012,7 @@ function WorkoutStep({
   onDone: () => void;
   onStateChanged: () => void;
 }) {
+  const { t } = useI18n();
   const [workout, setWorkout] = useState<Workout | null>(() => stepCache.get(`workout:${date}`));
   const [busy, setBusy] = useState(false);
   // Several exercises can be open at once, so a whole day can be typed in top to bottom.
@@ -1017,9 +1033,9 @@ function WorkoutStep({
       stepCache.set(`workout:${date}`, fresh);
       setWorkout(fresh);
     } catch (error) {
-      Alert.alert(`讀不到${dayWord(date)}的訓練`, error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('today.workout.loadFailed', { day: dayWord(date) }), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, [date]);
+  }, [date, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1042,7 +1058,7 @@ function WorkoutStep({
       stepCache.set(`workout:${date}`, fresh);
       setWorkout(fresh);
     } catch (error) {
-      Alert.alert('順序存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('today.workout.reorderFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       void load();
     }
   };
@@ -1076,7 +1092,7 @@ function WorkoutStep({
       if (rows) {
         const result = toRecords(entry, rows);
         if ('error' in result) {
-          Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${result.error}。`);
+          Alert.alert(t('today.workout.cannotSave'), `“${entry.item.exercise_name}” ${result.error}.`);
           return;
         }
         records.push({ entry, sets: result.sets });
@@ -1085,7 +1101,7 @@ function WorkoutStep({
       if (edit) {
         const problem = targetError(entry, edit);
         if (problem) {
-          Alert.alert('還不能儲存', `「${entry.item.exercise_name}」${problem}。`);
+          Alert.alert(t('today.workout.cannotSave'), `“${entry.item.exercise_name}” ${problem}.`);
           return;
         }
         changes.push({ entry, edit });
@@ -1113,7 +1129,7 @@ function WorkoutStep({
         setTargets(({ [itemId]: _saved, ...rest }) => rest);
       }
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       await load();
       // The sets change the day's burn, so the target in the header is read again too.
@@ -1130,7 +1146,7 @@ function WorkoutStep({
       await clearSession(date);
       onDone();
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -1141,14 +1157,14 @@ function WorkoutStep({
     const name = entry.item.exercise_name;
     const logged = entry.logs.length;
     const message = !logged
-      ? `確定移除「${name}」？這只會影響${word}的訓練。`
+      ? t('today.workout.removeDayOnly', { name, day: word })
       : entry.item.duration_sec
-        ? `確定移除「${name}」？已記錄的時間也會一起刪除。`
-        : `確定移除「${name}」？已記錄的 ${logged} 組也會一起刪除。`;
-    Alert.alert('移除動作', message, [
-      { text: '取消', style: 'cancel' },
+        ? t('today.workout.removeTimedLogged', { name })
+        : t('today.workout.removeSetsLogged', { name, count: logged });
+    Alert.alert(t('today.workout.removeTitle'), message, [
+      { text: t('common.actions.cancel'), style: 'cancel' },
       {
-        text: '移除',
+        text: t('common.actions.remove'),
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
@@ -1159,7 +1175,7 @@ function WorkoutStep({
             // Its sets leave the day's burn, and with it the target.
             onStateChanged();
           } catch (error) {
-            Alert.alert('移除不了動作', error instanceof ApiError ? error.message : '請稍後再試');
+            Alert.alert(t('today.workout.removeFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
           } finally {
             setBusy(false);
           }
@@ -1174,7 +1190,7 @@ function WorkoutStep({
       await api.patch(`/days/${date}`, { workout_skipped: true });
       onStateChanged();
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -1219,10 +1235,10 @@ function WorkoutStep({
         return (
           <>
             <PrimaryButton onPress={saveChanges} busy={busy}>
-              {busy ? '儲存中…' : '儲存修改'}
+              {busy ? t('common.states.saving') : t('today.workout.saveChanges')}
             </PrimaryButton>
             <View className="items-center">
-              <TextAction label="放棄修改" disabled={busy} onPress={discardChanges} className="min-h-[44px] justify-center" />
+              <TextAction label={t('today.workout.discardChanges')} disabled={busy} onPress={discardChanges} className="min-h-[44px] justify-center" />
             </View>
           </>
         );
@@ -1230,12 +1246,12 @@ function WorkoutStep({
         return (
           <>
             <PrimaryButton onPress={() => router.navigate(`/workouts/focus?date=${date}`)} disabled={busy}>
-              {footer.resume ? `繼續訓練 · ${finished} / ${total}` : '開始訓練'}
+              {footer.resume ? t('today.workout.resumeProgress', { done: finished, total }) : t('today.workout.start')}
             </PrimaryButton>
             {footer.then ? (
               <View className="items-center">
                 <TextAction
-                  label={footer.then === 'complete' ? `完成${word}的訓練` : '略過訓練'}
+                  label={footer.then === 'complete' ? t('today.workout.finishForDay', { day: word }) : t('today.workout.skip')}
                   disabled={busy}
                   onPress={footer.then === 'complete' ? complete : skipWorkout}
                   className="min-h-[44px] justify-center"
@@ -1247,13 +1263,13 @@ function WorkoutStep({
       case 'complete':
         return (
           <PrimaryButton onPress={complete} busy={busy}>
-            {busy ? '處理中…' : `完成${word}的訓練，下一步：${after}`}
+            {busy ? t('common.states.processing') : t('today.workout.finishThen', { day: word, next: after })}
           </PrimaryButton>
         );
       case 'skip':
         return (
           <View className="items-center">
-            <TextAction label={`${word}略過訓練`} disabled={busy} onPress={skipWorkout} className="min-h-[44px] justify-center" />
+            <TextAction label={t('today.workout.skipForDay', { day: word })} disabled={busy} onPress={skipWorkout} className="min-h-[44px] justify-center" />
           </View>
         );
       case 'done':
@@ -1270,18 +1286,20 @@ function WorkoutStep({
         <View className="flex-row items-end justify-between gap-3">
           <View className="flex-1 gap-1">
             <Hint>
-              {word}的訓練
-              {total > 0 ? ` · ${total} 個動作` : ''}
-              {workout.template?.duration_min ? ` · 約 ${workout.template.duration_min} 分鐘` : ''}
+              {t('today.workout.titleForDay', { day: word })}
+              {total > 0
+                ? ` · ${t(total === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', { count: total })}`
+                : ''}
+              {workout.template?.duration_min ? t('today.workout.approximateMinutes', { count: workout.template.duration_min }) : ''}
             </Hint>
             <Text accessibilityRole="header" className="text-2xl text-ink">
-              {templateName ?? (total ? `${word}的訓練` : `${word}沒有排定訓練`)}
+              {templateName ?? (total ? t('today.workout.titleForDay', { day: word }) : t('today.workout.noWorkoutScheduled', { day: word }))}
             </Text>
           </View>
           {skipped ? (
-            <StatusBadge label="已略過" tone="warm" />
+            <StatusBadge label={t('common.states.skipped')} tone="warm" />
           ) : resolved ? (
-            <StatusBadge label="已完成" tone="good" />
+            <StatusBadge label={t('common.states.completed')} tone="good" />
           ) : null}
         </View>
 
@@ -1323,7 +1341,7 @@ function WorkoutStep({
           </Card>
         ) : null}
         <AddRow
-          label="加入動作"
+          label={t('today.workout.addExercise')}
           disabled={busy}
           onPress={() => router.navigate(`/workouts/add-today?date=${date}`)}
         />
@@ -1331,7 +1349,7 @@ function WorkoutStep({
         {total > 0 ? (
           <View className="items-center">
             <TextAction
-              label="另存為我的課表"
+              label={t('today.workout.saveAsTemplate')}
               disabled={busy}
               onPress={() => router.navigate({ pathname: '/workouts/save-today', params: { date } })}
               className="min-h-[44px] justify-center"
@@ -1349,6 +1367,7 @@ function WorkoutStep({
 const UNDER_EATING_SHARE = 0.7;
 
 function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
+  const { t } = useI18n();
   const [extras, setExtras] = useState<Schema<'ExtraItemOut'>[] | null>(
     () => stepCache.get<Schema<'DayPlanOut'>>(`plan:${day.date}`)?.extras ?? null,
   );
@@ -1375,10 +1394,10 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
   );
 
   const removeExtra = (item: Schema<'ExtraItemOut'>) =>
-    Alert.alert('移除點心', `確定移除「${item.name}」？`, [
-      { text: '取消', style: 'cancel' },
+    Alert.alert(t('today.summary.removeSnack'), t('today.summary.removeSnackBody', { name: item.name }), [
+      { text: t('common.actions.cancel'), style: 'cancel' },
       {
-        text: '移除',
+        text: t('common.actions.remove'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -1386,7 +1405,7 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
             await loadExtras();
             onChanged();
           } catch (error) {
-            Alert.alert('移除不了', error instanceof ApiError ? error.message : '請稍後再試');
+            Alert.alert(t('today.summary.removeFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
           }
         },
       },
@@ -1397,34 +1416,34 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
 
   return (
     <View className="flex-1 gap-4">
-      <Title sub={`${dayWord(day.date)}的流程都走完了`}>辛苦了</Title>
+      <Title sub={t('today.summary.subtitle', { day: dayWord(day.date) })}>{t('today.summary.title')}</Title>
 
       <Card className="gap-3">
         <Text className="text-[28px] text-ink">
-          {eaten.toLocaleString()}{' '}
-          <Text className="text-base text-muted">/ {target.toLocaleString()} 大卡</Text>
+          {formatNumber(eaten)}{' '}
+          <Text className="text-base text-muted">/ {formatNumber(target)} {t('common.units.kcal')}</Text>
         </Text>
         {remaining < 0 ? (
-          <Text className="text-base text-warm">超過 {(-remaining).toLocaleString()} 大卡</Text>
+          <Text className="text-base text-warm">{t('today.summary.overCalories', { calories: formatNumber(-remaining) })}</Text>
         ) : share < UNDER_EATING_SHARE ? (
           <View className="gap-1">
-            <Text className="text-base text-warm">只吃了目標的 {Math.round(share * 100)}%</Text>
+            <Text className="text-base text-warm">{t('today.summary.underTarget', { percent: Math.round(share * 100) })}</Text>
             <Hint>
-              吃太少容易流失肌肉，隔天也更容易餓。
-              {proteinShort > 0 ? `可以補一份蛋白質，還差 ${proteinShort} g。` : ''}
+              {t('today.summary.underTargetWarning')}
+              {proteinShort > 0 ? ` ${t('today.summary.proteinShort', { grams: proteinShort })}` : ''}
             </Hint>
           </View>
         ) : (
-          <Text className="text-base text-good">還有 {remaining.toLocaleString()} 大卡的空間</Text>
+          <Text className="text-base text-good">{t('today.summary.remainingCalories', { calories: formatNumber(remaining) })}</Text>
         )}
-        {day.streak > 0 ? <Hint>連續 {day.streak} 天完成流程。</Hint> : null}
+        {day.streak > 0 ? <Hint>{t('today.summary.streak', { count: day.streak })}</Hint> : null}
       </Card>
 
       <Card className="gap-2">
         <SectionHeading
-          action={<TextAction icon={PlusIcon} label="補記點心" onPress={addSnack} className="min-h-[44px] justify-center" />}
+          action={<TextAction icon={PlusIcon} label={t('today.summary.addSnack')} onPress={addSnack} className="min-h-[44px] justify-center" />}
         >
-          點心
+          {t('common.mealTimes.extras')}
         </SectionHeading>
         {extras === null ? null : extras.length ? (
           extras.map((item) => (
@@ -1432,10 +1451,10 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
               <Text className="flex-1 text-base text-ink" numberOfLines={1}>
                 {item.name}
               </Text>
-              <Text className="text-sm text-muted">{Math.round(item.nutrients.kcal)} 大卡</Text>
+              <Text className="text-sm text-muted">{formatNumber(Math.round(item.nutrients.kcal))} {t('common.units.kcal')}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`移除${item.name}`}
+                accessibilityLabel={t('common.accessibility.removeNamed', { name: item.name })}
                 onPress={() => removeExtra(item)}
                 className="h-11 w-11 items-center justify-center active:opacity-60"
               >
@@ -1444,11 +1463,11 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
             </View>
           ))
         ) : (
-          <Hint>三餐以外吃的東西記在這裡，記下就算吃了。</Hint>
+          <Hint>{t('today.summary.extrasHint')}</Hint>
         )}
       </Card>
 
-      <Hint>想改哪一步，點上面的進度列回去。</Hint>
+      <Hint>{t('today.summary.editHint')}</Hint>
     </View>
   );
 }

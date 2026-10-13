@@ -12,6 +12,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { DumbbellIcon, ScaleIcon, UtensilsIcon, type IconProps } from '@/components/icons';
 import { Text } from '@/components/text';
 import { PrimaryButton, TextAction } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 type Advice = Schema<'WeeklyAdviceOut'>;
@@ -23,13 +24,8 @@ type State =
   // A week with nothing logged has nothing to advise on.
   | { kind: 'none' };
 
-const LINES: { key: 'diet' | 'training' | 'body'; label: string; icon: ComponentType<IconProps> }[] = [
-  { key: 'diet', label: '飲食', icon: UtensilsIcon },
-  { key: 'training', label: '訓練', icon: DumbbellIcon },
-  { key: 'body', label: '身體', icon: ScaleIcon },
-];
-
 export function WeeklyAdvice({ start, onPolicy }: { start: string; onPolicy: () => void }) {
+  const { t } = useI18n();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const [agreeing, setAgreeing] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -44,12 +40,12 @@ export function WeeklyAdvice({ start, onPolicy }: { start: string; onPolicy: () 
       .catch((error) => {
         if (!live) return;
         if (error instanceof ApiError && error.status === 428) setState({ kind: 'consent' });
-        else setState({ kind: 'failed', message: 'AI 建議暫時無法產生' });
+        else setState({ kind: 'failed', message: t('progress.advice.unavailable') });
       });
     return () => {
       live = false;
     };
-  }, [start, attempt]);
+  }, [start, attempt, t]);
 
   const retry = useCallback(() => {
     setState({ kind: 'loading' });
@@ -61,7 +57,7 @@ export function WeeklyAdvice({ start, onPolicy }: { start: string; onPolicy: () 
     try {
       if (await setAiConsent(true)) retry();
     } catch {
-      setState({ kind: 'failed', message: '無法儲存設定，請稍後再試' });
+      setState({ kind: 'failed', message: t('progress.advice.saveSettingsFailed') });
     } finally {
       setAgreeing(false);
     }
@@ -69,25 +65,31 @@ export function WeeklyAdvice({ start, onPolicy }: { start: string; onPolicy: () 
 
   if (state.kind === 'none') return null;
 
+  const lines: { key: 'diet' | 'training' | 'body'; label: string; icon: ComponentType<IconProps> }[] = [
+    { key: 'diet', label: t('progress.advice.diet'), icon: UtensilsIcon },
+    { key: 'training', label: t('progress.advice.training'), icon: DumbbellIcon },
+    { key: 'body', label: t('progress.advice.body'), icon: ScaleIcon },
+  ];
+
   return (
     <View className="gap-2">
-      <Text className="text-base text-ink">AI 建議</Text>
+      <Text className="text-base text-ink">{t('progress.advice.title')}</Text>
       <View className="gap-3 rounded-tile border-[1.5px] border-edge bg-surface px-4 py-3">
         {state.kind === 'loading' ? (
           <View className="flex-row items-center gap-2 py-2">
             <ActivityIndicator color={color.primary} />
-            <Text className="text-sm text-muted">整理建議中…</Text>
+            <Text className="text-sm text-muted">{t('progress.advice.loading')}</Text>
           </View>
         ) : state.kind === 'ready' ? (
           <>
             <View className="gap-1">
-              <Text className="text-sm text-muted">回顧</Text>
+              <Text className="text-sm text-muted">{t('progress.advice.review')}</Text>
               <Text className="text-base text-ink">{state.advice.summary}</Text>
             </View>
             <View className="h-px bg-line" />
             <View className="gap-2">
-              <Text className="text-sm text-muted">下週建議</Text>
-              {LINES.map((line) => (
+              <Text className="text-sm text-muted">{t('progress.advice.nextWeek')}</Text>
+              {lines.map((line) => (
                 <View key={line.key} className="flex-row gap-2">
                   <View className="pt-0.5">
                     <line.icon size={16} tint={color.ink} />
@@ -105,13 +107,13 @@ export function WeeklyAdvice({ start, onPolicy }: { start: string; onPolicy: () 
             <AiConsentText onPolicy={onPolicy} />
             {/* Outlined: in the pop-up 知道了 is the berry button. */}
             <PrimaryButton tone="plain" onPress={agree} busy={agreeing}>
-              同意並產生建議
+              {t('progress.advice.consentAndGenerate')}
             </PrimaryButton>
           </>
         ) : (
           <View className="flex-row items-center justify-between py-1">
             <Text className="text-sm text-muted">{state.message}</Text>
-            <TextAction label="再試一次" onPress={retry} />
+            <TextAction label={t('common.actions.retry')} onPress={retry} />
           </View>
         )}
       </View>

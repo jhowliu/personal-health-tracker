@@ -8,6 +8,7 @@ import { View, type AlertButton } from 'react-native';
 
 import { AppModal } from '@/components/AppModal';
 import { Text } from '@/components/text';
+import { translate } from '@/i18n/translator';
 import { PrimaryButton } from '@/components/ui';
 
 type Dialog = { title: string; message?: string; buttons: AlertButton[] };
@@ -32,7 +33,11 @@ function current() {
 
 export const Alert = {
   alert(title: string, message?: string, buttons?: AlertButton[]) {
-    queue.push({ title, message, buttons: buttons?.length ? buttons : [{ text: '好' }] });
+    queue.push({
+      title,
+      message,
+      buttons: buttons?.length ? buttons : [{ text: translate('common.actions.okay') }],
+    });
     notify();
   },
 };
@@ -77,7 +82,7 @@ export function AlertHost() {
                         : 'primary'
                   }
                 >
-                  {button.text ?? '好'}
+                  {button.text ?? translate('common.actions.okay')}
                 </PrimaryButton>
               </View>
             ))}

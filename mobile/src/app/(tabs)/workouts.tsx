@@ -9,21 +9,41 @@ import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { TemplateCard } from '@/components/TemplateCard';
 import { Text } from '@/components/text';
 import { Card, Empty, HeaderAddButton, Hint, Rows, Screen, SectionHeading, Tag, Title } from '@/components/ui';
+import { formatDate } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 import { workoutCategory } from '@/workouts/category';
 
 type Template = Schema<'TemplateOut'>;
 type ScheduleEntry = Schema<'ScheduleEntryOut'>;
 
-const WEEKDAYS = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
-
 export default function WorkoutsScreen() {
+  const { t } = useI18n();
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const weekdayNames = [
+    t('common.weekdays.monday'),
+    t('common.weekdays.tuesday'),
+    t('common.weekdays.wednesday'),
+    t('common.weekdays.thursday'),
+    t('common.weekdays.friday'),
+    t('common.weekdays.saturday'),
+    t('common.weekdays.sunday'),
+  ];
+  const weekdayLabels = [
+    t('common.weekdays.abbreviatedMonday'),
+    t('common.weekdays.abbreviatedTuesday'),
+    t('common.weekdays.abbreviatedWednesday'),
+    t('common.weekdays.abbreviatedThursday'),
+    t('common.weekdays.abbreviatedFriday'),
+    t('common.weekdays.abbreviatedSaturday'),
+    t('common.weekdays.abbreviatedSunday'),
+  ];
 
   const load = useCallback(async () => {
     try {
@@ -34,9 +54,9 @@ export default function WorkoutsScreen() {
       setTemplates(list);
       setSchedule(plan);
     } catch (error) {
-      Alert.alert('讀不到訓練資料', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.home.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +77,7 @@ export default function WorkoutsScreen() {
       setSchedule(await api.put('/workout-schedule', next));
       setEditingDay((current) => (current === weekday ? null : current));
     } catch (error) {
-      Alert.alert('排程存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.home.scheduleSaveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -70,7 +90,7 @@ export default function WorkoutsScreen() {
       const copied: Template = await api.post(`/workout-templates/${template.id}/copy`);
       router.navigate(`/workouts/${copied.id}`);
     } catch (error) {
-      Alert.alert('複製不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.home.copyFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setWorkingId(null);
     }
@@ -80,19 +100,19 @@ export default function WorkoutsScreen() {
     // The schedule points at its templates, so a scheduled one cannot go until it is replaced.
     const days = schedule
       .filter((entry) => entry.template_id === template.id)
-      .map((entry) => WEEKDAYS[entry.weekday]);
+      .map((entry) => weekdayNames[entry.weekday]);
     if (days.length > 0) {
       Alert.alert(
-        '這份課表還在排程裡',
-        `「${template.name}」排在${days.join('、')}。先到一週排程改成休息日或別的課表，才能刪除。`,
+        t('workouts.home.templateScheduledTitle'),
+        t('workouts.home.templateScheduledBody', { name: template.name, days: days.join(', ') }),
       );
       return;
     }
 
-    Alert.alert('刪除課表', `確定刪除「${template.name}」？刪除後無法復原。`, [
-      { text: '取消', style: 'cancel' },
+    Alert.alert(t('workouts.home.deleteTemplateTitle'), t('workouts.home.deleteTemplateBody', { name: template.name }), [
+      { text: t('common.actions.cancel'), style: 'cancel' },
       {
-        text: '刪除',
+        text: t('common.actions.delete'),
         style: 'destructive',
         onPress: () => {
           void (async () => {
@@ -102,7 +122,7 @@ export default function WorkoutsScreen() {
               setTemplates((current) => current?.filter((item) => item.id !== template.id) ?? current);
               setExpandedId((current) => (current === template.id ? null : current));
             } catch (error) {
-              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+              Alert.alert(t('common.errors.deleteFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
             } finally {
               setWorkingId(null);
             }
@@ -147,18 +167,20 @@ export default function WorkoutsScreen() {
       footerSafeArea={false}
       pinnedHeader={
         <View className="flex-row items-center justify-between">
-          <Title>訓練</Title>
-          <HeaderAddButton label="新增" accessibilityLabel="新增課表" onPress={() => router.navigate('/workouts/new')} />
+          <Title>{t('workouts.home.title')}</Title>
+          <HeaderAddButton label={t('common.actions.create')} accessibilityLabel={t('workouts.home.addTemplate')} onPress={() => router.navigate('/workouts/new')} />
         </View>
       }
     >
-      <SectionHeading action={<Text className="text-xs text-muted">{weekRange()}</Text>}>一週排程</SectionHeading>
+      <SectionHeading action={<Text className="text-xs text-muted">{weekRange()}</Text>}>
+        {t('workouts.home.weeklySchedule')}
+      </SectionHeading>
       {templates.length === 0 ? (
-        <Hint>先新增一份課表，才排得進星期幾。</Hint>
+        <Hint>{t('workouts.home.scheduleNeedsTemplate')}</Hint>
       ) : null}
       <Card className="px-0 py-0">
         <Rows>
-          {WEEKDAYS.map((label, weekday) => {
+          {weekdayLabels.map((label, weekday) => {
             const entry = schedule.find((item) => item.weekday === weekday);
             const template = entry ? byId.get(entry.template_id) : undefined;
             const category = template ? workoutCategory(template.category_id) : undefined;
@@ -169,7 +191,10 @@ export default function WorkoutsScreen() {
               <Pressable
                 key={label}
                 accessibilityRole="button"
-                accessibilityLabel={`更改${label}的課表，目前${template?.name ?? '休息日'}`}
+                accessibilityLabel={t('workouts.home.changeDayTemplate', {
+                  day: weekdayNames[weekday],
+                  name: template?.name ?? t('workouts.home.restDay'),
+                })}
                 accessibilityState={{ expanded: open }}
                 disabled={busy}
                 onPress={() => setEditingDay(open ? null : weekday)}
@@ -178,10 +203,10 @@ export default function WorkoutsScreen() {
                 }`}
               >
                 <Text className="w-9 text-sm text-muted">{label}</Text>
-                <Text className="flex-1 text-[15px] text-ink">{template?.name ?? '休息日'}</Text>
+                <Text className="flex-1 text-[15px] text-ink">{template?.name ?? t('workouts.home.restDay')}</Text>
                 {isToday ? (
                   <View className="rounded-full border-[1.5px] border-edge px-2 py-0.5">
-                    <Text className="text-xs text-ink">今天</Text>
+                    <Text className="text-xs text-ink">{t('common.labels.today')}</Text>
                   </View>
                 ) : category ? (
                   <Tag label={category.label} tone={category.tone} />
@@ -193,19 +218,19 @@ export default function WorkoutsScreen() {
         </Rows>
       </Card>
 
-      <SectionHeading action={<Text className="text-xs text-muted">{ownedTemplates.length} 份</Text>}>
-        我的課表
+      <SectionHeading action={<Text className="text-xs text-muted">{t(ownedTemplates.length === 1 ? 'common.counts.templates.one' : 'common.counts.templates.other', { count: ownedTemplates.length })}</Text>}>
+        {t('workouts.home.myTemplates')}
       </SectionHeading>
       {ownedTemplates.length === 0 ? (
-        <Empty compact>還沒有自己的課表，可新增或從公用課表複製</Empty>
+        <Empty compact>{t('workouts.home.noOwnedTemplates')}</Empty>
       ) : (
         <View className="gap-3">{ownedTemplates.map(renderTemplate)}</View>
       )}
 
       {builtinTemplates.length > 0 ? (
         <>
-          <SectionHeading action={<Text className="text-xs text-muted">{builtinTemplates.length} 份</Text>}>
-            公用課表
+          <SectionHeading action={<Text className="text-xs text-muted">{t(builtinTemplates.length === 1 ? 'common.counts.templates.one' : 'common.counts.templates.other', { count: builtinTemplates.length })}</Text>}>
+            {t('workouts.home.publicTemplates')}
           </SectionHeading>
           <View className="gap-3">{builtinTemplates.map(renderTemplate)}</View>
         </>
@@ -213,15 +238,15 @@ export default function WorkoutsScreen() {
 
       <Sheet
         visible={editingDay !== null}
-        title={editingDay === null ? '' : WEEKDAYS[editingDay]}
+        title={editingDay === null ? '' : weekdayNames[editingDay]}
         onClose={() => {
           if (!busy) setEditingDay(null);
         }}
       >
-        <Hint>目前：{editingTemplate?.name ?? '休息日'}</Hint>
+        <Hint>{t('workouts.home.currentTemplate', { name: editingTemplate?.name ?? t('workouts.home.restDay') })}</Hint>
         <ScrollView contentContainerClassName="gap-2 pb-4" keyboardShouldPersistTaps="handled">
           <ChoiceOption
-            label="休息日"
+            label={t('workouts.home.restDay')}
             selected={!editingEntry}
             disabled={busy || editingDay === null}
             onPress={() => editingDay !== null && assign(editingDay, null)}
@@ -230,7 +255,7 @@ export default function WorkoutsScreen() {
             <ChoiceOption
               key={option.id}
               label={option.name}
-              detail={`${option.is_builtin ? '公用 · ' : ''}${describe(option)}`}
+              detail={`${option.is_builtin ? t('workouts.home.publicPrefix') : ''}${describe(option)}`}
               selected={editingEntry?.template_id === option.id}
               disabled={busy || editingDay === null}
               onPress={() => editingDay !== null && assign(editingDay, option.id)}
@@ -253,11 +278,13 @@ function weekRange(): string {
   monday.setDate(monday.getDate() - todayWeekday());
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  const short = (day: Date) => `${day.getMonth() + 1}/${day.getDate()}`;
+  const short = (day: Date) => formatDate(day, { month: 'numeric', day: 'numeric' });
   return `${short(monday)} — ${short(sunday)}`;
 }
 
 function describe(template: Template): string {
-  const minutes = template.duration_min ? `，約 ${template.duration_min} 分鐘` : '';
-  return `${template.items.length} 個動作${minutes}`;
+  const minutes = template.duration_min
+    ? translate('workouts.home.approximateMinutes', { count: template.duration_min })
+    : '';
+  return translate('workouts.home.summary', { count: template.items.length, minutes });
 }

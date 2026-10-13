@@ -10,15 +10,16 @@ import { Text } from '@/components/text';
 import { TrendChart } from '@/components/TrendChart';
 import { VolumeChart } from '@/components/VolumeChart';
 import { Card, HeaderIconButton, Rows, Screen, SectionHeading } from '@/components/ui';
+import { formatDate } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 type Summary = Schema<'BodySummaryOut'>;
 type Log = Schema<'BodyLogOut'>;
 type Volume = Schema<'VolumeTrendOut'>;
 
-const WEEKDAY = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
-
 export default function BodyScreen() {
+  const { t } = useI18n();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [logs, setLogs] = useState<Log[]>([]);
   const [volume, setVolume] = useState<Volume | null>(null);
@@ -43,9 +44,9 @@ export default function BodyScreen() {
         // Only the dot depends on it.
         .catch(() => {});
     } catch (error) {
-      Alert.alert('讀不到紀錄', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('body.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -67,11 +68,11 @@ export default function BodyScreen() {
     <Screen footerSafeArea={false}>
       <View className="flex-row items-center justify-between">
         <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
-          進度
+          {t('body.title')}
         </Text>
         <HeaderIconButton
           icon={ReportIcon}
-          accessibilityLabel={newReport ? '週報，有新的一週' : '週報'}
+          accessibilityLabel={newReport ? t('body.weeklyReportNew') : t('body.weeklyReport')}
           badge={newReport}
           onPress={() => router.push('/progress/weeks')}
         />
@@ -82,9 +83,9 @@ export default function BodyScreen() {
       </Card>
 
       <View className="flex-row border-b border-line pb-4">
-        <Kpi label="本週平均" value={summary.week_avg_weight?.toFixed(1) ?? '—'} unit="kg" />
+        <Kpi label={t('common.labels.weeklyAverage')} value={summary.week_avg_weight?.toFixed(1) ?? '—'} unit="kg" />
         <Kpi
-          label="比上週"
+          label={t('common.labels.comparedWithLastWeek')}
           value={
             summary.week_avg_delta === null
               ? '—'
@@ -95,11 +96,11 @@ export default function BodyScreen() {
             summary.week_avg_delta === null ? 'ink' : summary.week_avg_delta <= 0 ? 'good' : 'warm'
           }
         />
-        <Kpi label="腰圍" value={summary.latest_waist?.toFixed(1) ?? '—'} unit="cm" />
+        <Kpi label={t('common.labels.waist')} value={summary.latest_waist?.toFixed(1) ?? '—'} unit="cm" />
       </View>
 
-      <TrendChart title="體重" unit="kg，近 30 天" points={summary.weight_series} />
-      <TrendChart title="腰圍" unit="cm，近 30 天" points={summary.waist_series} />
+      <TrendChart title={t('body.weightTrend')} unit={t('body.lastThirtyDaysKg')} points={summary.weight_series} />
+      <TrendChart title={t('body.waistTrend')} unit={t('body.lastThirtyDaysCm')} points={summary.waist_series} />
       {volume ? <VolumeChart trend={volume} /> : null}
 
       <SectionHeading
@@ -108,22 +109,28 @@ export default function BodyScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityState={{ expanded: showLogs }}
-              accessibilityLabel={showLogs ? '收起紀錄' : `展開 ${logs.length} 筆紀錄`}
+              accessibilityLabel={showLogs ? t('body.collapseRecords') : t('body.expandRecords', { count: logs.length })}
               onPress={() => setShowLogs((open) => !open)}
               hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
               className="flex-row items-center gap-1 active:opacity-70"
             >
-              <Text className="text-base text-muted">{showLogs ? '收起' : `${logs.length} 筆`}</Text>
+              <Text className="text-base text-muted">
+                {showLogs
+                  ? t('common.actions.collapse')
+                  : t(logs.length === 1 ? 'common.counts.entries.one' : 'common.counts.entries.other', {
+                      count: logs.length,
+                    })}
+              </Text>
               <ChevronIcon direction={showLogs ? 'up' : 'down'} size={16} tint={color.muted} />
             </Pressable>
           ) : null
         }
       >
-        紀錄
+        {t('body.records')}
       </SectionHeading>
       {logs.length === 0 ? (
         <Card>
-          <Text className="py-2 text-center text-base text-muted">還沒有紀錄</Text>
+          <Text className="py-2 text-center text-base text-muted">{t('body.noRecords')}</Text>
         </Card>
       ) : showLogs ? (
         <Card className="py-0">
@@ -136,12 +143,12 @@ export default function BodyScreen() {
                   className="flex-row items-center justify-between py-3"
                 >
                   <Text className="text-base text-ink">
-                    {parsed.getMonth() + 1}/{parsed.getDate()} {WEEKDAY[parsed.getDay()]}
+                    {formatDate(parsed, { month: 'numeric', day: 'numeric', weekday: 'short' })}
                   </Text>
                   <Text className="text-base text-muted">
                     {[
                       log.weight_kg ? `${log.weight_kg.toFixed(1)} kg` : null,
-                      log.waist_cm ? `腰 ${log.waist_cm.toFixed(1)} cm` : null,
+                      log.waist_cm ? t('body.waistValue', { value: log.waist_cm.toFixed(1) }) : null,
                     ]
                       .filter(Boolean)
                       .join(',')}

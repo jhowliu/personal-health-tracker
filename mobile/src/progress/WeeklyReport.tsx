@@ -7,20 +7,20 @@ import { View } from 'react-native';
 
 import type { Schema } from '@/api/client';
 import { Text } from '@/components/text';
+import { formatDate, formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { WeeklyAdvice } from '@/progress/WeeklyAdvice';
 
 export type Review = Schema<'WeeklyReviewOut'>;
 
 /** "10/5 – 10/11" */
 export function weekRange(review: { start: string; end: string }) {
-  const short = (iso: string) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8))}`;
+  const short = (iso: string) => formatDate(`${iso}T00:00:00`, { month: 'numeric', day: 'numeric' });
   return `${short(review.start)} – ${short(review.end)}`;
 }
 
 const signed = (value: number) =>
   `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)}`;
-
-const thousands = (value: number) => String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
 export function WeeklyReport({
   review,
@@ -30,6 +30,7 @@ export function WeeklyReport({
   /** Closes the modal the report is in, before a link opens another screen. */
   onLeave?: () => void;
 }) {
+  const { t } = useI18n();
   const volumeChange =
     review.previous_volume_kg > 0
       ? Math.round(((review.volume_kg - review.previous_volume_kg) / review.previous_volume_kg) * 100)
@@ -39,28 +40,29 @@ export function WeeklyReport({
     <View className="gap-3">
       <View className="flex-row gap-3">
         <Tile
-          label="體重平均"
+          label={t('progress.weightAverage')}
           value={review.weight_average?.toFixed(1) ?? '—'}
           unit="kg"
           change={review.weight_change}
         />
-        <Tile label="腰圍" value={review.waist_latest?.toFixed(1) ?? '—'} unit="cm" change={review.waist_change} />
+        <Tile label={t('progress.waist')} value={review.waist_latest?.toFixed(1) ?? '—'} unit="cm" change={review.waist_change} />
       </View>
       <View className="flex-row gap-3">
-        <Tile label="完成" value={String(review.days_complete)} unit="/ 7 天" />
-        <Tile label="訓練" value={String(review.workouts)} unit="次" />
+        <Tile label={t('progress.completed')} value={String(review.days_complete)} unit={t('progress.sevenDays')} />
+        <Tile label={t('progress.workouts')} value={String(review.workouts)} unit="" />
       </View>
       <View className="gap-0.5 rounded-tile border-[1.5px] border-edge bg-surface px-4 py-3">
-        <Text className="text-xs text-muted">總訓練量</Text>
+        <Text className="text-xs text-muted">{t('progress.totalVolume')}</Text>
         <View className="flex-row items-baseline justify-between">
           <Text className="text-[25px] text-ink">
-            {thousands(review.volume_kg)}
+            {formatNumber(review.volume_kg)}
             <Text className="text-xs text-muted"> kg</Text>
           </Text>
           {volumeChange !== null ? (
             <Text className="text-sm text-muted">
-              比上週 {volumeChange > 0 ? '+' : volumeChange < 0 ? '−' : ''}
-              {Math.abs(volumeChange)}%
+              {t('progress.comparedValue', {
+                value: `${volumeChange > 0 ? '+' : volumeChange < 0 ? '−' : ''}${Math.abs(volumeChange)}%`,
+              })}
             </Text>
           ) : null}
         </View>
@@ -89,6 +91,7 @@ function Tile({
   unit: string;
   change?: number | null;
 }) {
+  const { t } = useI18n();
   return (
     <View className="flex-1 gap-0.5 rounded-tile border-[1.5px] border-edge bg-surface px-4 py-3">
       <Text className="text-xs text-muted">{label}</Text>
@@ -98,7 +101,7 @@ function Tile({
       </Text>
       {change !== undefined ? (
         <Text className={`text-sm ${change === null ? 'text-muted' : change <= 0 ? 'text-good' : 'text-warm'}`}>
-          {change === null ? '比上週 —' : `比上週 ${signed(change)}`}
+          {change === null ? t('progress.comparedNoValue') : t('progress.comparedValue', { value: signed(change) })}
         </Text>
       ) : null}
     </View>
