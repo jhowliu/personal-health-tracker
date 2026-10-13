@@ -34,6 +34,7 @@ import {
   type TourStepId,
   type TourTargetId,
 } from './tour';
+import { startSpotlightMeasurementRetries } from './measurement-retry';
 
 type TourPhase = 'idle' | 'offer' | 'running' | 'complete';
 
@@ -185,6 +186,14 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refreshTarget();
   }, [phase, stepIndex, refreshTarget]);
+
+  // Native navigation and Modal dismissal can briefly report a zero-sized target even after the
+  // next screen has mounted. onLayout is not guaranteed to fire again, so retry for a short,
+  // bounded window instead of leaving the tour on its waiting state forever.
+  useEffect(() => {
+    if (phase !== 'running' || targetRect) return;
+    return startSpotlightMeasurementRetries(measureTarget);
+  }, [phase, stepIndex, targetRect, measureTarget]);
 
   useEffect(() => {
     if (phase !== 'running') return;

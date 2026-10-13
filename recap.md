@@ -21,10 +21,15 @@
 - Added Settings → 新手導覽 / Getting started for replay. A replay after today's body log exists uses
   a shorter review step instead of requesting duplicate entry.
 - Regenerated OpenAPI and mobile API types. Added unit tests for step sequences and backend versioning.
+- Fixed the native onboarding tour getting stuck on 「正在準備下一個步驟」 after opening the food
+  library. iOS navigation/Modal transitions can briefly report a zero-sized spotlight target without
+  another `onLayout`; the provider now retries measurement for a bounded two-second window.
 
 ## Validation completed
 
 - Mobile: `npm run typecheck`, `npm run lint`, `npm test -- --runInBand` — 10 suites / 82 tests.
+- After the native measurement fix: mobile typecheck and lint passed; 11 suites / 84 tests passed,
+  including regression coverage for transient zero-sized targets and bounded retries.
 - Backend: `.venv/bin/ruff check .`, `.venv/bin/python -m pytest -q` — 246 passed.
 - Architecture/OpenAPI: `.venv/bin/lint-imports` (4 contracts kept) and
   `.venv/bin/python -m scripts.check_openapi` passed.
@@ -46,6 +51,8 @@
 - The tour can be deferred without marking it complete; Skip/Exit and full completion persist version 1.
 - Physical iOS/Android checks for native modal layering, largest Dynamic Type, screen-reader focus,
   reduced motion, and landscape are still recommended before release.
+- The reported iOS stuck-spinner path needs one physical-device confirmation after installing the
+  updated PR build; the deterministic transition regression is covered locally.
 
 ## Next target
 
