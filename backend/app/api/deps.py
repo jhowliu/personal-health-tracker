@@ -210,7 +210,10 @@ def meal_store(conn: DbConn, locale: RequestLocale) -> SqliteMealStore:
 
 def daily_flow(conn: DbConn, locale: RequestLocale) -> DailyFlowService:
     return DailyFlowService(
-        day_store(conn, locale), SqliteAccountStore(conn), SqliteWorkoutExecutionStore(conn), clock()
+        day_store(conn, locale),
+        SqliteAccountStore(conn),
+        SqliteWorkoutExecutionStore(conn),
+        clock(),
     )
 
 

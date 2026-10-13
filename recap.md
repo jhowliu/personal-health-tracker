@@ -27,6 +27,8 @@
 
 ## Validation completed
 
+- Fixed PR #30 backend CI failure caused by Ruff `E501` in `backend/app/api/deps.py`; the exact
+  CI lint command (`.venv/bin/ruff check .`) now passes locally.
 - Mobile: `npm run typecheck`, `npm run lint`, `npm test -- --runInBand` — 9 suites / 79 tests.
 - Backend: `.venv/bin/python -m pytest -q` — 245 passed.
 - OpenAPI: `.venv/bin/python -m scripts.check_openapi` — current.
