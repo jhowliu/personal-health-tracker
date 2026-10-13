@@ -11,6 +11,7 @@ import { AppModal } from '@/components/AppModal';
 import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
 import { todayISO } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { WeeklyReport, weekRange, type Review } from '@/progress/WeeklyReport';
 
 let pending: Review | null = null;
@@ -55,6 +56,7 @@ export async function checkWeeklyReport(): Promise<void> {
 }
 
 export function WeeklyReportHost() {
+  const { t } = useI18n();
   const review = useSyncExternalStore(subscribe, current, current);
   if (!review) return null;
 
@@ -73,13 +75,13 @@ export function WeeklyReportHost() {
           <ScrollView className="grow-0" contentContainerClassName="gap-4">
             <View className="gap-1">
               <Text accessibilityRole="header" className="text-2xl text-ink">
-                {review.end >= todayISO() ? '這週週報' : '上週週報'}
+                {review.end >= todayISO() ? t('progress.thisWeekReport') : t('progress.lastWeekReport')}
               </Text>
               <Text className="text-sm text-muted">{weekRange(review)}</Text>
             </View>
             <WeeklyReport review={review} onLeave={close} />
           </ScrollView>
-          <PrimaryButton onPress={close}>知道了</PrimaryButton>
+          <PrimaryButton onPress={close}>{t('progress.understood')}</PrimaryButton>
         </View>
       </View>
     </AppModal>

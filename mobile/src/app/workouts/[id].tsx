@@ -22,6 +22,7 @@ import {
   TextAction,
   Title,
 } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 import { backOrReplace } from '@/navigation/back';
 import { replacement } from '@/workouts/replacement';
@@ -45,6 +46,7 @@ let unsavedKeys = 0;
 const newKey = () => `new-${++unsavedKeys}`;
 
 export default function EditTemplate() {
+  const { t } = useI18n();
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
   const navigation = useNavigation();
@@ -92,15 +94,15 @@ export default function EditTemplate() {
           setLoadedId(id);
         }
       } catch (error) {
-        Alert.alert('讀不到課表', error instanceof ApiError ? error.message : '請稍後再試', [
-          { text: '返回訓練', onPress: () => backOrReplace('/workouts') },
+        Alert.alert(t('workouts.editor.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'), [
+          { text: t('workouts.editor.returnToWorkouts'), onPress: () => backOrReplace('/workouts') },
         ]);
       }
     })();
     return () => {
       live = false;
     };
-  }, [id, isNew]);
+  }, [id, isNew, t]);
 
   const ready = loadedId === id;
   const dirty = ready && baseline !== serialiseTemplate(name, duration, items);
@@ -124,10 +126,10 @@ export default function EditTemplate() {
 
   usePreventRemove(dirty && !allowLeave, ({ data }) => {
     if (busy) return;
-    Alert.alert('放棄未儲存的修改？', '這次編輯的課表內容將不會保留。', [
-      { text: '繼續編輯', style: 'cancel' },
+    Alert.alert(t('workouts.editor.discardTitle'), t('workouts.editor.discardBody'), [
+      { text: t('workouts.editor.continueEditing'), style: 'cancel' },
       {
-        text: '放棄',
+        text: t('common.actions.discard'),
         style: 'destructive',
         onPress: () => {
           setAllowLeave(true);
@@ -183,7 +185,7 @@ export default function EditTemplate() {
       setAllowLeave(true);
       requestAnimationFrame(() => backOrReplace('/workouts'));
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -196,7 +198,7 @@ export default function EditTemplate() {
       setAllowLeave(true);
       requestAnimationFrame(() => router.replace(`/workouts/${copied.id}`));
     } catch (error) {
-      Alert.alert('複製不了課表', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.editor.copyFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -218,50 +220,52 @@ export default function EditTemplate() {
       footer={
         isBuiltin ? (
           <PrimaryButton onPress={copy} busy={busy}>
-            {busy ? '複製中…' : '複製並自訂'}
+            {busy ? t('common.states.copying') : t('workouts.editor.copyCustomize')}
           </PrimaryButton>
         ) : (
           <View className="flex-row items-center gap-3">
-            <Text className="text-sm text-muted">{items.length} 個動作</Text>
+            <Text className="text-sm text-muted">
+              {t(items.length === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', { count: items.length })}
+            </Text>
             <View className="flex-1">
               <PrimaryButton
                 onPress={save}
                 disabled={!name || items.length === 0}
                 busy={busy}
               >
-                {busy ? '儲存中…' : '儲存課表'}
+                {busy ? t('common.states.saving') : t('workouts.editor.saveTemplate')}
               </PrimaryButton>
             </View>
           </View>
         )
       }
     >
-      <BackLink label="訓練" onPress={() => backOrReplace('/workouts')} disabled={busy} />
+      <BackLink label={t('workouts.home.title')} onPress={() => backOrReplace('/workouts')} disabled={busy} />
 
-      <Title>{isNew ? '新增課表' : isBuiltin ? '公用課表' : '編輯課表'}</Title>
+      <Title>{isNew ? t('workouts.editor.newTitle') : isBuiltin ? t('workouts.editor.publicTitle') : t('workouts.editor.editTitle')}</Title>
 
-      {isBuiltin ? <Hint>公用課表可直接排程，但不能修改。複製後即可自訂。</Hint> : null}
+      {isBuiltin ? <Hint>{t('workouts.editor.publicHint')}</Hint> : null}
 
       <Field
-        label="課表名稱"
+        label={t('workouts.editor.templateName')}
         value={name}
         onChangeText={setName}
-        placeholder="健身房：下肢"
+        placeholder={t('workouts.editor.templateNamePlaceholder')}
         editable={!isBuiltin}
       />
 
       <Field
-        label="大約時間"
-        suffix="分鐘"
+        label={t('workouts.editor.approximateTime')}
+        suffix={t('common.units.minute')}
         value={duration}
         onChangeText={setDuration}
         keyboardType="numeric"
         editable={!isBuiltin}
       />
-      <Hint>地點依動作用到的器材自動判定：出現槓鈴、機械、滑輪或跑步機就算健身房。</Hint>
+      <Hint>{t('workouts.editor.locationHint')}</Hint>
 
-      <SectionHeading action={<Text className="text-sm text-muted">{items.length} 個</Text>}>
-        動作
+      <SectionHeading action={<Text className="text-sm text-muted">{items.length}</Text>}>
+        {t('workouts.editor.exercises')}
       </SectionHeading>
 
       <ReorderList
@@ -290,7 +294,7 @@ export default function EditTemplate() {
                     </Text>
                     <TextAction
                       tone="danger"
-                      label="移除"
+                      label={t('common.actions.remove')}
                       onPress={() => {
                         setItems(items.filter((_, i) => i !== index));
                         setEditing(null);
@@ -309,28 +313,28 @@ export default function EditTemplate() {
                       )
                     }
                     options={[
-                      { value: 'reps', label: '次數' },
-                      { value: 'time', label: '時間' },
+                      { value: 'reps', label: t('workouts.editor.repsMode') },
+                      { value: 'time', label: t('workouts.editor.timeMode') },
                     ]}
                   />
 
                   {item.duration_sec === null ? (
                     <View className="flex-row items-end gap-3">
                       <View className="gap-1">
-                        <Text className="text-sm text-muted">組數</Text>
+                        <Text className="text-sm text-muted">{t('common.labels.sets')}</Text>
                         <NumberStepper
                           value={item.sets ?? 1}
                           onChange={(sets) => patch(index, { sets })}
                         />
                       </View>
                       <Field
-                        label="次數"
+                        label={t('common.labels.reps')}
                         value={item.reps ?? ''}
                         onChangeText={(reps) => patch(index, { reps })}
                         placeholder="10-12"
                       />
                       <Field
-                        label="重量"
+                        label={t('common.labels.weight')}
                         suffix="kg"
                         value={item.weight_kg === null ? '' : String(item.weight_kg)}
                         onChangeText={(text) => patch(index, { weight_kg: text ? Number(text) : null })}
@@ -339,8 +343,8 @@ export default function EditTemplate() {
                     </View>
                   ) : (
                     <Field
-                      label="時間"
-                      suffix="分鐘"
+                      label={t('common.labels.time')}
+                      suffix={t('common.units.minute')}
                       value={String(Math.round(item.duration_sec / 60))}
                       onChangeText={(text) =>
                         patch(index, { duration_sec: Math.max(1, Number(text) || 1) * 60 })
@@ -350,22 +354,22 @@ export default function EditTemplate() {
                   )}
 
                   <Field
-                    label="做法說明"
+                    label={t('common.labels.notes')}
                     value={item.note ?? ''}
                     onChangeText={(note) => patch(index, { note: note || null })}
-                    placeholder="腳與肩同寬，膝蓋不要完全打直"
+                    placeholder={t('workouts.editor.notePlaceholder')}
                   />
 
                   <Field
-                    label="休息"
+                    label={t('common.labels.rest')}
                     value={String(item.rest_sec)}
                     onChangeText={(text) => patch(index, { rest_sec: Number(text) || 0 })}
-                    suffix="秒"
+                    suffix={t('common.units.second')}
                     keyboardType="numeric"
                   />
 
                   <TextAction
-                    label="找替代動作"
+                    label={t('workouts.editor.findAlternative')}
                     onPress={() =>
                       router.navigate(
                         `/workouts/alternatives?template_id=${id}&exercise_id=${item.exercise_id}&item_index=${index}&name=${encodeURIComponent(item.exercise_name)}`,
@@ -373,7 +377,7 @@ export default function EditTemplate() {
                     }
                   />
 
-                  <TextAction tone="muted" label="收起" onPress={() => setEditing(null)} className="justify-center" />
+                  <TextAction tone="muted" label={t('common.actions.collapse')} onPress={() => setEditing(null)} className="justify-center" />
                 </Card>
               ) : (
                 // The handle sits beside the row's button, not inside it: a button in a button
@@ -386,7 +390,7 @@ export default function EditTemplate() {
                   {handle}
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`編輯${item.exercise_name}`}
+                    accessibilityLabel={t('common.accessibility.editNamed', { name: item.exercise_name })}
                     disabled={isBuiltin}
                     onPress={() => setEditing(index)}
                     className="min-h-[44px] flex-1 justify-center gap-0.5"
@@ -396,9 +400,9 @@ export default function EditTemplate() {
                     </Text>
                     <Text className="text-sm text-muted">
                       {item.duration_sec
-                        ? `${Math.round(item.duration_sec / 60)} 分鐘`
+                        ? t('workouts.editor.durationSummary', { minutes: Math.round(item.duration_sec / 60) })
                         : item.sets
-                          ? `${item.sets} 組 × ${item.reps}`
+                          ? t('workouts.editor.setsRepsSummary', { sets: item.sets, reps: item.reps ?? '' })
                           : item.reps}
                       {item.weight_kg ? `,${item.weight_kg} kg` : ''}
                     </Text>
@@ -411,7 +415,7 @@ export default function EditTemplate() {
         }}
       />
 
-      {items.length === 0 ? <Hint>還沒有動作，從下面加入。</Hint> : null}
+      {items.length === 0 ? <Hint>{t('workouts.editor.noExercises')}</Hint> : null}
 
       {isBuiltin ? null : (
         <>
@@ -420,7 +424,7 @@ export default function EditTemplate() {
             icon={libraryOpen ? undefined : PlusIcon}
             onPress={() => setLibraryOpen((open) => !open)}
           >
-            {libraryOpen ? '收起動作庫' : '從動作庫加入'}
+            {libraryOpen ? t('workouts.editor.closeLibrary') : t('workouts.editor.openLibrary')}
           </PrimaryButton>
 
           {libraryOpen ? (

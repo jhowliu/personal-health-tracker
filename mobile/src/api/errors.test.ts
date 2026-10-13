@@ -1,6 +1,9 @@
 import { errorMessage } from '@/api/errors';
+import { activateLocale } from '@/i18n/translator';
 
 describe('an error message', () => {
+  afterEach(() => activateLocale('zh-TW'));
+
   it('passes the app\'s own message through', () => {
     expect(errorMessage('找不到這天排定的動作', 404)).toBe('找不到這天排定的動作');
   });
@@ -20,5 +23,15 @@ describe('an error message', () => {
   it('falls back to something general', () => {
     expect(errorMessage([{ loc: ['body', 'mystery'], msg: 'Input should be valid' }], 422)).toBe('輸入的資料格式不正確，請檢查後再試。');
     expect(errorMessage(null, 500)).toBe('請求失敗（500）');
+  });
+
+  it('localises legacy server and validation errors for English', () => {
+    activateLocale('en');
+
+    expect(errorMessage('Email 或密碼不對', 401)).toBe('Email or password is incorrect.');
+    expect(errorMessage([{ loc: ['body', 'reps'], msg: 'Input should be valid' }], 422)).toBe(
+      'Reps is not valid.',
+    );
+    expect(errorMessage(null, 500)).toBe('Request failed (500)');
   });
 });

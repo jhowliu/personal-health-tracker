@@ -5,6 +5,7 @@ import { Pressable, View } from 'react-native';
 import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { Field, PrimaryButton } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 
 function TapRow({
   label,
@@ -15,10 +16,11 @@ function TapRow({
   display: string;
   onPress: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`更改${label}`}
+      accessibilityLabel={t('common.accessibility.changeNamed', { name: label })}
       onPress={onPress}
       className="min-h-[44px] flex-row items-center justify-between py-3"
     >
@@ -89,6 +91,7 @@ export function NumberRow({
   decimal?: boolean;
   onSave: (next: number) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(String(value));
 
@@ -125,7 +128,7 @@ export function NumberRow({
             />
           </View>
           <PrimaryButton onPress={save} disabled={!valid}>
-            儲存
+            {t('common.actions.save')}
           </PrimaryButton>
         </View>
       </Sheet>

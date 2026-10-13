@@ -11,33 +11,43 @@ import { Text } from '@/components/text';
 import { TimezoneRow } from '@/components/TimezoneRow';
 import { Card, Row, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { todayISO } from '@/dates';
+import type { LocalePreference } from '@/i18n';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { syncWeighInReminder } from '@/notifications/reminder';
 import { color } from '@/theme/tokens';
 
-const SEX_OPTIONS = [
-  { value: 'f' as const, label: '女' },
-  { value: 'm' as const, label: '男' },
-];
-const ACTIVITY_OPTIONS = [
-  { value: 'sedentary' as const, label: '久坐' },
-  { value: 'light' as const, label: '常走動' },
-  { value: 'moderate' as const, label: '勞力工作' },
-  { value: 'active' as const, label: '粗重勞力' },
-];
-const DEFICIT_OPTIONS = ([10, 12, 15, 20] as const).map((value) => ({ value, label: `少吃 ${value}%` }));
-// Where the workout sits in the day's flow: after breakfast, or between lunch and dinner.
-const WORKOUT_TIME_OPTIONS = [
-  { value: 'am' as const, label: '早上練（早餐後）' },
-  { value: 'pm' as const, label: '晚上練（晚餐前）' },
-];
-
 export default function SettingsScreen() {
   const { profile, signOut, reload } = useSession();
+  const { preference, setPreference, t } = useI18n();
 
   if (!profile) return null;
   const { profile: me, targets } = profile;
 
   const age = new Date().getFullYear() - Number(me.birth_date.slice(0, 4));
+  const sexOptions = [
+    { value: 'f' as const, label: t('common.labels.female') },
+    { value: 'm' as const, label: t('common.labels.male') },
+  ];
+  const activityOptions = [
+    { value: 'sedentary' as const, label: t('profileSetup.activity.sedentary') },
+    { value: 'light' as const, label: t('profileSetup.activity.light') },
+    { value: 'moderate' as const, label: t('profileSetup.activity.moderate') },
+    { value: 'active' as const, label: t('profileSetup.activity.active') },
+  ];
+  const deficitOptions = ([10, 12, 15, 20] as const).map((value) => ({
+    value,
+    label: t('settings.calorieDeficit', { value }),
+  }));
+  const workoutTimeOptions = [
+    { value: 'am' as const, label: t('settings.workoutMorning') },
+    { value: 'pm' as const, label: t('settings.workoutEvening') },
+  ];
+  const languageOptions: { value: LocalePreference; label: string }[] = [
+    { value: 'system', label: t('settings.languageSystem') },
+    { value: 'zh-TW', label: t('settings.languageTraditionalChinese') },
+    { value: 'en', label: t('settings.languageEnglish') },
+  ];
 
   const saveReminder = async (next: string | null) => {
     try {
@@ -45,10 +55,13 @@ export default function SettingsScreen() {
       await reload();
       const result = await syncWeighInReminder(next, { askPermission: next !== null });
       if (result === 'denied') {
-        Alert.alert('通知沒有開', '請到手機的系統設定，允許這個 App 傳送通知，提醒才會響。');
+        Alert.alert(t('settings.notificationsDisabled'), t('settings.notificationsDisabledBody'));
       }
     } catch (error) {
-      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('settings.changeFailed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
     }
   };
 
@@ -57,7 +70,10 @@ export default function SettingsScreen() {
       await api.patch('/users/me/profile', changes);
       await reload();
     } catch (error) {
-      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('settings.changeFailed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
     }
   };
 
@@ -71,15 +87,27 @@ export default function SettingsScreen() {
       await api.patch(`/days/${todayISO()}`, { workout_time });
       await reload();
     } catch (error) {
-      Alert.alert('改不了', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('settings.changeFailed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
+    }
+  };
+
+  const saveLanguage = async (next: LocalePreference) => {
+    try {
+      await setPreference(next);
+      await syncWeighInReminder(me.reminder_time);
+    } catch {
+      Alert.alert(t('settings.changeFailed'), t('common.errors.tryAgain'));
     }
   };
 
   const confirmDelete = () =>
-    Alert.alert('刪除帳號', '所有紀錄會一起刪掉，無法復原。', [
-      { text: '取消', style: 'cancel' },
+    Alert.alert(t('settings.deleteAccount'), t('settings.deleteAccountBody'), [
+      { text: t('common.actions.cancel'), style: 'cancel' },
       {
-        text: '刪除',
+        text: t('common.actions.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -88,7 +116,10 @@ export default function SettingsScreen() {
             // The account is still there (its photos go first), so stay signed in to try again.
             // An expired session cannot be helped from here: sign out as before.
             if (!(error instanceof ApiError) || error.status !== 401) {
-              Alert.alert('刪除失敗', error instanceof ApiError ? error.message : '請稍後再試');
+              Alert.alert(
+                t('settings.deleteAccountFailed'),
+                error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+              );
               return;
             }
           }
@@ -99,28 +130,28 @@ export default function SettingsScreen() {
 
   return (
     <Screen footerSafeArea={false}>
-      <Title>設定</Title>
+      <Title>{t('settings.title')}</Title>
 
-      <SectionHeading>個人資料</SectionHeading>
+      <SectionHeading>{t('settings.personalDetails')}</SectionHeading>
       <Card className="py-0">
         <Rows>
           <ChoiceRow
-            label="性別"
+            label={t('common.labels.sex')}
             value={me.sex}
-            options={SEX_OPTIONS}
+            options={sexOptions}
             onSave={(sex) => patchProfile({ sex })}
           />
           <NumberRow
-            label="年齡"
-            unit="歲"
+            label={t('common.labels.age')}
+            unit={t('common.units.year')}
             value={age}
             min={10}
             max={100}
             onSave={(years) => patchProfile({ birth_date: `${new Date().getFullYear() - years}-01-01` })}
           />
           <NumberRow
-            label="身高"
-            unit="cm"
+            label={t('common.labels.height')}
+            unit={t('common.units.centimeter')}
             value={me.height_cm}
             min={100}
             max={250}
@@ -128,8 +159,8 @@ export default function SettingsScreen() {
             onSave={(height_cm) => patchProfile({ height_cm })}
           />
           <NumberRow
-            label="體重"
-            unit="kg"
+            label={t('common.labels.weight')}
+            unit={t('common.units.kilogram')}
             value={me.weight_kg}
             min={30}
             max={300}
@@ -137,50 +168,61 @@ export default function SettingsScreen() {
             onSave={(weight_kg) => patchProfile({ weight_kg })}
           />
           <ChoiceRow
-            label="日常活動量"
+            label={t('settings.activityLevel')}
             value={me.activity_level}
-            options={ACTIVITY_OPTIONS}
+            options={activityOptions}
             onSave={(activity_level) => patchProfile({ activity_level })}
           />
           <ChoiceRow
-            label="減脂速度"
+            label={t('settings.deficitSpeed')}
             value={me.deficit_pct}
-            options={DEFICIT_OPTIONS}
+            options={deficitOptions}
             onSave={(deficit_pct) => patchProfile({ deficit_pct })}
           />
         </Rows>
       </Card>
 
-      <SectionHeading action={<Text className="text-xs text-muted">不含運動</Text>}>每日目標</SectionHeading>
+      <SectionHeading action={<Text className="text-xs text-muted">{t('settings.excludesExercise')}</Text>}>
+        {t('settings.dailyTargets')}
+      </SectionHeading>
       <Card className="py-0">
         <Rows>
-          <Row label="熱量" value={`${targets.kcal.toLocaleString()} 大卡`} />
-          <Row label="蛋白質" value={`${targets.protein_g} g`} />
-          <Row label="脂肪" value={`${targets.fat_g} g`} />
-          <Row label="碳水" value={`${targets.carb_g} g`} />
-          <Row label="基礎代謝" value={`${targets.bmr.toLocaleString()} 大卡`} />
-          <Row label="日常總消耗" value={`${targets.tdee.toLocaleString()} 大卡`} />
+          <Row label={t('common.labels.calories')} value={`${formatNumber(targets.kcal)} ${t('common.units.kcal')}`} />
+          <Row label={t('common.labels.protein')} value={`${targets.protein_g} ${t('common.units.gram')}`} />
+          <Row label={t('common.labels.fat')} value={`${targets.fat_g} ${t('common.units.gram')}`} />
+          <Row label={t('common.labels.carbs')} value={`${targets.carb_g} ${t('common.units.gram')}`} />
+          <Row label={t('settings.basalMetabolicRate')} value={`${formatNumber(targets.bmr)} ${t('common.units.kcal')}`} />
+          <Row label={t('settings.dailyExpenditure')} value={`${formatNumber(targets.tdee)} ${t('common.units.kcal')}`} />
         </Rows>
       </Card>
 
-      <SectionHeading>偏好</SectionHeading>
+      <SectionHeading>{t('settings.preferences')}</SectionHeading>
       <Card className="py-0">
         <Rows>
           <ChoiceRow
-            label="訓練時段"
+            label={t('settings.workoutTime')}
             value={me.workout_time}
-            options={WORKOUT_TIME_OPTIONS}
+            options={workoutTimeOptions}
             onSave={saveWorkoutTime}
           />
-          <Row label="常用地點" value={me.default_location === 'gym' ? '健身房' : '在家'} />
+          <Row
+            label={t('settings.defaultLocation')}
+            value={t(me.default_location === 'gym' ? 'common.locations.gym' : 'common.locations.home')}
+          />
           <TimezoneRow value={me.timezone} onSave={saveTimezone} />
           <ReminderRow value={me.reminder_time} onSave={saveReminder} />
+          <ChoiceRow
+            label={t('settings.language')}
+            value={preference}
+            options={languageOptions}
+            onSave={saveLanguage}
+          />
         </Rows>
       </Card>
 
       <PrivacySettings />
 
-      <SectionHeading>帳號</SectionHeading>
+      <SectionHeading>{t('settings.account')}</SectionHeading>
       <Card className="py-0">
         <Rows>
           <Pressable
@@ -188,7 +230,7 @@ export default function SettingsScreen() {
             onPress={signOut}
             className="min-h-[52px] flex-row items-center justify-between py-3 active:opacity-70"
           >
-            <Text className="text-base text-ink">登出</Text>
+            <Text className="text-base text-ink">{t('settings.signOut')}</Text>
             <LogOutIcon size={18} tint={color.ink} />
           </Pressable>
           <Pressable
@@ -196,7 +238,7 @@ export default function SettingsScreen() {
             onPress={confirmDelete}
             className="min-h-[52px] flex-row items-center justify-between py-3 active:opacity-70"
           >
-            <Text className="text-base text-danger">刪除帳號</Text>
+            <Text className="text-base text-danger">{t('settings.deleteAccount')}</Text>
             <TrashIcon size={18} tint={color.danger} />
           </Pressable>
         </Rows>

@@ -91,6 +91,15 @@ async def test_exercise_catalog_can_filter_and_search_translated_builtins(
     assert [exercise["id"] for exercise in searched.json()] == ["incline-treadmill-walk"]
 
 
+async def test_exercise_catalog_follows_accept_language(with_exercises: AsyncClient):
+    response = await with_exercises.get(
+        "/exercises", params={"q": "Barbell Back Squat"}, headers={"Accept-Language": "en"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()[0]["name"] == "Barbell Back Squat"
+
+
 async def test_custom_exercise_preserves_nullable_catalog_metadata(with_exercises: AsyncClient):
     created = await with_exercises.post(
         "/exercises",

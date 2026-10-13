@@ -1,5 +1,8 @@
 /** Time zones: the phone's own, and the short list offered on the settings screen. */
 
+import type { MessageKey } from '@/i18n';
+import { translate } from '@/i18n/translator';
+
 const FALLBACK = 'Asia/Taipei';
 
 /** The IANA name the phone is set to, e.g. "Asia/Tokyo". */
@@ -11,25 +14,25 @@ export function deviceTimezone(): string {
   }
 }
 
-export const COMMON_TIMEZONES: { id: string; label: string }[] = [
-  { id: 'Asia/Taipei', label: '台北' },
-  { id: 'Asia/Tokyo', label: '東京' },
-  { id: 'Asia/Seoul', label: '首爾' },
-  { id: 'Asia/Hong_Kong', label: '香港' },
-  { id: 'Asia/Singapore', label: '新加坡' },
-  { id: 'Asia/Bangkok', label: '曼谷' },
-  { id: 'Australia/Brisbane', label: '布里斯本' },
-  { id: 'Australia/Sydney', label: '雪梨' },
-  { id: 'Pacific/Auckland', label: '奧克蘭' },
-  { id: 'Europe/London', label: '倫敦' },
-  { id: 'Europe/Paris', label: '巴黎' },
-  { id: 'America/New_York', label: '紐約' },
-  { id: 'America/Chicago', label: '芝加哥' },
-  { id: 'America/Los_Angeles', label: '洛杉磯' },
-  { id: 'America/Vancouver', label: '溫哥華' },
+export const COMMON_TIMEZONES: { id: string; labelKey: MessageKey }[] = [
+  { id: 'Asia/Taipei', labelKey: 'timezone.cities.taipei' },
+  { id: 'Asia/Tokyo', labelKey: 'timezone.cities.tokyo' },
+  { id: 'Asia/Seoul', labelKey: 'timezone.cities.seoul' },
+  { id: 'Asia/Hong_Kong', labelKey: 'timezone.cities.hongKong' },
+  { id: 'Asia/Singapore', labelKey: 'timezone.cities.singapore' },
+  { id: 'Asia/Bangkok', labelKey: 'timezone.cities.bangkok' },
+  { id: 'Australia/Brisbane', labelKey: 'timezone.cities.brisbane' },
+  { id: 'Australia/Sydney', labelKey: 'timezone.cities.sydney' },
+  { id: 'Pacific/Auckland', labelKey: 'timezone.cities.auckland' },
+  { id: 'Europe/London', labelKey: 'timezone.cities.london' },
+  { id: 'Europe/Paris', labelKey: 'timezone.cities.paris' },
+  { id: 'America/New_York', labelKey: 'timezone.cities.newYork' },
+  { id: 'America/Chicago', labelKey: 'timezone.cities.chicago' },
+  { id: 'America/Los_Angeles', labelKey: 'timezone.cities.losAngeles' },
+  { id: 'America/Vancouver', labelKey: 'timezone.cities.vancouver' },
 ];
 
-export function timezoneLabel(id: string): string {
+export function timezoneLabel(id: string, t: typeof translate = translate): string {
   const known = COMMON_TIMEZONES.find((zone) => zone.id === id);
-  return known ? `${known.label}(${id})` : id;
+  return known ? `${t(known.labelKey)} (${id})` : id;
 }

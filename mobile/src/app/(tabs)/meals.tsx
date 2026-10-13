@@ -9,6 +9,7 @@ import { ShowMore, usePaged } from '@/components/paging';
 import { CameraIcon, ChevronIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { Card, Chip, Empty, HeaderAddButton, HeaderIconButton, Hint, Rows, Screen, Segmented } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { byCategoryOrder } from '@/meals/order';
 import { describeFood, formatPortion } from '@/meals/portion';
 import { color } from '@/theme/tokens';
@@ -19,21 +20,8 @@ type Category = Schema<'FoodCategoryOut'>;
 
 type Tab = 'mine' | 'library';
 
-const SLOT_FILTERS = [
-  { id: 'all', label: '全部' },
-  { id: 'breakfast', label: '早餐' },
-  { id: 'lunch', label: '午餐' },
-  { id: 'dinner', label: '晚餐' },
-];
-
-const SWAP_HINT: Record<string, string> = {
-  carb: '換成同分類食物時，會依「碳水」換算等量克數。',
-  protein: '換成同分類食物時，會依「蛋白質」換算等量克數。',
-  kcal: '換成同分類食物時，會依「熱量」換算等量克數。',
-  none: '這個分類不做等量換算。',
-};
-
 export default function MealsScreen() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('mine');
 
   return (
@@ -43,19 +31,19 @@ export default function MealsScreen() {
         <>
           <View className="flex-row items-center justify-between">
             <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
-              餐點
+              {t('meals.home.title')}
             </Text>
             <View className="flex-row items-center gap-2">
               {tab === 'mine' ? (
                 <HeaderIconButton
                   icon={CameraIcon}
-                  accessibilityLabel="用照片記錄今天吃的食物"
+                  accessibilityLabel={t('meals.home.photoAccessibility')}
                   onPress={() => router.navigate('/meals/photo?destination=today')}
                 />
               ) : null}
               <HeaderAddButton
-                label="新增"
-                accessibilityLabel={tab === 'mine' ? '新增餐點' : '新增食物'}
+                label={t('common.actions.create')}
+                accessibilityLabel={tab === 'mine' ? t('meals.home.addMeal') : t('meals.home.addFood')}
                 onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
               />
             </View>
@@ -65,8 +53,8 @@ export default function MealsScreen() {
             onChange={setTab}
             tone="soft"
             options={[
-              { value: 'mine', label: '我的餐點' },
-              { value: 'library', label: '食物庫' },
+              { value: 'mine', label: t('meals.home.savedMeals') },
+              { value: 'library', label: t('meals.home.foodLibrary') },
             ]}
           />
         </>
@@ -78,6 +66,7 @@ export default function MealsScreen() {
 }
 
 function MyMeals() {
+  const { t } = useI18n();
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [slot, setSlot] = useState('all');
 
@@ -86,9 +75,9 @@ function MyMeals() {
       const query = slot === 'all' ? '' : `?meal_time=${slot}`;
       setMeals(await api.get(`/meals${query}`));
     } catch (error) {
-      Alert.alert('讀不到餐點', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.home.loadMealsFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, [slot]);
+  }, [slot, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,7 +88,12 @@ function MyMeals() {
   return (
     <>
       <View className="flex-row flex-wrap gap-2">
-        {SLOT_FILTERS.map((option) => (
+        {[
+          { id: 'all', label: t('common.labels.all') },
+          { id: 'breakfast', label: t('common.mealTimes.breakfast') },
+          { id: 'lunch', label: t('common.mealTimes.lunch') },
+          { id: 'dinner', label: t('common.mealTimes.dinner') },
+        ].map((option) => (
           <Chip
             key={option.id}
             label={option.label}
@@ -112,7 +106,7 @@ function MyMeals() {
       {meals === null ? (
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
-        <Empty>還沒有自己的餐點，按右上角新增一道</Empty>
+        <Empty>{t('meals.home.noSavedMeals')}</Empty>
       ) : (
         <View className="gap-3">
           {meals.map((meal) => (
@@ -125,6 +119,7 @@ function MyMeals() {
 }
 
 function FoodLibrary() {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [foods, setFoods] = useState<Food[] | null>(null);
   const [category, setCategory] = useState('all');
@@ -139,9 +134,9 @@ function FoodLibrary() {
       setFoods(list);
       setCategories(cats);
     } catch (error) {
-      Alert.alert('讀不到食物庫', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.home.loadFoodsFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     }
-  }, [category]);
+  }, [category, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -150,13 +145,19 @@ function FoodLibrary() {
   );
 
   const selected = categories.find((c) => c.id === category);
+  const swapHint: Record<string, string> = {
+    carb: t('meals.home.swapHintCarbs'),
+    protein: t('meals.home.swapHintProtein'),
+    kcal: t('meals.home.swapHintCalories'),
+    none: t('meals.home.swapHintNone'),
+  };
   const ordered = useMemo(() => (foods ? byCategoryOrder(foods, categories) : []), [foods, categories]);
   const { visible, remaining, showMore } = usePaged(ordered, ordered);
 
   return (
     <>
       <View className="flex-row flex-wrap gap-2">
-        <Chip label="全部" selected={category === 'all'} onPress={() => setCategory('all')} />
+        <Chip label={t('common.labels.all')} selected={category === 'all'} onPress={() => setCategory('all')} />
         {categories.map((c) => (
           <Chip
             key={c.id}
@@ -167,12 +168,12 @@ function FoodLibrary() {
         ))}
       </View>
 
-      {selected ? <Hint>{SWAP_HINT[selected.swap_by]}</Hint> : null}
+      {selected ? <Hint>{swapHint[selected.swap_by]}</Hint> : null}
 
       {foods === null ? (
         <ActivityIndicator color={color.primary} />
       ) : foods.length === 0 ? (
-        <Empty>這個分類還沒有食物</Empty>
+        <Empty>{t('meals.home.noFoodsInCategory')}</Empty>
       ) : (
         <Card className="py-0">
           <Rows>
@@ -180,7 +181,7 @@ function FoodLibrary() {
               <Pressable
                 key={food.id}
                 accessibilityRole="button"
-                accessibilityLabel={`編輯${food.name}`}
+                accessibilityLabel={t('meals.home.editFood', { name: food.name })}
                 onPress={() => router.navigate({ pathname: '/foods/[id]', params: { id: food.id } })}
                 className="min-h-[52px] flex-row items-center justify-between gap-3 py-3"
               >
@@ -189,7 +190,7 @@ function FoodLibrary() {
                   <Text className="text-sm text-muted">{describeFood(food)}</Text>
                 </View>
                 <View className="items-end">
-                  <Text className="text-xs text-muted">常用</Text>
+                  <Text className="text-xs text-muted">{t('common.states.common')}</Text>
                   <Text className="text-sm text-ink">{formatPortion(food, food.usual_grams)}</Text>
                 </View>
                 <ChevronIcon direction="right" size={16} tint={color.muted} />

@@ -14,6 +14,7 @@ import { api } from '@/api/client';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { PrimaryButton, TextAction } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 
 export async function readAiConsent(): Promise<boolean> {
   return (await api.get('/users/me/ai-consent')).consent;
@@ -28,19 +29,14 @@ export async function setAiConsent(consent: boolean): Promise<boolean> {
  * `onPolicy` opens the privacy policy; the caller first closes whatever modal it is in.
  */
 export function AiConsentText({ onPolicy }: { onPolicy: () => void }) {
+  const { t } = useI18n();
   return (
     <View className="gap-2">
-      <Text className="text-base text-ink">
-        AI 分析會把以下資料傳給 Anthropic 的 Claude 處理：
-      </Text>
-      <Text className="text-sm text-muted">・拍照辨識時：餐點照片</Text>
-      <Text className="text-sm text-muted">
-        ・週報建議時：這週的飲食、訓練、體重與腰圍紀錄，以及性別、年齡、身高
-      </Text>
-      <Text className="text-sm text-muted">
-        不會傳送 Email 或帳號資料。可以隨時在「設定」關閉。
-      </Text>
-      <TextAction label="隱私權政策" onPress={onPolicy} className="self-start" />
+      <Text className="text-base text-ink">{t('privacy.consent.intro')}</Text>
+      <Text className="text-sm text-muted">{t('privacy.consent.photoData')}</Text>
+      <Text className="text-sm text-muted">{t('privacy.consent.weeklyData')}</Text>
+      <Text className="text-sm text-muted">{t('privacy.consent.accountExcluded')}</Text>
+      <TextAction label={t('privacy.policy')} onPress={onPolicy} className="self-start" />
     </View>
   );
 }
@@ -83,6 +79,7 @@ function answer(consent: boolean) {
 }
 
 export function AiConsentHost() {
+  const { t } = useI18n();
   const open = useSyncExternalStore(subscribe, isAsking, isAsking);
 
   const agree = async () => {
@@ -94,14 +91,14 @@ export function AiConsentHost() {
   };
 
   return (
-    <Sheet visible={open} title="使用 AI 分析" onClose={() => answer(false)}>
+    <Sheet visible={open} title={t('privacy.consent.title')} onClose={() => answer(false)}>
       <AiConsentText
         onPolicy={() => {
           answer(false);
           router.push('/privacy');
         }}
       />
-      <PrimaryButton onPress={agree}>同意並繼續</PrimaryButton>
+      <PrimaryButton onPress={agree}>{t('privacy.consent.agree')}</PrimaryButton>
     </Sheet>
   );
 }

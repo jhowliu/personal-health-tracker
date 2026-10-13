@@ -1,6 +1,8 @@
 /** A small - N + control for short ranges, such as the set count on the template editor. */
 import { Pressable, View } from 'react-native';
+
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
 
 export function NumberStepper({
   value,
@@ -18,6 +20,7 @@ export function NumberStepper({
   step?: number;
   format?: (value: number) => string;
 }) {
+  const { t } = useI18n();
   const move = (direction: 1 | -1) =>
     onChange(Math.min(max, Math.max(min, value + direction * step)));
 
@@ -25,7 +28,7 @@ export function NumberStepper({
     <View className="flex-row items-center rounded-field border-[1.5px] border-edge bg-surface">
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="減少"
+        accessibilityLabel={t('common.accessibility.decreaseNamed', { name: '' }).trim()}
         onPress={() => move(-1)}
         disabled={value <= min}
         className="min-h-[44px] w-11 items-center justify-center"
@@ -37,7 +40,7 @@ export function NumberStepper({
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="增加"
+        accessibilityLabel={t('common.accessibility.increaseNamed', { name: '' }).trim()}
         onPress={() => move(1)}
         disabled={value >= max}
         className="min-h-[44px] w-11 items-center justify-center"

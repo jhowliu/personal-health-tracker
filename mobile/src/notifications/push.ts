@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 
 import { api } from '@/api/client';
 import { color } from '@/theme/tokens';
+import { translate } from '@/i18n/translator';
 
 const ANDROID_CHANNEL = 'weigh-in';
 
@@ -21,7 +22,7 @@ export async function registerPushToken(): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(ANDROID_CHANNEL, {
-        name: '每天早上提醒',
+        name: translate('reminders.channel'),
         importance: Notifications.AndroidImportance.DEFAULT,
         lightColor: color.primary,
       });

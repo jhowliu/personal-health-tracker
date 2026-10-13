@@ -19,6 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { GripIcon } from '@/components/icons';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 const SPRING = { damping: 22, stiffness: 260, mass: 0.6 };
@@ -126,6 +127,7 @@ function ReorderRow({
   onDragChange?: (dragging: boolean) => void;
   render: (handle: ReactNode) => ReactNode;
 }) {
+  const { t } = useI18n();
   const { order, heights, dragging, dragTop, estimate, divided } = layout;
   const startOrder = useSharedValue<string[]>([]);
   const startTop = useSharedValue(0);
@@ -199,7 +201,7 @@ function ReorderRow({
     <GestureDetector gesture={pan}>
       <View
         accessibilityRole="adjustable"
-        accessibilityLabel="按住拖曳調整順序"
+        accessibilityLabel={t('common.accessibility.dragToReorder')}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         className="h-11 w-9 items-center justify-center"
       >

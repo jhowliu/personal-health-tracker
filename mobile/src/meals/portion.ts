@@ -3,18 +3,22 @@
  * grams. Every screen that shows or edits a portion goes through here, so the same food
  * never reads "60 g" in one place and "2 顆" in another.
  */
+import { translate } from '@/i18n/translator';
 
 type PortionFood = { unit: string; grams_per_unit: number | null };
 
 type Per100g = { kcal: number; protein_g: number; fat_g: number; carb_g: number };
 
-const UNIT_LABEL: Record<string, string> = {
-  g: 'g',
-  ml: 'ml',
-  piece: '顆',
-  scoop: '匙',
-  bowl: '碗',
-};
+function unitLabel(unit: string): string {
+  const labels: Record<string, string> = {
+    g: translate('common.units.gram'),
+    ml: 'ml',
+    piece: translate('common.units.piece'),
+    scoop: translate('common.units.scoop'),
+    bowl: translate('common.units.bowl'),
+  };
+  return labels[unit] ?? unit;
+}
 
 /** The unit a portion is shown in, and how many grams one of it weighs. */
 export function portionUnit(food: PortionFood | null | undefined): {
@@ -22,9 +26,9 @@ export function portionUnit(food: PortionFood | null | undefined): {
   gramsPerUnit: number;
 } {
   if (food?.grams_per_unit && food.unit !== 'g') {
-    return { label: UNIT_LABEL[food.unit] ?? food.unit, gramsPerUnit: food.grams_per_unit };
+    return { label: unitLabel(food.unit), gramsPerUnit: food.grams_per_unit };
   }
-  return { label: 'g', gramsPerUnit: 1 };
+  return { label: translate('common.units.gram'), gramsPerUnit: 1 };
 }
 
 /** One decimal at most, and no trailing ".0". */
@@ -49,9 +53,17 @@ export function formatPortion(food: PortionFood | null | undefined, grams: numbe
 /** The nutrition line under a food's name: per piece for foods sold by the piece, else per 100 g. */
 export function describeFood(food: PortionFood & { per_100g: Per100g }): string {
   const perPiece = Boolean(food.grams_per_unit) && food.unit === 'piece';
-  const base = perPiece ? `每顆 ${food.grams_per_unit} g` : '每 100 g';
+  const base = perPiece
+    ? translate('meals.portion.perPiece', { grams: food.grams_per_unit })
+    : translate('meals.portion.perHundred');
   const factor = perPiece && food.grams_per_unit ? food.grams_per_unit / 100 : 1;
   const round = (n: number) => Math.round(n * factor);
   const { kcal, protein_g, fat_g, carb_g } = food.per_100g;
-  return `${base} ${round(kcal)} 大卡，蛋白質 ${round(protein_g)}、脂肪 ${round(fat_g)}、碳水 ${round(carb_g)} g`;
+  return translate('meals.portion.nutritionSummary', {
+    base,
+    calories: round(kcal),
+    protein: round(protein_g),
+    fat: round(fat_g),
+    carbs: round(carb_g),
+  });
 }

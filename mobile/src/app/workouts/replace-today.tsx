@@ -6,10 +6,11 @@ import { ApiError, api } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Empty, Hint, Rows, Screen, Title } from '@/components/ui';
-import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
-import { color } from '@/theme/tokens';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
+import { color } from '@/theme/tokens';
+import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 
 type Reason = 'equipment_occupied' | 'knee_discomfort' | 'missing_equipment' | 'variety';
 type Alternative = {
@@ -18,14 +19,10 @@ type Alternative = {
   hint: string;
 };
 
-const REASONS: { id: Reason; label: string }[] = [
-  { id: 'equipment_occupied', label: '器材有人用' },
-  { id: 'knee_discomfort', label: '膝蓋不舒服' },
-  { id: 'missing_equipment', label: '沒有器材' },
-  { id: 'variety', label: '想換動作' },
-];
+const REASONS: Reason[] = ['equipment_occupied', 'knee_discomfort', 'missing_equipment', 'variety'];
 
 export default function ReplaceTodayWorkout() {
+  const { t } = useI18n();
   const { date, item_id: itemId, exercise_id: exerciseId, name, from } = useLocalSearchParams<{
     date: string;
     item_id: string;
@@ -41,11 +38,11 @@ export default function ReplaceTodayWorkout() {
 
   useEffect(() => {
     if (!date || !itemId || !exerciseId) {
-      Alert.alert('找不到今日動作', '請回到今日流程重新選擇動作。', [
-        { text: '返回今天', onPress: () => router.replace('/today') },
+      Alert.alert(t('workouts.replacement.missingTodayExerciseTitle'), t('workouts.replacement.missingTodayExerciseBody'), [
+        { text: t('meals.photo.returnToToday'), onPress: () => router.replace('/today') },
       ]);
     }
-  }, [date, exerciseId, itemId]);
+  }, [date, exerciseId, itemId, t]);
 
   const load = useCallback(async () => {
     if (!exerciseId) return;
@@ -55,10 +52,10 @@ export default function ReplaceTodayWorkout() {
       const result = await api.get(`/exercises/${exerciseId}/alternatives?reason=${reason}`);
       if (version === loadVersion.current) setAlternatives(result);
     } catch (error) {
-      Alert.alert('讀不到替代動作', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.replacement.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
       setAlternatives([]);
     }
-  }, [exerciseId, reason]);
+  }, [exerciseId, reason, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,7 +72,7 @@ export default function ReplaceTodayWorkout() {
       });
       backOrReplace('/today');
     } catch (error) {
-      Alert.alert('換不了動作', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('workouts.replacement.replaceFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
       setBusy(false);
     }
@@ -83,18 +80,34 @@ export default function ReplaceTodayWorkout() {
 
   return (
     <Screen>
-      <BackLink label={from === 'focus' ? '回到訓練' : '今天'} onPress={() => backOrReplace('/today')} disabled={busy} />
-      <Title sub={`只換${date ? dayWord(date) : '今天'}這一次，不會改到原本課表。`}>替代 {name ?? '動作'}</Title>
+      <BackLink
+        label={from === 'focus' ? t('workouts.addToday.backToWorkout') : t('common.labels.today')}
+        onPress={() => backOrReplace('/today')}
+        disabled={busy}
+      />
+      <Title sub={t('workouts.replacement.todaySubtitle', { day: date ? dayWord(date) : t('common.labels.today') })}>
+        {t('workouts.replacement.title', { name: name ?? t('workouts.library.exerciseFallback') })}
+      </Title>
       <View className="flex-row flex-wrap gap-2">
         {REASONS.map((option) => (
-          <Chip key={option.id} label={option.label} selected={reason === option.id} onPress={() => setReason(option.id)} />
+          <Chip
+            key={option}
+            label={t({
+              equipment_occupied: 'workouts.replacement.occupied',
+              knee_discomfort: 'workouts.replacement.kneeDiscomfort',
+              missing_equipment: 'workouts.replacement.equipment',
+              variety: 'workouts.replacement.variety',
+            }[option] as 'workouts.replacement.occupied')}
+            selected={reason === option}
+            onPress={() => setReason(option)}
+          />
         ))}
       </View>
 
       {alternatives === null ? (
         <ActivityIndicator color={color.primary} />
       ) : alternatives.length === 0 ? (
-        <Empty>找不到合適的替代動作</Empty>
+        <Empty>{t('workouts.replacement.noResults')}</Empty>
       ) : (
         <Card className="px-4 py-0">
           <Rows>
@@ -110,11 +123,11 @@ export default function ReplaceTodayWorkout() {
                 <View className="flex-1 gap-1">
                   <View className="flex-row items-center gap-2">
                     <Text className="flex-1 text-base text-ink">{alternative.exercise.name}</Text>
-                    {alternative.recommended ? <Chip label="推薦" tone="good" /> : null}
+                    {alternative.recommended ? <Chip label={t('common.states.recommended')} tone="good" /> : null}
                   </View>
                   {alternative.exercise.description ? <Hint>{alternative.exercise.description}</Hint> : null}
                   <Hint>{alternative.hint}</Hint>
-                  <Text className="text-base text-primary">換成這個動作</Text>
+                  <Text className="text-base text-primary">{t('workouts.replacement.replaceAction')}</Text>
                 </View>
               </Pressable>
             ))}

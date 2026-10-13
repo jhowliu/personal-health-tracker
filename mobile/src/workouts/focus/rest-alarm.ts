@@ -10,6 +10,8 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { translate } from '@/i18n/translator';
+
 const CHANNEL = 'rest-timer';
 const identifier = (date: string) => `focus-rest:${date}`;
 const supported = Platform.OS !== 'web';
@@ -37,14 +39,14 @@ export async function scheduleRestAlarm(date: string, endsAt: number, body: stri
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL, {
-        name: '休息結束提醒',
+        name: translate('reminders.restChannel'),
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
       });
     }
     await Notifications.scheduleNotificationAsync({
       identifier: identifier(date),
-      content: { title: '休息結束', body, sound: true, data: { kind: 'focus-rest' } },
+      content: { title: translate('reminders.restTitle'), body, sound: true, data: { kind: 'focus-rest' } },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds,

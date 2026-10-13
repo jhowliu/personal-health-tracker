@@ -9,11 +9,13 @@ import { ActivityIndicator, View } from 'react-native';
 import { ApiError, api } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { BackLink, Screen, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { WeeklyReport, weekRange, type Review } from '@/progress/WeeklyReport';
 import { color } from '@/theme/tokens';
 
 export default function WeekReport() {
+  const { t } = useI18n();
   const { week } = useLocalSearchParams<{ week: string }>();
   const [review, setReview] = useState<Review | null>(null);
 
@@ -28,19 +30,19 @@ export default function WeekReport() {
         api.post(`/progress/weekly/${fresh.start}/seen`).catch(() => {});
       })
       .catch((error) => {
-        if (live) Alert.alert('讀不到週報', error instanceof ApiError ? error.message : '請稍後再試');
+        if (live) Alert.alert(t('progress.loadReportFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       });
     return () => {
       live = false;
     };
-  }, [week]);
+  }, [week, t]);
 
   return (
     <Screen footerSafeArea={false}>
-      <BackLink label="週報" onPress={() => backOrReplace('/progress/weeks')} />
+      <BackLink label={t('progress.weeklyReport')} onPress={() => backOrReplace('/progress/weeks')} />
       {review ? (
         <>
-          <Title sub={weekRange(review)}>週報</Title>
+          <Title sub={weekRange(review)}>{t('progress.weeklyReport')}</Title>
           <WeeklyReport review={review} />
         </>
       ) : (

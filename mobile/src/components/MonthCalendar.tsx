@@ -11,12 +11,12 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { api, type Schema } from '@/api/client';
 import { ChevronIcon, DumbbellIcon, PawIcon } from '@/components/icons';
 import { Text } from '@/components/text';
+import { formatDate } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 type Month = Schema<'CalendarMonthOut'>;
 type Day = Month['days'][number];
-
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 
 /** "2026-10" moved by whole months. */
 function shiftMonth(month: string, by: number): string {
@@ -37,6 +37,7 @@ export function MonthCalendar({
   /** Change it to load the shown month again, after something was logged. */
   refreshKey?: unknown;
 }) {
+  const { t } = useI18n();
   // The month asked for; null is this month, which the server knows from the user's time zone.
   const [wanted, setWanted] = useState<string | null>(null);
   const [data, setData] = useState<Month | null>(null);
@@ -73,24 +74,37 @@ export function MonthCalendar({
   const trained = data.days.filter((day) => day.workout === 'done').length;
 
   const go = (by: number) => setWanted(shiftMonth(data.month, by));
+  const weekdays = [
+    t('common.weekdays.shortMonday'),
+    t('common.weekdays.shortTuesday'),
+    t('common.weekdays.shortWednesday'),
+    t('common.weekdays.shortThursday'),
+    t('common.weekdays.shortFriday'),
+    t('common.weekdays.shortSaturday'),
+    t('common.weekdays.shortSunday'),
+  ];
+  const monthDate = new Date(year, number - 1, 1);
 
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="上個月"
+          accessibilityLabel={t('calendar.previousMonth')}
           onPress={() => go(-1)}
           className="h-11 w-11 items-center justify-center"
         >
           <ChevronIcon direction="left" size={18} tint={color.ink} />
         </Pressable>
         <Text className="text-[17px] text-ink">
-          {year} 年 {number} 月
+          {t('calendar.monthHeading', {
+            month: formatDate(monthDate, { month: 'long' }),
+            year,
+          })}
         </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="下個月"
+          accessibilityLabel={t('calendar.nextMonth')}
           disabled={data.month >= thisMonth}
           onPress={() => go(1)}
           className="h-11 w-11 items-center justify-center"
@@ -100,8 +114,8 @@ export function MonthCalendar({
       </View>
 
       <View className="flex-row">
-        {WEEKDAYS.map((weekday) => (
-          <Text key={weekday} className="flex-1 text-center text-xs text-muted">
+        {weekdays.map((weekday, index) => (
+          <Text key={`${weekday}-${index}`} className="flex-1 text-center text-xs text-muted">
             {weekday}
           </Text>
         ))}
@@ -135,15 +149,18 @@ export function MonthCalendar({
         <View className="flex-row items-center gap-3">
           <View className="flex-row items-center gap-1">
             <PawIcon size={13} tint={color.primary} />
-            <Text className="text-xs text-muted">完成</Text>
+            <Text className="text-xs text-muted">{t('calendar.completedLabel')}</Text>
           </View>
           <View className="flex-row items-center gap-1">
             <DumbbellIcon size={13} tint={color.good} />
-            <Text className="text-xs text-muted">訓練</Text>
+            <Text className="text-xs text-muted">{t('calendar.workoutLabel')}</Text>
           </View>
         </View>
         <Text className="text-xs text-muted">
-          完成 {complete} 天 · 訓練 {trained} 次
+          {t('calendar.completeDaysAndWorkouts', {
+            days: t(complete === 1 ? 'common.counts.days.one' : 'common.counts.days.other', { count: complete }),
+            workouts: t(trained === 1 ? 'common.counts.workouts.one' : 'common.counts.workouts.other', { count: trained }),
+          })}
         </Text>
       </View>
     </View>
@@ -161,15 +178,20 @@ function DayCell({
   future: boolean;
   onPress?: () => void;
 }) {
+  const { t } = useI18n();
   const complete = day.mark === 'complete';
   const trained = day.workout === 'done';
   const date = Number(day.date.slice(8));
-  const state = complete ? '完成' : '未完成';
+  const state = complete ? t('common.states.completed') : t('common.states.notCompleted');
 
   return (
     <Pressable
       accessibilityRole={onPress ? 'button' : 'text'}
-      accessibilityLabel={`${date} 日，${future ? '還沒到' : state}${trained ? '，有訓練' : ''}`}
+      accessibilityLabel={t('calendar.dayAccessibility', {
+        date,
+        state: future ? t('calendar.future') : state,
+        trained: trained ? t('calendar.trained') : '',
+      })}
       disabled={!onPress}
       onPress={onPress}
       className={`h-12 flex-1 items-center justify-center rounded-control ${

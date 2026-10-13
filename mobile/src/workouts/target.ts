@@ -3,6 +3,7 @@
  * into the fields, and what is sent back for it.
  */
 import type { Schema } from '@/api/client';
+import { translate } from '@/i18n/translator';
 
 type Entry = Schema<'WorkoutExecutionItemOut'>;
 
@@ -28,13 +29,13 @@ const REPS = /^\d+(\s*[-–~]\s*\d+)?$/;
 /** What is wrong with an exercise's edited target, in words, or null when it can be saved. */
 export function targetError(entry: Entry, edit: TargetEdit): string | null {
   if (entry.item.duration_sec) {
-    if (!WHOLE.test(edit.durationMin.trim()) || Number(edit.durationMin) < 1) return '的目標時間要填 1 以上的整數分鐘';
+    if (!WHOLE.test(edit.durationMin.trim()) || Number(edit.durationMin) < 1) return translate('workouts.validation.targetMinutesPositive');
   } else {
-    if (!WHOLE.test(edit.sets.trim()) || Number(edit.sets) < 1) return '的組數要填 1 以上的整數';
-    if (!REPS.test(edit.reps.trim())) return '的次數要填數字或範圍，例如 12 或 10-12';
+    if (!WHOLE.test(edit.sets.trim()) || Number(edit.sets) < 1) return translate('workouts.validation.setsPositive');
+    if (!REPS.test(edit.reps.trim())) return translate('workouts.validation.repsPattern');
   }
-  if (edit.weight.trim() && !(Number(edit.weight) >= 0)) return '的重量要是數字';
-  if (edit.rest.trim() && !WHOLE.test(edit.rest.trim())) return '的休息要填整數秒';
+  if (edit.weight.trim() && !(Number(edit.weight) >= 0)) return translate('workouts.validation.targetWeightNumber');
+  if (edit.rest.trim() && !WHOLE.test(edit.rest.trim())) return translate('workouts.validation.restInteger');
   return null;
 }
 

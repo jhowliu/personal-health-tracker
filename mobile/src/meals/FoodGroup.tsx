@@ -17,6 +17,7 @@ import {
 } from '@/components/icons';
 import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { color, foodCategoryTone } from '@/theme/tokens';
 
 type Nutrients = Schema<'NutrientsOut'>;
@@ -31,6 +32,7 @@ const CATEGORY_ICON: Record<string, typeof UtensilsIcon> = {
 
 /** A category's label and count, then its `FoodItem` rows in one outlined card. */
 export function FoodGroup({ category, label, children }: { category: string; label: string; children: ReactNode }) {
+  const { t } = useI18n();
   const rows = Children.toArray(children);
   const Glyph = CATEGORY_ICON[category] ?? UtensilsIcon;
   return (
@@ -43,7 +45,9 @@ export function FoodGroup({ category, label, children }: { category: string; lab
           <Glyph size={13} tint={color.ink} />
           <Text className="text-xs text-ink">{label}</Text>
         </View>
-        <Text className="text-xs text-muted">{rows.length} 項</Text>
+        <Text className="text-xs text-muted">
+          {t(rows.length === 1 ? 'common.counts.items.one' : 'common.counts.items.other', { count: rows.length })}
+        </Text>
       </View>
       <View className="overflow-hidden rounded-tile border-[1.5px] border-edge bg-surface">
         {rows.map((row, index) => (
@@ -76,11 +80,16 @@ export function FoodItem({
   onToggle: () => void;
   children?: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <View className={open ? 'bg-warm-soft' : ''}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${name}，${kcal} 大卡${amount ? `，${amount}` : ''}`}
+        accessibilityLabel={t('meals.foodGroup.accessibility', {
+          name,
+          calories: kcal,
+          amount: amount ? `, ${amount}` : '',
+        })}
         accessibilityState={{ expanded: open, disabled: Boolean(busy) }}
         disabled={busy}
         onPress={onToggle}
@@ -88,7 +97,7 @@ export function FoodItem({
       >
         <View className="flex-1 gap-0.5">
           <Text className="text-[15px] text-ink">{name}</Text>
-          <Text className="text-xs text-muted">{kcal} 大卡</Text>
+          <Text className="text-xs text-muted">{kcal} {t('common.units.kcal')}</Text>
         </View>
         {amount ? <Text className="text-sm text-ink">{amount}</Text> : null}
         <ChevronIcon direction={open ? 'down' : 'right'} size={15} tint={color.ink} />
@@ -100,10 +109,11 @@ export function FoodItem({
 
 /** Protein, carbs and fat of one food, side by side in its open row. */
 export function FoodMacros({ nutrients }: { nutrients: Nutrients }) {
+  const { t } = useI18n();
   const columns = [
-    { label: '蛋白質', value: nutrients.protein_g },
-    { label: '碳水', value: nutrients.carb_g },
-    { label: '脂肪', value: nutrients.fat_g },
+    { label: t('common.labels.protein'), value: nutrients.protein_g },
+    { label: t('common.labels.carbs'), value: nutrients.carb_g },
+    { label: t('common.labels.fat'), value: nutrients.fat_g },
   ];
   return (
     <View className="flex-row">

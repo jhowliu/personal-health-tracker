@@ -7,12 +7,14 @@ import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { BackLink, Card, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Workout = Schema<'WorkoutExecutionOut'>;
 
 export default function SaveTodayWorkout() {
+  const { t } = useI18n();
   const { date } = useLocalSearchParams<{ date: string }>();
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [name, setName] = useState('');
@@ -24,14 +26,14 @@ export default function SaveTodayWorkout() {
     api.get(`/days/${date}/workout`).then((result: Workout) => {
       if (!live) return;
       setWorkout(result);
-      setName(result.template ? `${result.template.name}・我的版本` : `${date} 的訓練`);
+      setName(result.template ? t('workouts.saveToday.myVersion', { name: result.template.name }) : t('workouts.saveToday.fallbackName', { date }));
     }).catch((error) =>
-      Alert.alert('讀不到今天的訓練', error instanceof ApiError ? error.message : '請稍後再試。', [
-        { text: '返回今天', onPress: () => backOrReplace('/today') },
+      Alert.alert(t('workouts.saveToday.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'), [
+        { text: t('meals.photo.returnToToday'), onPress: () => backOrReplace('/today') },
       ]),
     );
     return () => { live = false; };
-  }, [date]);
+  }, [date, t]);
 
   const save = async () => {
     if (!date || !name.trim()) return;
@@ -43,7 +45,7 @@ export default function SaveTodayWorkout() {
       )) as Schema<'TemplateOut'>;
       router.replace({ pathname: '/workouts/[id]', params: { id: saved.id } });
     } catch (error) {
-      Alert.alert('另存失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('workouts.saveToday.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -58,12 +60,16 @@ export default function SaveTodayWorkout() {
   }
 
   return (
-    <Screen footer={<PrimaryButton onPress={save} disabled={!name.trim() || !workout.items.length} busy={busy}>儲存為我的課表</PrimaryButton>}>
-      <BackLink label="今天" disabled={busy} onPress={() => backOrReplace('/today')} />
-      <Title sub={`從${date ? dayWord(date) : '今天'}調整後的動作建立新課表；不會修改原課表或每週排程。`}>另存課表</Title>
-      <Field label="課表名稱" value={name} onChangeText={setName} placeholder="我的全身訓練" />
+    <Screen footer={<PrimaryButton onPress={save} disabled={!name.trim() || !workout.items.length} busy={busy}>{t('workouts.saveToday.action')}</PrimaryButton>}>
+      <BackLink label={t('common.labels.today')} disabled={busy} onPress={() => backOrReplace('/today')} />
+      <Title sub={t('workouts.saveToday.subtitle', { day: date ? dayWord(date) : t('common.labels.today') })}>
+        {t('workouts.saveToday.title')}
+      </Title>
+      <Field label={t('workouts.saveToday.templateName')} value={name} onChangeText={setName} placeholder={t('workouts.saveToday.namePlaceholder')} />
       <Card className="gap-2">
-        <Text className="text-base text-ink">{workout.items.length} 個動作</Text>
+        <Text className="text-base text-ink">
+          {t(workout.items.length === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', { count: workout.items.length })}
+        </Text>
         {workout.items.map(({ item }, index) => (
           <Hint key={item.id}>{index + 1}. {item.exercise_name}</Hint>
         ))}

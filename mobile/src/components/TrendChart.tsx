@@ -12,6 +12,7 @@ import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import { FONT_FAMILY, Text } from '@/components/text';
 import { daysBetween, valueAxis } from '@/components/trend-axis';
 import { dayWord, shiftDay, todayISO } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
 
 export type TrendPoint = { date: string; value: number; average_7d: number | null };
@@ -39,6 +40,7 @@ export function TrendChart({
   /** The narrowest value range drawn, in the chart's unit. */
   minSpan?: number;
 }) {
+  const { t } = useI18n();
   const [width, setWidth] = useState(0);
 
   // The server's window ends on its today; trust the later of the two clocks.
@@ -70,9 +72,14 @@ export function TrendChart({
     .map((p) => `${x(p.date)},${y(p.average_7d as number)}`)
     .join(' ');
 
-  const summary =
-    last &&
-    `${title}，最新 ${oneDecimal(last.value)}，近 30 天最低 ${oneDecimal(Math.min(...values))}、最高 ${oneDecimal(Math.max(...values))}`;
+  const summary = last
+    ? t('charts.trendAccessibility', {
+        title,
+        latest: oneDecimal(last.value),
+        minimum: oneDecimal(Math.min(...values)),
+        maximum: oneDecimal(Math.max(...values)),
+      })
+    : undefined;
 
   return (
     <View className="gap-2 rounded-card border-2 border-edge bg-surface p-4">
@@ -168,14 +175,14 @@ export function TrendChart({
         ) : (
           <View className="flex-1 items-center justify-center">
             <Text className="text-center text-sm text-muted">
-              {points.length === 0 ? '還沒有紀錄' : '再多記幾天，就會看到趨勢'}
+              {points.length === 0 ? t('charts.noRecords') : t('charts.needMoreRecords')}
             </Text>
           </View>
         )}
       </View>
 
       {points.length >= 2 ? (
-        <Text className="text-xs text-muted">實線：每次紀錄　虛線：7 天平均</Text>
+        <Text className="text-xs text-muted">{t('charts.trendLegend')}</Text>
       ) : null}
     </View>
   );

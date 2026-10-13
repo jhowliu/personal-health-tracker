@@ -7,10 +7,12 @@ import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { Field, PrimaryButton, Screen, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { safeReturnTo } from '@/navigation/return-to';
 
 export default function Login() {
   const { signIn } = useSession();
+  const { t } = useI18n();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +24,10 @@ export default function Login() {
       await signIn('/auth/login', { email, password });
       router.replace(safeReturnTo(returnTo));
     } catch (error) {
-      Alert.alert('登入失敗', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('auth.login.failed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
     } finally {
       setBusy(false);
     }
@@ -31,26 +36,32 @@ export default function Login() {
   return (
     <Screen>
       <View className="gap-6 pt-16">
-        <Title sub="每天照著流程走，把好習慣養起來。">每日減脂計畫</Title>
+        <Title sub={t('common.tagline')}>{t('auth.login.title')}</Title>
 
         <View className="gap-3">
-          <PrimaryButton tone="dark" onPress={() => Alert.alert('尚未設定', 'Apple 登入需要 development build 與 Apple 開發者帳號。')}>
-            使用 Apple 繼續
+          <PrimaryButton
+            tone="dark"
+            onPress={() => Alert.alert(t('auth.login.notConfigured'), t('auth.login.appleUnavailable'))}
+          >
+            {t('auth.login.continueWithApple')}
           </PrimaryButton>
-          <PrimaryButton tone="plain" onPress={() => Alert.alert('尚未設定', 'Google 登入需要 development build 與三組 Client ID。')}>
-            使用 Google 繼續
+          <PrimaryButton
+            tone="plain"
+            onPress={() => Alert.alert(t('auth.login.notConfigured'), t('auth.login.googleUnavailable'))}
+          >
+            {t('auth.login.continueWithGoogle')}
           </PrimaryButton>
         </View>
 
         <View className="flex-row items-center gap-3">
           <View className="h-px flex-1 bg-line" />
-          <Text className="text-sm text-muted">或使用 Email</Text>
+          <Text className="text-sm text-muted">{t('auth.login.emailDivider')}</Text>
           <View className="h-px flex-1 bg-line" />
         </View>
 
         <View className="gap-3">
           <Field
-            label="Email"
+            label={t('common.labels.email')}
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
@@ -59,29 +70,31 @@ export default function Login() {
             textContentType="emailAddress"
           />
           <Field
-            label="密碼"
+            label={t('common.labels.password')}
             value={password}
             onChangeText={setPassword}
-            placeholder="至少 8 個字"
+            placeholder={t('auth.register.passwordPlaceholder')}
             secureTextEntry
             textContentType="password"
           />
-          <Text className="text-right text-sm text-primary underline">忘記密碼</Text>
+          <Text className="text-right text-sm text-primary underline">
+            {t('auth.login.forgotPassword')}
+          </Text>
         </View>
 
         <PrimaryButton onPress={submit} disabled={busy || !email || !password}>
-          {busy ? '登入中…' : '登入'}
+          {busy ? t('auth.login.signingIn') : t('auth.login.action')}
         </PrimaryButton>
 
         <Text className="text-center text-base text-muted">
-          還沒有帳號？{' '}
+          {t('auth.login.noAccount')}{' '}
           <Link href={{ pathname: '/register', params: { returnTo } }} className="text-primary underline">
-            註冊新帳號
+            {t('auth.login.register')}
           </Link>
         </Text>
 
         <Text className="text-center text-sm text-muted">
-          第一次用 Apple 或 Google 登入時會自動建立帳號，接著填寫個人資料。
+          {t('auth.login.socialFirstUse')}
         </Text>
       </View>
     </Screen>

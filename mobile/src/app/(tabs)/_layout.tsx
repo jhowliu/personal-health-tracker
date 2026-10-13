@@ -6,21 +6,22 @@ import { ProtectedRoute } from '@/auth/route-gates';
 import { useSession } from '@/auth/session';
 import { CalendarCheckIcon, DumbbellIcon, ScaleIcon, SlidersIcon, UtensilsIcon } from '@/components/icons';
 import { FONT_FAMILY } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
 import { registerPushToken } from '@/notifications/push';
 import { WeeklyReportHost } from '@/progress/weekly-popup';
 import { color } from '@/theme/tokens';
 
-const TABS = [
-  { name: 'today', title: '今天', icon: CalendarCheckIcon },
-  { name: 'body', title: '進度', icon: ScaleIcon },
-  { name: 'meals', title: '餐點', icon: UtensilsIcon },
-  { name: 'workouts', title: '訓練', icon: DumbbellIcon },
-  { name: 'settings', title: '設定', icon: SlidersIcon },
-] as const;
-
 export default function TabsLayout() {
   const { status } = useSession();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  const tabs = [
+    { name: 'today', title: t('navigation.today'), icon: CalendarCheckIcon },
+    { name: 'body', title: t('navigation.progress'), icon: ScaleIcon },
+    { name: 'meals', title: t('navigation.meals'), icon: UtensilsIcon },
+    { name: 'workouts', title: t('navigation.workouts'), icon: DumbbellIcon },
+    { name: 'settings', title: t('navigation.settings'), icon: SlidersIcon },
+  ] as const;
 
   useEffect(() => {
     if (status === 'ready') registerPushToken();
@@ -48,7 +49,7 @@ export default function TabsLayout() {
           sceneStyle: { backgroundColor: color.bg },
         }}
       >
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <Tabs.Screen
             key={tab.name}
             name={tab.name}

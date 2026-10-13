@@ -6,6 +6,7 @@ import { ExpandableCard } from '@/components/ExpandableCard';
 import { CopyIcon, EyeIcon, PencilIcon, TrashIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { Tag } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { workoutCategory } from '@/workouts/category';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 import { formatPrescription } from '@/workouts/prescription';
@@ -30,12 +31,15 @@ export function TemplateCard({
   onCopy: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useI18n();
   const category = workoutCategory(template.category_id);
   const gym = template.location === 'gym';
   const summary = template.items.map((item) => item.exercise_name).join('・');
   const length = template.duration_min
-    ? `${template.duration_min} 分鐘`
-    : `${template.items.length} 個動作`;
+    ? `${template.duration_min} ${t('common.units.minute')}`
+    : t(template.items.length === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', {
+        count: template.items.length,
+      });
 
   return (
     <ExpandableCard
@@ -52,11 +56,11 @@ export function TemplateCard({
 
           <View className="flex-row flex-wrap gap-1.5">
             {category ? <Tag label={category.label} tone={category.tone} /> : null}
-            <Tag label={gym ? '健身房' : '在家'} tone={gym ? 'good' : 'warm'} />
+            <Tag label={gym ? t('common.locations.gym') : t('common.locations.home')} tone={gym ? 'good' : 'warm'} />
           </View>
 
           <Text className="text-sm text-muted" numberOfLines={1}>
-            {summary || '還沒有動作'}
+            {summary || t('workouts.templateCard.noExercises')}
           </Text>
         </>
       }
@@ -74,28 +78,28 @@ export function TemplateCard({
         template.is_builtin
           ? [
               {
-                label: '查看課表',
-                accessibilityLabel: `查看${template.name}`,
+                label: t('workouts.templateCard.viewTemplate'),
+                accessibilityLabel: t('common.accessibility.viewNamed', { name: template.name }),
                 icon: EyeIcon,
                 onPress: onOpen,
               },
               {
-                label: '複製並自訂',
-                accessibilityLabel: `複製${template.name}`,
+                label: t('workouts.templateCard.copyCustomize'),
+                accessibilityLabel: t('workouts.templateCard.copyCustomize'),
                 icon: CopyIcon,
                 onPress: onCopy,
               },
             ]
           : [
               {
-                label: '編輯課表',
-                accessibilityLabel: `編輯${template.name}`,
+                label: t('workouts.templateCard.editTemplate'),
+                accessibilityLabel: t('common.accessibility.editNamed', { name: template.name }),
                 icon: PencilIcon,
                 onPress: onOpen,
               },
               {
-                label: '刪除',
-                accessibilityLabel: `刪除${template.name}`,
+                label: t('common.actions.delete'),
+                accessibilityLabel: t('common.accessibility.deleteNamed', { name: template.name }),
                 icon: TrashIcon,
                 onPress: onDelete,
                 tone: 'danger',

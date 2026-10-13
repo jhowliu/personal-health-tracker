@@ -16,9 +16,15 @@ _EXERCISE_FROM = """
 """
 _EXERCISE_VISIBLE = "(e.user_id IS NULL OR e.user_id = ?) AND e.archived_at IS NULL"
 _TEMPLATE_COLUMNS = (
-    "id, category_id, name, location, duration_min, user_id IS NULL AS is_builtin"
+    "wt.id, wt.category_id, COALESCE(tt.text, wt.name) AS name, wt.location, "
+    "wt.duration_min, wt.user_id IS NULL AS is_builtin"
 )
-_TEMPLATE_VISIBLE = "(user_id IS NULL OR user_id = ?) AND archived_at IS NULL"
+_TEMPLATE_FROM = """
+    FROM workout_templates wt
+    LEFT JOIN translations tt
+      ON tt.key = 'workout_template.' || wt.id || '.name' AND tt.locale = ?
+"""
+_TEMPLATE_VISIBLE = "(wt.user_id IS NULL OR wt.user_id = ?) AND wt.archived_at IS NULL"
 
 
 class SqliteTrainingStore:
@@ -113,13 +119,13 @@ class SqliteTrainingStore:
         self, user_id: str, location: str | None
     ) -> tuple[WorkoutTemplate, ...]:
         clause = ""
-        params: list[object] = [user_id]
+        params: list[object] = [self._locale, user_id]
         if location:
-            clause = " AND (location = ? OR location = 'both')"
+            clause = " AND (wt.location = ? OR wt.location = 'both')"
             params.append(location)
 
         async with self._conn.execute(
-            f"SELECT {_TEMPLATE_COLUMNS} FROM workout_templates"
+            f"SELECT {_TEMPLATE_COLUMNS} {_TEMPLATE_FROM}"
             f" WHERE {_TEMPLATE_VISIBLE}{clause} ORDER BY is_builtin DESC, name",
             params,
         ) as cursor:
@@ -142,9 +148,9 @@ class SqliteTrainingStore:
 
     async def load_template(self, user_id: str, template_id: str) -> WorkoutTemplate | None:
         async with self._conn.execute(
-            f"SELECT {_TEMPLATE_COLUMNS} FROM workout_templates"
+            f"SELECT {_TEMPLATE_COLUMNS} {_TEMPLATE_FROM}"
             f" WHERE id = ? AND {_TEMPLATE_VISIBLE}",
-            (template_id, user_id),
+            (self._locale, template_id, user_id),
         ) as cursor:
             row = await cursor.fetchone()
         if row is None:

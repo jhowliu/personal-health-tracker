@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 import { PrimaryButton } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 
 const PAGE_SIZE = 12;
 
@@ -24,10 +25,11 @@ export function usePaged<T>(items: readonly T[], resetKey: unknown) {
 
 /** Renders nothing once every row is showing. */
 export function ShowMore({ remaining, onPress }: { remaining: number; onPress: () => void }) {
+  const { t } = useI18n();
   if (remaining <= 0) return null;
   return (
     <PrimaryButton tone="plain" onPress={onPress}>
-      {`顯示更多（還有 ${remaining} 個）`}
+      {t('common.actions.showMore', { count: remaining })}
     </PrimaryButton>
   );
 }

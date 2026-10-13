@@ -50,6 +50,39 @@ FOODS: list[tuple] = [
     ("soy-sauce", "fat_sauce", "醬油", "na", 60, 6, 0, 8, "ml", 1.1, 10, 30),
 ]
 
+ENGLISH_NAMES = {
+    "brown-rice-cooked": "Brown rice (cooked)",
+    "white-rice-cooked": "White rice (cooked)",
+    "oats-raw": "Rolled oats (raw)",
+    "rice-cake": "Rice cake",
+    "sweet-potato-cooked": "Sweet potato (cooked)",
+    "toast": "Toast",
+    "chicken-breast-cooked": "Chicken breast (cooked)",
+    "chicken-thigh-skin-on-cooked": "Skin-on boneless chicken thigh (cooked)",
+    "pork-collar-cooked": "Pork collar (cooked)",
+    "pork-belly-slices": "Pork belly slices",
+    "egg": "Egg",
+    "firm-tofu": "Firm tofu",
+    "whey-protein": "Whey protein",
+    "soy-milk-unsweetened": "Unsweetened soy milk",
+    "salmon-cooked": "Salmon (cooked)",
+    "shredded-chicken": "Shredded chicken",
+    "broccoli-cooked": "Broccoli (cooked)",
+    "zucchini-cooked": "Zucchini (cooked)",
+    "carrot-cooked": "Carrot (cooked)",
+    "tomato": "Tomato",
+    "enoki-mushroom": "Enoki mushrooms",
+    "napa-cabbage-cooked": "Napa cabbage (cooked)",
+    "spinach-cooked": "Spinach (cooked)",
+    "banana": "Banana",
+    "apple": "Apple",
+    "guava": "Guava",
+    "sesame-dressing": "Sesame dressing",
+    "olive-oil": "Olive oil",
+    "peanut-butter": "Peanut butter",
+    "soy-sauce": "Soy sauce",
+}
+
 # Search synonyms — not translations. These are what people actually type.
 ALIASES: dict[str, tuple[str, ...]] = {
     "chicken-thigh-skin-on-cooked": ("雞腿", "乾煎雞腿", "chicken thigh"),
@@ -90,6 +123,20 @@ async def seed() -> int:
                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
             """,
             [(*row, json.dumps(ALIASES.get(row[0], ()), ensure_ascii=False)) for row in FOODS],
+        )
+        await conn.executemany(
+            """
+            INSERT INTO translations (key, locale, text) VALUES (?, ?, ?)
+            ON CONFLICT (key, locale) DO UPDATE SET text = excluded.text
+            """,
+            [
+                translation
+                for food_id, _, zh_name, *_ in FOODS
+                for translation in (
+                    (f"food.{food_id}.name", "zh-TW", zh_name),
+                    (f"food.{food_id}.name", "en", ENGLISH_NAMES[food_id]),
+                )
+            ],
         )
         async with conn.execute("SELECT id FROM users") as cursor:
             users = await cursor.fetchall()

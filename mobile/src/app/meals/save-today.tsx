@@ -14,6 +14,7 @@ import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
@@ -21,13 +22,10 @@ type Plan = Schema<'DayPlanOut'>;
 type Slot = Plan['meals'][number];
 type MealTime = Schema<'MealIn'>['meal_times'][number];
 
-const SLOTS: { id: MealTime; label: string }[] = [
-  { id: 'breakfast', label: '早餐' },
-  { id: 'lunch', label: '午餐' },
-  { id: 'dinner', label: '晚餐' },
-];
+const SLOTS: MealTime[] = ['breakfast', 'lunch', 'dinner'];
 
 export default function SaveTodayMeal() {
+  const { t } = useI18n();
   const { date, slot } = useLocalSearchParams<{ date: string; slot: MealTime }>();
   const [meal, setMeal] = useState<Slot | null>(null);
   const [name, setName] = useState('');
@@ -44,17 +42,17 @@ export default function SaveTodayMeal() {
         if (!live || !found) return;
         setMeal(found);
         const names = found.items.flatMap((item) => (item.food ? [item.food.name] : []));
-        setName(found.name ? `${found.name}・我的版本` : names.slice(0, 3).join('・'));
+        setName(found.name ? t('meals.saveToday.myVersion', { name: found.name }) : names.slice(0, 3).join(' · '));
       })
       .catch((error) =>
-        Alert.alert('讀不到這一餐', error instanceof ApiError ? error.message : '請稍後再試。', [
-          { text: '返回今天', onPress: () => backOrReplace('/today') },
+        Alert.alert(t('meals.saveToday.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'), [
+          { text: t('meals.saveToday.returnToday'), onPress: () => backOrReplace('/today') },
         ]),
       );
     return () => {
       live = false;
     };
-  }, [date, slot]);
+  }, [date, slot, t]);
 
   const foods = meal?.items.filter((item) => item.food && item.grams !== null) ?? [];
   const leftOut = (meal?.items.length ?? 0) - foods.length;
@@ -71,9 +69,9 @@ export default function SaveTodayMeal() {
         items: foods.map((item) => ({ food_id: item.food!.id, grams: item.grams })),
       });
       backOrReplace('/today');
-      Alert.alert('已存成我的餐點', '下次可以從「加入」→「從我的餐點選一道」直接加入。');
+      Alert.alert(t('meals.saveToday.savedTitle'), t('meals.saveToday.savedBody'));
     } catch (error) {
-      Alert.alert('儲存失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
@@ -93,37 +91,39 @@ export default function SaveTodayMeal() {
     <Screen
       footer={
         <PrimaryButton onPress={save} disabled={!name.trim() || !times.length || !foods.length} busy={busy}>
-          存成我的餐點
+          {t('meals.saveToday.title')}
         </PrimaryButton>
       }
     >
-      <BackLink label="今天" disabled={busy} onPress={() => backOrReplace('/today')} />
-      <Title sub={`把${date ? dayWord(date) : '今天'}這一餐的食物和份量存起來，之後可以整道加入。`}>
-        存成我的餐點
+      <BackLink label={t('common.labels.today')} disabled={busy} onPress={() => backOrReplace('/today')} />
+      <Title sub={t('meals.saveToday.subtitle', { day: date ? dayWord(date) : t('common.labels.today') })}>
+        {t('meals.saveToday.title')}
       </Title>
-      <Field label="餐點名稱" value={name} onChangeText={setName} placeholder="例如：梅花豬豆腐飯" />
+      <Field label={t('meals.saveToday.mealName')} value={name} onChangeText={setName} placeholder={t('meals.saveToday.mealNamePlaceholder')} />
       <View className="gap-2">
-        <Text className="text-sm text-muted">適合的時段</Text>
+        <Text className="text-sm text-muted">{t('meals.saveToday.suitableTimes')}</Text>
         <View className="flex-row gap-2">
           {SLOTS.map((option) => (
             <Chip
-              key={option.id}
-              label={option.label}
-              selected={times.includes(option.id)}
-              onPress={() => toggle(option.id)}
+              key={option}
+              label={t(`common.mealTimes.${option}`)}
+              selected={times.includes(option)}
+              onPress={() => toggle(option)}
             />
           ))}
         </View>
       </View>
       <Card className="gap-2">
-        <Text className="text-base text-ink">{foods.length} 樣食物</Text>
+        <Text className="text-base text-ink">
+          {t(foods.length === 1 ? 'common.counts.foods.one' : 'common.counts.foods.other', { count: foods.length })}
+        </Text>
         {foods.map((item) => (
           <Hint key={item.id}>
             {item.food!.name}　{Math.round(item.grams!)} g
           </Hint>
         ))}
       </Card>
-      {leftOut > 0 ? <Hint>{leftOut} 項只有熱量的自訂項目不會存進餐點。</Hint> : null}
+      {leftOut > 0 ? <Hint>{t('meals.saveToday.excludedItems', { count: leftOut })}</Hint> : null}
     </Screen>
   );
 }

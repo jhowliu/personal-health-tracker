@@ -9,29 +9,17 @@ import { Text } from '@/components/text';
 import { Card, Field, Hint, PrimaryButton, Screen, Segmented, Title } from '@/components/ui';
 import { safeReturnTo } from '@/navigation/return-to';
 import { deviceTimezone } from '@/timezone';
+import { formatNumber } from '@/i18n/format';
+import { useI18n } from '@/i18n/runtime';
 
 type Targets = Schema<'TargetsOut'>;
 type Sex = 'f' | 'm';
 type Activity = 'sedentary' | 'light' | 'moderate' | 'active';
 type Deficit = 10 | 12 | 15 | 20;
 
-// Daily life only: the day's workout is added to the target on its own.
-const ACTIVITY_LABEL: Record<Activity, string> = {
-  sedentary: '久坐（辦公室、開車通勤）',
-  light: '常走動（站立、外勤、走路通勤）',
-  moderate: '勞力工作（搬運、餐飲、照護）',
-  active: '粗重勞力（工地、農務）',
-};
-
-const DEFICIT_LABEL: Record<Deficit, string> = {
-  10: '慢慢來（少吃 10%）',
-  12: '穩定（少吃 12%）',
-  15: '積極（少吃 15%）',
-  20: '最快（少吃 20%）',
-};
-
 export default function ProfileSetup() {
   const { reload, profile: existing } = useSession();
+  const { t } = useI18n();
   // A new account starts on the phone's own zone; editing keeps whatever was chosen.
   const timezone = existing?.profile.timezone ?? deviceTimezone();
   const { returnTo } = useLocalSearchParams<{ returnTo?: string | string[] }>();
@@ -46,6 +34,19 @@ export default function ProfileSetup() {
   const [deficit, setDeficit] = useState<Deficit>(12);
   const [targets, setTargets] = useState<Targets | null>(null);
   const [busy, setBusy] = useState(false);
+  // Daily life only: the day's workout is added to the target on its own.
+  const activityLabels: Record<Activity, string> = {
+    sedentary: t('profileSetup.activity.sedentary'),
+    light: t('profileSetup.activity.light'),
+    moderate: t('profileSetup.activity.moderate'),
+    active: t('profileSetup.activity.active'),
+  };
+  const deficitLabels: Record<Deficit, string> = {
+    10: t('profileSetup.deficit.slow'),
+    12: t('profileSetup.deficit.steady'),
+    15: t('profileSetup.deficit.active'),
+    20: t('profileSetup.deficit.fastest'),
+  };
 
   const payload = useMemo(() => {
     const years = Number(age);
@@ -97,7 +98,10 @@ export default function ProfileSetup() {
       await reload();
       router.replace(safeReturnTo(returnTo));
     } catch (error) {
-      Alert.alert('存不起來', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(
+        t('profileSetup.saveFailed'),
+        error instanceof ApiError ? error.message : t('common.errors.tryAgain'),
+      );
     } finally {
       setBusy(false);
     }
@@ -109,48 +113,69 @@ export default function ProfileSetup() {
         <View className="flex-row items-center gap-3">
           {payload && targets ? (
             <View>
-              <Text className="text-xs text-muted">每日目標</Text>
+              <Text className="text-xs text-muted">{t('profileSetup.dailyTarget')}</Text>
               <Text className="text-lg text-ink">
-                {targets.kcal.toLocaleString()}{' '}
-                <Text className="text-xs text-muted">大卡</Text>
+                {formatNumber(targets.kcal)}{' '}
+                <Text className="text-xs text-muted">{t('common.units.kcal')}</Text>
               </Text>
             </View>
           ) : null}
           <View className="flex-1">
             <PrimaryButton onPress={submit} disabled={!payload} busy={busy}>
-              {busy ? '儲存中…' : '開始使用'}
+              {busy ? t('profileSetup.saving') : t('profileSetup.startUsing')}
             </PrimaryButton>
           </View>
         </View>
       }
     >
       <View className="gap-5 pt-4">
-        <Title sub="用來計算每天的熱量和營養素目標">建立你的資料</Title>
+        <Title sub={t('profileSetup.subtitle')}>{t('profileSetup.title')}</Title>
 
         <View className="gap-1">
-          <Text className="text-sm text-muted">性別</Text>
+          <Text className="text-sm text-muted">{t('common.labels.sex')}</Text>
           <View className="w-40">
             <Segmented
               value={sex}
               onChange={setSex}
               options={[
-                { value: 'f', label: '女' },
-                { value: 'm', label: '男' },
+                { value: 'f', label: t('common.labels.female') },
+                { value: 'm', label: t('common.labels.male') },
               ]}
             />
           </View>
         </View>
 
         <View className="flex-row gap-3">
-          <Field label="年齡" suffix="歲" value={age} onChangeText={setAge} placeholder="例如 30" keyboardType="numeric" />
-          <Field label="身高" suffix="cm" value={height} onChangeText={setHeight} placeholder="例如 165" keyboardType="decimal-pad" />
+          <Field
+            label={t('common.labels.age')}
+            suffix={t('common.units.year')}
+            value={age}
+            onChangeText={setAge}
+            placeholder={t('profileSetup.agePlaceholder')}
+            keyboardType="numeric"
+          />
+          <Field
+            label={t('common.labels.height')}
+            suffix={t('common.units.centimeter')}
+            value={height}
+            onChangeText={setHeight}
+            placeholder={t('profileSetup.heightPlaceholder')}
+            keyboardType="decimal-pad"
+          />
         </View>
 
         <View className="flex-row gap-3">
-          <Field label="體重" suffix="kg" value={weight} onChangeText={setWeight} placeholder="例如 55" keyboardType="decimal-pad" />
           <Field
-            label="腰圍（選填）"
-            suffix="cm"
+            label={t('common.labels.weight')}
+            suffix={t('common.units.kilogram')}
+            value={weight}
+            onChangeText={setWeight}
+            placeholder={t('profileSetup.weightPlaceholder')}
+            keyboardType="decimal-pad"
+          />
+          <Field
+            label={t('profileSetup.waistOptional')}
+            suffix={t('common.units.centimeter')}
             value={waist}
             onChangeText={setWaist}
             keyboardType="decimal-pad"
@@ -158,12 +183,17 @@ export default function ProfileSetup() {
         </View>
 
         <Picker
-          label="日常活動量（不含運動）"
+          label={t('profileSetup.activityLevel')}
           value={activity}
-          labels={ACTIVITY_LABEL}
+          labels={activityLabels}
           onChange={setActivity}
         />
-        <Picker label="減脂速度" value={deficit} labels={DEFICIT_LABEL} onChange={setDeficit} />
+        <Picker
+          label={t('profileSetup.deficitSpeed')}
+          value={deficit}
+          labels={deficitLabels}
+          onChange={setDeficit}
+        />
 
         <TargetPreview targets={payload ? targets : null} />
       </View>
@@ -214,30 +244,34 @@ function Picker<T extends string | number>({
 }
 
 function TargetPreview({ targets }: { targets: Targets | null }) {
+  const { t } = useI18n();
   if (!targets) {
     return (
       <Card>
-        <Hint>填完年齡、身高和體重就會算出每日目標。</Hint>
+        <Hint>{t('profileSetup.incompleteHint')}</Hint>
       </Card>
     );
   }
 
   return (
     <Card className="gap-3">
-      <Text className="text-sm text-muted">你的每日目標</Text>
+      <Text className="text-sm text-muted">{t('profileSetup.yourDailyTarget')}</Text>
       <Text className="text-[28px] text-ink">
-        {targets.kcal.toLocaleString()} <Text className="text-sm text-muted">大卡</Text>
+        {formatNumber(targets.kcal)}{' '}
+        <Text className="text-sm text-muted">{t('common.units.kcal')}</Text>
       </Text>
 
       <View className="flex-row gap-2">
-        <Macro value={`${targets.protein_g} g`} label="蛋白質" box="bg-primary-soft" text="text-primary" />
-        <Macro value={`${targets.fat_g} g`} label="脂肪" box="bg-warm-soft" text="text-warm" />
-        <Macro value={`${targets.carb_g} g`} label="碳水" box="bg-good-soft" text="text-good" />
+        <Macro value={`${targets.protein_g} ${t('common.units.gram')}`} label={t('common.labels.protein')} box="bg-primary-soft" text="text-primary" />
+        <Macro value={`${targets.fat_g} ${t('common.units.gram')}`} label={t('common.labels.fat')} box="bg-warm-soft" text="text-warm" />
+        <Macro value={`${targets.carb_g} ${t('common.units.gram')}`} label={t('common.labels.carbs')} box="bg-good-soft" text="text-good" />
       </View>
 
       <Hint>
-        基礎代謝 {targets.bmr.toLocaleString()} 大卡，不運動的一天約消耗 {targets.tdee.toLocaleString()} 大卡。
-        訓練標記完成後，會再加回訓練消耗的一半。
+        {t('profileSetup.targetExplanation', {
+          bmr: formatNumber(targets.bmr),
+          tdee: formatNumber(targets.tdee),
+        })}
       </Hint>
     </Card>
   );

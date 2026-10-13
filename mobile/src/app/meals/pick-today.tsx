@@ -14,18 +14,24 @@ import { FoodOptionRow } from '@/components/FoodOptionRow';
 import { PlusIcon } from '@/components/icons';
 import { BackLink, Card, Empty, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { dayWord } from '@/dates';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { color } from '@/theme/tokens';
 
 type Meal = Schema<'MealOut'>;
 
-const SLOT_LABEL: Record<string, string> = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐' };
-
 export default function PickMealForToday() {
+  const { t } = useI18n();
   const { date, slot } = useLocalSearchParams<{ date: string; slot: string }>();
   const [meals, setMeals] = useState<Meal[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const slotLabel = SLOT_LABEL[slot] ?? '這餐';
+  const slotLabel = slot === 'breakfast'
+    ? t('common.mealTimes.breakfast')
+    : slot === 'lunch'
+      ? t('common.mealTimes.lunch')
+      : slot === 'dinner'
+        ? t('common.mealTimes.dinner')
+        : t('common.mealTimes.thisMeal');
 
   useEffect(() => {
     let live = true;
@@ -38,12 +44,12 @@ export default function PickMealForToday() {
       })
       .catch((error) => {
         if (live) setMeals([]);
-        Alert.alert('讀不到我的餐點', error instanceof ApiError ? error.message : '請稍後再試。');
+        Alert.alert(t('meals.pickSaved.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       });
     return () => {
       live = false;
     };
-  }, [slot]);
+  }, [slot, t]);
 
   const pick = async (meal: Meal) => {
     if (!date || !slot) return;
@@ -52,7 +58,7 @@ export default function PickMealForToday() {
       await api.post(`/days/${date}/plan/${slot}/meal`, { meal_id: meal.id });
       backOrReplace('/today');
     } catch (error) {
-      Alert.alert('加入失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('common.errors.addFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusyId(null);
     }
@@ -60,9 +66,9 @@ export default function PickMealForToday() {
 
   return (
     <Screen>
-      <BackLink label="今天" disabled={busyId !== null} onPress={() => backOrReplace('/today')} />
-      <Title sub={`加到${date ? dayWord(date) : '今天'}的${slotLabel}；主食份量會依今天的目標調整。`}>
-        從我的餐點選一道
+      <BackLink label={t('common.labels.today')} disabled={busyId !== null} onPress={() => backOrReplace('/today')} />
+      <Title sub={t('meals.pickSaved.subtitle', { day: date ? dayWord(date) : t('common.labels.today'), meal: slotLabel })}>
+        {t('meals.pickSaved.title')}
       </Title>
 
       {meals === null ? (
@@ -78,11 +84,11 @@ export default function PickMealForToday() {
                 router.replace({ pathname: '/meals/add-food', params: { destination: 'day', date, slot } })
               }
             >
-              改從食物庫加入
+              {t('meals.pickSaved.useLibrary')}
             </PrimaryButton>
           }
         >
-          還沒有存過餐點。記錄一餐之後，可以在今天的畫面按「存成我的餐點」。
+          {t('meals.pickSaved.empty')}
         </Empty>
       ) : (
         <Card className="px-0 py-0">
@@ -92,14 +98,14 @@ export default function PickMealForToday() {
                 key={meal.id}
                 name={meal.name}
                 detail={meal.items.map((item) => item.food.name).join('・')}
-                trailing={busyId === meal.id ? '加入中…' : `${Math.round(meal.nutrients.kcal)} 大卡`}
+                trailing={busyId === meal.id ? t('common.states.adding') : `${Math.round(meal.nutrients.kcal)} ${t('common.units.kcal')}`}
                 onPress={busyId === null ? () => pick(meal) : undefined}
               />
             ))}
           </Rows>
         </Card>
       )}
-      {meals?.length ? <Hint>只會加入這一天；之後改這道餐點，不會影響已經記錄的內容。</Hint> : null}
+      {meals?.length ? <Hint>{t('meals.pickSaved.dayOnlyHint')}</Hint> : null}
     </Screen>
   );
 }

@@ -6,6 +6,7 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Field, Hint, PrimaryButton, Screen, Title } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
 import { backOrReplace } from '@/navigation/back';
 import { newFoodHandoff } from '@/meals/new-food-handoff';
 import { pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
@@ -18,6 +19,7 @@ const calories = (protein: string, carbs: string, fat: string) =>
   number(protein) * 4 + number(carbs) * 4 + number(fat) * 9;
 
 export default function NewFoodScreen() {
+  const { t } = useI18n();
   const { id, name: typedName, category_id: typedCategory, from } = useLocalSearchParams<{
     id?: string;
     /** Opened from 加入食物's empty search: what was typed there, and the category in view. */
@@ -51,9 +53,9 @@ export default function NewFoodScreen() {
         setCategoryId((current) => current || items[0]?.id || '');
       })
       .catch((error) =>
-        Alert.alert('讀不到食物分類', error instanceof ApiError ? error.message : '請稍後再試。'),
+        Alert.alert(t('meals.foodEditor.loadCategoriesFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain')),
       );
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isNew) return;
@@ -74,12 +76,12 @@ export default function NewFoodScreen() {
       setMaxGrams(String(food.max_grams));
       setLoadedId(id);
     }).catch((error) =>
-      Alert.alert('讀不到食物', error instanceof ApiError ? error.message : '請稍後再試。', [
-        { text: '返回食物庫', onPress: () => backOrReplace('/meals') },
+      Alert.alert(t('meals.foodEditor.loadFoodFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'), [
+        { text: t('meals.foodEditor.returnToLibrary'), onPress: () => backOrReplace('/meals') },
       ]),
     );
     return () => { live = false; };
-  }, [id, isNew]);
+  }, [id, isNew, t]);
 
   const changeMacro = (which: 'protein' | 'carbs' | 'fat', value: string) => {
     const next = { protein, carbs, fat, [which]: value };
@@ -95,7 +97,7 @@ export default function NewFoodScreen() {
       const analysis = await pickAndAnalyzeMealPhoto();
       if (!analysis) return;
       const item = analysis.items[0];
-      if (!item) throw new Error('照片中沒有辨識到食物。');
+      if (!item) throw new Error(t('meals.foodEditor.photoMissingFood'));
 
       setName(item.label);
       setUsualGrams(String(Math.round(item.grams)));
@@ -118,8 +120,8 @@ export default function NewFoodScreen() {
       }
     } catch (error) {
       Alert.alert(
-        '照片帶入失敗',
-        error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試。',
+        t('meals.foodEditor.photoImportFailed'),
+        error instanceof ApiError ? error.message : error instanceof Error ? error.message : t('common.errors.tryAgain'),
       );
     } finally {
       setBusy(false);
@@ -130,7 +132,7 @@ export default function NewFoodScreen() {
     const grams = number(usualGrams);
     const max = maxGrams ? number(maxGrams) : grams * 2;
     if (!name.trim() || !categoryId || grams <= 0 || max < grams || (unit !== 'g' && number(gramsPerUnit) <= 0)) {
-      Alert.alert('資料不完整', '請填寫名稱、分類、有效份量與每單位公克數。');
+      Alert.alert(t('common.errors.incompleteData'), t('meals.foodEditor.incompleteBody'));
       return;
     }
     setBusy(true);
@@ -159,21 +161,21 @@ export default function NewFoodScreen() {
       else await api.patch(`/foods/${id}`, payload);
       backOrReplace('/meals');
     } catch (error) {
-      Alert.alert('儲存失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+      Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
       setBusy(false);
     }
   };
 
-  const remove = () => Alert.alert('移除食物', `從食物庫移除「${name}」？既有餐點仍可使用。`, [
-    { text: '取消', style: 'cancel' },
-    { text: '移除', style: 'destructive', onPress: async () => {
+  const remove = () => Alert.alert(t('meals.foodEditor.removeTitle'), t('meals.foodEditor.removeBody', { name }), [
+    { text: t('common.actions.cancel'), style: 'cancel' },
+    { text: t('common.actions.remove'), style: 'destructive', onPress: async () => {
       setBusy(true);
       try {
         await api.delete(`/foods/${id}`);
         backOrReplace('/meals');
       } catch (error) {
-        Alert.alert('移除失敗', error instanceof ApiError ? error.message : '請稍後再試。');
+        Alert.alert(t('common.errors.removeFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
       } finally { setBusy(false); }
     } },
   ]);
@@ -188,40 +190,46 @@ export default function NewFoodScreen() {
       footer={
         <>
           <View className="flex-row items-baseline justify-between">
-            <Text className="text-sm text-muted">每 100 g</Text>
-            <Text className="text-2xl text-ink">約 {kcal} 大卡</Text>
+            <Text className="text-sm text-muted">{t('meals.foodEditor.perHundredGrams')}</Text>
+            <Text className="text-2xl text-ink">{t('meals.foodEditor.approximateCalories', { calories: kcal })}</Text>
           </View>
           <PrimaryButton onPress={save} busy={busy}>
-            {busy ? '處理中…' : fromSearch ? '新增並加入' : isNew ? '新增食物' : '儲存食物'}
+            {busy
+              ? t('common.states.processing')
+              : fromSearch
+                ? t('meals.foodEditor.createAndAdd')
+                : isNew
+                  ? t('meals.foodEditor.createFood')
+                  : t('meals.foodEditor.saveFood')}
           </PrimaryButton>
         </>
       }
     >
       <BackLink
-        label={fromSearch ? '加入食物' : '食物庫'}
+        label={fromSearch ? t('meals.foodEditor.addFood') : t('meals.home.foodLibrary')}
         onPress={() => (fromSearch ? router.back() : backOrReplace('/meals'))}
         disabled={busy}
       />
-      <Title sub="營養以每 100 g 計；編輯後會更新既有餐點，已吃紀錄保留原值。">
-        {isNew ? '新增食物' : '編輯食物'}
+      <Title sub={t('meals.foodEditor.nutritionEditHint')}>
+        {isNew ? t('meals.foodEditor.titleNew') : t('meals.foodEditor.titleEdit')}
       </Title>
 
       <PrimaryButton tone="plain" onPress={fillFromPhoto} disabled={busy}>
-        {busy ? '辨識中…' : '從照片帶入'}
+        {busy ? t('common.states.recognizing') : t('meals.foodEditor.importFromPhoto')}
       </PrimaryButton>
 
       <Card className="gap-3">
-        <Field label="食物名稱" value={name} onChangeText={setName} placeholder="例如：火龍果" />
+        <Field label={t('meals.foodEditor.foodName')} value={name} onChangeText={setName} placeholder={t('meals.foodEditor.foodNamePlaceholder')} />
         <View className="gap-1">
-          <Hint>狀態</Hint>
+          <Hint>{t('common.labels.status')}</Hint>
           <View className="flex-row gap-2">
-            {([['na', '未指定'], ['raw', '生'], ['cooked', '熟']] as const).map(([value, label]) => (
-              <Chip key={value} label={label} selected={state === value} onPress={() => setState(value)} />
+            {([['na', 'meals.foodEditor.stateUnspecified'], ['raw', 'meals.foodEditor.stateRaw'], ['cooked', 'meals.foodEditor.stateCooked']] as const).map(([value, labelKey]) => (
+              <Chip key={value} label={t(labelKey)} selected={state === value} onPress={() => setState(value)} />
             ))}
           </View>
         </View>
         <View className="gap-1">
-          <Hint>分類</Hint>
+          <Hint>{t('common.labels.category')}</Hint>
           <View className="flex-row flex-wrap gap-2">
             {categories.map((category) => (
               <Chip
@@ -236,38 +244,38 @@ export default function NewFoodScreen() {
       </Card>
 
       <Card className="gap-3">
-        <Text className="text-base text-ink">份量</Text>
+        <Text className="text-base text-ink">{t('common.labels.portion')}</Text>
         <View className="flex-row flex-wrap gap-2">
-          {([['g', 'g'], ['ml', 'ml'], ['piece', '顆'], ['scoop', '匙'], ['bowl', '碗']] as const).map(([value, label]) => (
-            <Chip key={value} label={label} selected={unit === value} onPress={() => setUnit(value)} />
+          {([['g', 'g'], ['ml', 'ml'], ['piece', 'common.units.piece'], ['scoop', 'common.units.scoop'], ['bowl', 'common.units.bowl']] as const).map(([value, label]) => (
+            <Chip key={value} label={label.includes('.') ? t(label as 'common.units.piece') : label} selected={unit === value} onPress={() => setUnit(value)} />
           ))}
         </View>
         {unit !== 'g' ? (
-          <Field label="每單位公克數" value={gramsPerUnit} onChangeText={setGramsPerUnit} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('meals.foodEditor.gramsPerUnit')} value={gramsPerUnit} onChangeText={setGramsPerUnit} suffix="g" keyboardType="decimal-pad" />
         ) : null}
         <View className="flex-row gap-3">
-          <Field label="常用份量" value={usualGrams} onChangeText={setUsualGrams} suffix="g" keyboardType="decimal-pad" />
-          <Field label="最大份量" value={maxGrams} onChangeText={setMaxGrams} suffix="g" keyboardType="decimal-pad" placeholder="常用份量的兩倍" />
+          <Field label={t('meals.foodEditor.usualPortion')} value={usualGrams} onChangeText={setUsualGrams} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('meals.foodEditor.maximumPortion')} value={maxGrams} onChangeText={setMaxGrams} suffix="g" keyboardType="decimal-pad" placeholder={t('meals.foodEditor.maximumPlaceholder')} />
         </View>
-        {fromSearch ? <Hint>新增後會用常用份量加入，之後可以再調整。</Hint> : null}
+        {fromSearch ? <Hint>{t('meals.foodEditor.createFromSearchHint')}</Hint> : null}
       </Card>
 
       <Card className="gap-3">
-        <Text className="text-base text-ink">每 100 g 營養</Text>
-        <Field label="熱量" value={kcalValue} onChangeText={setKcalValue} suffix="kcal" keyboardType="decimal-pad" />
+        <Text className="text-base text-ink">{t('meals.foodEditor.nutritionPerHundred')}</Text>
+        <Field label={t('common.labels.calories')} value={kcalValue} onChangeText={setKcalValue} suffix="kcal" keyboardType="decimal-pad" />
         <View className="flex-row gap-3">
-          <Field label="蛋白質" value={protein} onChangeText={(value) => changeMacro('protein', value)} suffix="g" keyboardType="decimal-pad" />
-          <Field label="碳水" value={carbs} onChangeText={(value) => changeMacro('carbs', value)} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('common.labels.protein')} value={protein} onChangeText={(value) => changeMacro('protein', value)} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('common.labels.carbs')} value={carbs} onChangeText={(value) => changeMacro('carbs', value)} suffix="g" keyboardType="decimal-pad" />
         </View>
         <View className="flex-row gap-3">
-          <Field label="脂肪" value={fat} onChangeText={(value) => changeMacro('fat', value)} suffix="g" keyboardType="decimal-pad" />
-          <Field label="纖維（選填）" value={fiber} onChangeText={setFiber} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('common.labels.fat')} value={fat} onChangeText={(value) => changeMacro('fat', value)} suffix="g" keyboardType="decimal-pad" />
+          <Field label={t('meals.foodEditor.fiberOptional')} value={fiber} onChangeText={setFiber} suffix="g" keyboardType="decimal-pad" />
         </View>
-        <Hint>修改三大營養素時會重算熱量，也可自行調整熱量。</Hint>
+        <Hint>{t('meals.foodEditor.macroRecalculationHint')}</Hint>
       </Card>
 
       {isNew ? null : (
-        <PrimaryButton tone="danger" onPress={remove} disabled={busy}>移除這項食物</PrimaryButton>
+        <PrimaryButton tone="danger" onPress={remove} disabled={busy}>{t('meals.foodEditor.removeThisFood')}</PrimaryButton>
       )}
     </Screen>
   );

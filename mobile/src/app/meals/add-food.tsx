@@ -6,10 +6,11 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { categoryTone, FoodOptionRow } from '@/components/FoodOptionRow';
 import { CheckIcon, PlusIcon } from '@/components/icons';
-import { STEP_LABEL } from '@/components/StepIndicator';
+import { stepLabel } from '@/components/StepIndicator';
 import { Text } from '@/components/text';
 import { BackLink, Card, Chip, Empty, Field, Hint, PrimaryButton, Rows, Screen, Title } from '@/components/ui';
 import { ShowMore, usePaged } from '@/components/paging';
+import { useI18n } from '@/i18n/runtime';
 import { draft } from '@/meals/draft';
 import { newFoodHandoff } from '@/meals/new-food-handoff';
 import { byCategoryOrder } from '@/meals/order';
@@ -25,6 +26,7 @@ type Category = Schema<'FoodCategoryOut'>;
 const NO_FOODS: Food[] = [];
 
 export default function AddFood() {
+  const { t } = useI18n();
   const { category, meal_id, destination = 'meal', date, slot } = useLocalSearchParams<{
     category?: string;
     meal_id?: string;
@@ -50,19 +52,25 @@ export default function AddFood() {
     destination === 'day'
       ? '/today'
       : ({ pathname: '/meals/[id]', params: { id: meal_id ?? 'new' } } as const);
-  const parentLabel = destination === 'day' ? (slot && STEP_LABEL[slot]) || '今天' : '編輯餐點';
+  const parentLabel = destination === 'day'
+    ? (slot && stepLabel(slot)) || t('meals.addFood.today')
+    : t('meals.addFood.editMeal');
   // A snack goes into the day's Extras, outside the three meals, and counts as eaten at once.
   const snack = destination === 'day' && slot === 'extras';
   // Where the food goes, not which category the list is filtered to.
-  const heading = snack ? '補記點心' : destination === 'day' && slot && STEP_LABEL[slot] ? `加入${STEP_LABEL[slot]}` : '加入食物';
+  const heading = snack
+    ? t('meals.addFood.addSnack')
+    : destination === 'day' && slot
+      ? t('meals.addFood.addToMeal', { meal: stepLabel(slot) })
+      : t('meals.addFood.addFood');
 
   useEffect(() => {
     if (destination === 'meal' && (!meal_id || !draft.has(meal_id))) {
-      Alert.alert('找不到餐點草稿', '請回到餐點頁重新開啟要編輯的餐點。', [
-        { text: '返回餐點', onPress: () => router.replace('/meals') },
+      Alert.alert(t('meals.addFood.missingDraftTitle'), t('meals.addFood.missingDraftBody'), [
+        { text: t('meals.photo.returnToMeals'), onPress: () => router.replace('/meals') },
       ]);
     }
-  }, [destination, meal_id]);
+  }, [destination, meal_id, t]);
 
   useEffect(() => {
     api.get('/food-categories').then(setCategories).catch(() => setCategories([]));
@@ -77,9 +85,9 @@ export default function AddFood() {
       const result = await api.get(`/foods?${params}`);
       if (version === searchVersion.current) setFoods(result);
     } catch (error) {
-      Alert.alert('搜尋失敗', error instanceof ApiError ? error.message : '請稍後再試');
+      Alert.alert(t('meals.addFood.searchFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     }
-  }, [query, filter]);
+  }, [query, filter, t]);
 
   useEffect(() => {
     const timer = setTimeout(search, 200);
@@ -96,20 +104,20 @@ export default function AddFood() {
     setBusy(true);
     try {
       if (destination === 'day') {
-        if (!date || !slot) throw new Error('找不到要加入的日期或餐次。');
+        if (!date || !slot) throw new Error(t('meals.addFood.missingDateOrSlot'));
         await api.post(
           snack ? `/days/${date}/meals/extras/items` : `/days/${date}/plan/${slot}/items`,
           { food_id: food.id, grams: portion },
         );
       } else {
-        if (!meal_id || !draft.has(meal_id)) throw new Error('找不到目前餐點草稿，請重新開啟餐點。');
+        if (!meal_id || !draft.has(meal_id)) throw new Error(t('meals.addFood.missingCurrentDraft'));
         draft.addItem(meal_id, food, portion);
       }
       setAdded((current) => [...current, food.name]);
       setPicked(null);
       setAmount('');
     } catch (error) {
-      Alert.alert('加入失敗', error instanceof ApiError ? error.message : error instanceof Error ? error.message : '請稍後再試');
+      Alert.alert(t('common.errors.addFailed'), error instanceof ApiError ? error.message : error instanceof Error ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
       setBusy(false);
     }
@@ -138,7 +146,7 @@ export default function AddFood() {
 
   const addFromPhoto = async () => {
     if (destination === 'day' && (!date || !slot)) {
-      Alert.alert('找不到餐次', '請回到今日流程重新選擇早餐、午餐或晚餐。');
+      Alert.alert(t('meals.addFood.missingSlotTitle'), t('meals.addFood.missingSlotBody'));
       return;
     }
     setPhotoBusy(true);
@@ -160,7 +168,7 @@ export default function AddFood() {
             },
       });
     } catch (error) {
-      Alert.alert('無法辨識餐點', photoErrorMessage(error));
+      Alert.alert(t('meals.photo.recognitionFailed'), photoErrorMessage(error));
     } finally {
       setPhotoBusy(false);
     }
@@ -179,23 +187,23 @@ export default function AddFood() {
           <>
             <View className="flex-row items-end gap-3">
               <View className="flex-1 gap-0.5">
-                <Text className="text-sm text-muted">已選擇</Text>
+                <Text className="text-sm text-muted">{t('common.states.selected')}</Text>
                 <Text className="text-base text-ink" numberOfLines={1}>
                   {picked.name}
                 </Text>
               </View>
-              <Text className="text-2xl text-ink">{kcal} 大卡</Text>
+              <Text className="text-2xl text-ink">{kcal} {t('common.units.kcal')}</Text>
             </View>
             <Field
-              label="份量"
+              label={t('common.labels.portion')}
               value={amount}
               onChangeText={setAmount}
               suffix={unit.label}
               keyboardType="decimal-pad"
             />
-            {unit.gramsPerUnit === 1 || !pickedGrams ? null : <Hint>約 {readableAmount(pickedGrams)} g</Hint>}
+            {unit.gramsPerUnit === 1 || !pickedGrams ? null : <Hint>{t('today.meal.approximateGrams', { grams: readableAmount(pickedGrams) })}</Hint>}
             <PrimaryButton onPress={add} disabled={!Number(amount) || photoBusy} busy={busy}>
-              {busy ? '加入中…' : snack ? '記下這份點心' : `加入${picked.name}`}
+              {busy ? t('common.states.adding') : snack ? t('meals.addFood.recordSnack') : t('meals.addFood.addNamed', { name: picked.name })}
             </PrimaryButton>
           </>
         ) : added.length ? (
@@ -203,11 +211,11 @@ export default function AddFood() {
             <View className="flex-row items-center gap-2">
               <CheckIcon size={18} tint={color.good} />
               <Text className="flex-1 text-base text-ink" numberOfLines={2}>
-                已加入 {added.length} 項：{added.join('、')}
+                {t('meals.addFood.addedItems', { count: added.length, names: added.join(', ') })}
               </Text>
             </View>
             <PrimaryButton onPress={() => backOrReplace(parentRoute)} disabled={photoBusy}>
-              {`完成，回到${parentLabel}`}
+              {t('meals.addFood.doneReturn', { destination: parentLabel })}
             </PrimaryButton>
           </>
         ) : undefined
@@ -219,17 +227,17 @@ export default function AddFood() {
         disabled={busy || photoBusy}
       />
 
-      <Title sub={snack ? '三餐以外吃的，記下就算吃了。' : undefined}>{heading}</Title>
+      <Title sub={snack ? t('meals.addFood.snackSubtitle') : undefined}>{heading}</Title>
 
       <PrimaryButton tone="plain" onPress={addFromPhoto} disabled={busy} busy={photoBusy}>
-        {photoBusy ? '辨識中…' : '用照片辨識多個食物'}
+        {photoBusy ? t('common.states.recognizing') : t('meals.addFood.photoAction')}
       </PrimaryButton>
-      <Hint>可拍照或從相簿選擇，確認辨識結果後才會加入。</Hint>
+      <Hint>{t('meals.addFood.photoHint')}</Hint>
 
-      <Field value={query} onChangeText={setQuery} placeholder="搜尋食物名稱或別名" />
+      <Field value={query} onChangeText={setQuery} placeholder={t('meals.addFood.searchPlaceholder')} />
 
       <View className="flex-row flex-wrap gap-2">
-        <Chip label="全部" selected={filter === 'all'} onPress={() => setFilter('all')} />
+        <Chip label={t('common.labels.all')} selected={filter === 'all'} onPress={() => setFilter('all')} />
         {categories.map((c) => (
           <Chip
             key={c.id}
@@ -247,11 +255,13 @@ export default function AddFood() {
           compact
           action={
             <PrimaryButton tone="plain" icon={PlusIcon} onPress={createFood} disabled={busy}>
-              {query.trim() ? `新增「${query.trim()}」到食物庫` : '新增食物到食物庫'}
+              {query.trim() ? t('meals.addFood.createNamedFood', { query: query.trim() }) : t('meals.addFood.createFood')}
             </PrimaryButton>
           }
         >
-          食物庫裡找不到{query.trim() ? `「${query.trim()}」` : '符合的食物'}。新增後會直接加進來。
+          {t('meals.addFood.noSearchResults', {
+            query: query.trim() ? `“${query.trim()}”` : t('meals.addFood.noMatchingFood'),
+          })}
         </Empty>
       ) : (
         <Card className="px-0 py-0">

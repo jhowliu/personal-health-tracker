@@ -9,6 +9,7 @@
  */
 import type { paths } from './types';
 import { errorMessage } from '@/api/errors';
+import { getActiveLocale, translate } from '@/i18n/translator';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -51,6 +52,7 @@ async function send(method: Method, path: string, body?: unknown, retry = true):
     headers: {
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       ...(tokens ? { Authorization: `Bearer ${tokens.access_token}` } : {}),
+      'Accept-Language': getActiveLocale(),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -109,7 +111,10 @@ async function performRefresh(tokens: Tokens, sessionVersion: number): Promise<b
   try {
     response = await fetch(`${BASE_URL}/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept-Language': getActiveLocale(),
+      },
       body: JSON.stringify({ refresh_token: tokens.refresh_token }),
     });
   } catch (error) {
@@ -139,7 +144,7 @@ async function performRefresh(tokens: Tokens, sessionVersion: number): Promise<b
 }
 
 async function fail(response: Response): Promise<never> {
-  let detail = `請求失敗（${response.status}）`;
+  let detail = translate('common.errors.requestFailed', { status: response.status });
   try {
     const body = await response.json();
     detail = errorMessage(body?.detail, response.status);

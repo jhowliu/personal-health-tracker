@@ -6,16 +6,21 @@ import { Pressable, View } from 'react-native';
 
 import { CheckIcon, DumbbellIcon, ScaleIcon, UtensilsIcon } from '@/components/icons';
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 
-export const STEP_LABEL: Record<string, string> = {
-  body: '量身形',
-  breakfast: '早餐',
-  lunch: '午餐',
-  workout: '訓練',
-  dinner: '晚餐',
-  done: '完成',
-};
+export function stepLabel(step: string): string {
+  const labels: Record<string, string> = {
+    body: translate('stepIndicator.body'),
+    breakfast: translate('common.mealTimes.breakfast'),
+    lunch: translate('common.mealTimes.lunch'),
+    workout: translate('stepIndicator.workout'),
+    dinner: translate('common.mealTimes.dinner'),
+    done: translate('stepIndicator.done'),
+  };
+  return labels[step] ?? step;
+}
 
 const STEP_ICON: Record<string, typeof CheckIcon> = {
   body: ScaleIcon,
@@ -83,6 +88,7 @@ export function StepIndicator({
   next?: string;
   onSelect?: (step: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <View className="flex-row">
       {steps.map((step, index) => {
@@ -90,15 +96,24 @@ export function StepIndicator({
         const isSkipped = isDone && skipped.includes(step);
         const isCurrent = step === current;
         const isNext = step === next;
-        const name = STEP_LABEL[step] ?? step;
+        const name = stepLabel(step);
+        const state = isSkipped
+          ? t('common.states.skipped')
+          : isDone
+            ? t('common.states.completed')
+            : t('common.states.notCompleted');
 
         return (
           <Pressable
             key={step}
             accessibilityRole="button"
-            accessibilityLabel={`${name}，第 ${index + 1} 步，共 ${steps.length} 步，${
-              isSkipped ? '已略過' : isDone ? '已完成' : '未完成'
-            }${isCurrent ? '，目前顯示' : ''}`}
+            accessibilityLabel={t('stepIndicator.accessibility', {
+              name,
+              current: index + 1,
+              total: steps.length,
+              state,
+              currentSuffix: isCurrent ? t('stepIndicator.currentSuffix') : '',
+            })}
             accessibilityState={{ selected: isCurrent }}
             disabled={!onSelect}
             onPress={() => onSelect?.(step)}

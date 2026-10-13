@@ -11,6 +11,8 @@ import type { Schema } from '@/api/client';
 import { ChevronIcon } from '@/components/icons';
 import { Text } from '@/components/text';
 import { Field, Hint, PrimaryButton } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 import { type RecordRow } from '@/workouts/record';
 import { SetRecordEditor } from '@/workouts/SetRecordEditor';
@@ -27,10 +29,12 @@ export function isItemDone(entry: Entry): boolean {
 
 function status(entry: Entry): string {
   const prescribed = entry.item;
-  if (isItemDone(entry)) return '✓ 完成';
-  if (prescribed.duration_sec) return `${Math.round(prescribed.duration_sec / 60)} 分鐘`;
-  if (entry.logs.length) return `${entry.logs.length} / ${prescribed.sets ?? 1} 組`;
-  return `${prescribed.sets ?? 1} 組${prescribed.reps ? ` × ${prescribed.reps}` : ''}${
+  if (isItemDone(entry)) return translate('workouts.item.completed');
+  if (prescribed.duration_sec) {
+    return `${Math.round(prescribed.duration_sec / 60)} ${translate('common.units.minute')}`;
+  }
+  if (entry.logs.length) return translate('workouts.item.setProgress', { done: entry.logs.length, total: prescribed.sets ?? 1 });
+  return `${translate('common.counts.sets.other', { count: prescribed.sets ?? 1 })}${prescribed.reps ? ` × ${prescribed.reps}` : ''}${
     prescribed.weight_kg !== null ? ` · ${prescribed.weight_kg} kg` : ''
   }`;
 }
@@ -73,6 +77,7 @@ export function WorkoutItemRow({
   /** The drag handle from the list, before the row's own button. */
   handle?: ReactNode;
 }) {
+  const { t } = useI18n();
   const prescribed = entry.item;
   const done = isItemDone(entry);
   const set = (change: Partial<TargetEdit>) => onTargetChange({ ...target, ...change });
@@ -83,7 +88,9 @@ export function WorkoutItemRow({
         {handle}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${open ? '收起' : '修改'}${prescribed.exercise_name}`}
+          accessibilityLabel={t(open ? 'common.accessibility.collapseNamed' : 'common.accessibility.editNamed', {
+            name: prescribed.exercise_name,
+          })}
           accessibilityState={{ expanded: open, disabled: busy }}
           disabled={busy}
           onPress={onToggle}
@@ -98,7 +105,7 @@ export function WorkoutItemRow({
           </View>
           <Text className="flex-1 text-sm text-ink">{prescribed.exercise_name}</Text>
           {edited ? (
-            <Text className="text-sm text-primary">未儲存</Text>
+            <Text className="text-sm text-primary">{t('common.states.unsaved')}</Text>
           ) : (
             <Text className={`text-sm ${done ? 'text-good' : 'text-ink'}`}>{status(entry)}</Text>
           )}
@@ -109,26 +116,26 @@ export function WorkoutItemRow({
       {open ? (
         <View className="gap-4 border-t border-line px-4 pb-4 pt-3">
           {prescribed.replaced_exercise_name ? (
-            <Hint>{word}已替換原本的 {prescribed.replaced_exercise_name}</Hint>
+            <Hint>{t('workouts.item.replacedOriginal', { day: word, name: prescribed.replaced_exercise_name })}</Hint>
           ) : null}
 
           <View className="gap-3">
-            <Text className="text-sm text-muted">紀錄</Text>
+            <Text className="text-sm text-muted">{t('workouts.item.record')}</Text>
             <SetRecordEditor entry={entry} rows={rows} onChange={onRowsChange} />
             {suggestion !== undefined ? (
               <View className="rounded-field bg-primary-soft p-3">
                 {/* The next session reads this back from the logged effort; nothing to save. */}
-                <Text className="text-base text-ink">下次會從 {suggestion} kg 開始</Text>
+                <Text className="text-base text-ink">{t('workouts.item.nextWeight', { weight: suggestion })}</Text>
               </View>
             ) : null}
           </View>
 
           <View className="gap-3">
-            <Text className="text-sm text-muted">目標</Text>
+            <Text className="text-sm text-muted">{t('workouts.item.target')}</Text>
             {prescribed.duration_sec ? (
               <Field
-                label="目標時間"
-                suffix="分鐘"
+                label={t('workouts.item.targetTime')}
+                suffix={t('common.units.minute')}
                 value={target.durationMin}
                 onChangeText={(durationMin) => set({ durationMin })}
                 keyboardType="numeric"
@@ -136,42 +143,42 @@ export function WorkoutItemRow({
             ) : (
               <View className="flex-row gap-3">
                 <Field
-                  label="組數"
+                  label={t('common.labels.sets')}
                   value={target.sets}
                   onChangeText={(sets) => set({ sets })}
                   keyboardType="numeric"
                 />
-                <Field label="次數" value={target.reps} onChangeText={(reps) => set({ reps })} />
+                <Field label={t('common.labels.reps')} value={target.reps} onChangeText={(reps) => set({ reps })} />
               </View>
             )}
             <View className="flex-row gap-3">
               <Field
-                label="重量"
+                label={t('common.labels.weight')}
                 suffix="kg"
                 value={target.weight}
                 onChangeText={(weight) => set({ weight })}
                 keyboardType="decimal-pad"
               />
               <Field
-                label="休息"
-                suffix="秒"
+                label={t('common.labels.rest')}
+                suffix={t('common.units.second')}
                 value={target.rest}
                 onChangeText={(rest) => set({ rest })}
                 keyboardType="numeric"
               />
             </View>
-            <Field label="做法說明" value={target.note} onChangeText={(note) => set({ note })} />
+            <Field label={t('common.labels.notes')} value={target.note} onChangeText={(note) => set({ note })} />
           </View>
 
           <View className="flex-row gap-2">
             <View className="flex-1">
               <PrimaryButton tone="plain" onPress={onReplace} disabled={busy}>
-                換動作
+                {t('workouts.item.changeExercise')}
               </PrimaryButton>
             </View>
             <View className="flex-1">
               <PrimaryButton tone="danger" onPress={onRemove} disabled={busy}>
-                移除
+                {t('common.actions.remove')}
               </PrimaryButton>
             </View>
           </View>

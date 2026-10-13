@@ -8,6 +8,8 @@ import { ShowMore, usePaged } from '@/components/paging';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { Chip, Field, Hint, PrimaryButton, Tag } from '@/components/ui';
+import { useI18n } from '@/i18n/runtime';
+import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 import { ExerciseFigure } from '@/workouts/figure/ExerciseFigure';
 
@@ -16,7 +18,7 @@ export type Exercise = Schema<'ExerciseOut'>;
 
 export function ExerciseLibrary({
   onSelect,
-  selectLabel = '加入',
+  selectLabel,
   addedIds,
 }: {
   onSelect: (exercise: Exercise) => void;
@@ -24,6 +26,8 @@ export function ExerciseLibrary({
   /** Exercises that are already in place: their card turns green and cannot be added again. */
   addedIds?: ReadonlySet<string>;
 }) {
+  const { t } = useI18n();
+  const effectiveSelectLabel = selectLabel ?? t('common.actions.add');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -50,18 +54,18 @@ export function ExerciseLibrary({
         if (version === loadVersion.current) setExercises(result);
       } catch (error) {
         if (version === loadVersion.current) {
-          Alert.alert('讀不到動作庫', error instanceof ApiError ? error.message : '請稍後再試');
+          Alert.alert(t('workouts.library.loadFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
         }
       } finally {
         if (version === loadVersion.current) setLoading(false);
       }
     }, 200);
     return () => clearTimeout(timer);
-  }, [bodyRegion, category, equipment, query]);
+  }, [bodyRegion, category, equipment, query, t]);
 
   return (
     <View className="gap-3">
-      <Field value={query} onChangeText={setQuery} placeholder="搜尋動作名稱" />
+      <Field value={query} onChangeText={setQuery} placeholder={t('workouts.library.searchPlaceholder')} />
       {/* One line each, swiped sideways: three wrapped rows of chips pushed the list off the screen. */}
       <View className="-mx-4">
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2 px-4">
@@ -84,10 +88,10 @@ export function ExerciseLibrary({
       {loading ? (
         <ActivityIndicator color={color.primary} />
       ) : exercises.length === 0 ? (
-        <Hint>找不到符合的動作，請調整搜尋或篩選。</Hint>
+        <Hint>{t('workouts.library.noResults')}</Hint>
       ) : (
         <View className="gap-2">
-          <Hint>共 {exercises.length} 個動作</Hint>
+          <Hint>{t('workouts.library.resultCount', { count: exercises.length })}</Hint>
           {visible.map((exercise) => (
             // The thumbnail and 查看動作 preview, the button adds; three sibling targets, since a
             // button inside a button is invalid on web.
@@ -99,7 +103,7 @@ export function ExerciseLibrary({
             >
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`查看${exercise.name}的動作示範`}
+                accessibilityLabel={t('workouts.library.viewDemo', { name: exercise.name })}
                 onPress={() => setPreviewing(exercise)}
                 className="self-start"
               >
@@ -125,12 +129,12 @@ export function ExerciseLibrary({
                 <View className="flex-row items-center justify-between gap-2">
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`查看${exercise.name}的動作示範`}
+                    accessibilityLabel={t('workouts.library.viewDemo', { name: exercise.name })}
                     onPress={() => setPreviewing(exercise)}
                     hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
                     className="flex-row items-center gap-0.5"
                   >
-                    <Text className="text-sm text-primary">查看動作</Text>
+                    <Text className="text-sm text-primary">{t('workouts.library.viewExercise')}</Text>
                     <ChevronIcon direction="right" size={16} tint={color.primary} />
                   </Pressable>
                   {addedIds?.has(exercise.id) ? (
@@ -139,7 +143,7 @@ export function ExerciseLibrary({
                       className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control px-3"
                     >
                       <CheckIcon size={16} tint={color.good} />
-                      <Text className="text-sm text-good">已加入</Text>
+                      <Text className="text-sm text-good">{t('common.states.added')}</Text>
                     </View>
                   ) : (
                     <Pressable
@@ -148,7 +152,7 @@ export function ExerciseLibrary({
                       className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control border-[1.5px] border-edge bg-primary px-4 active:opacity-80"
                     >
                       <PlusIcon size={16} tint={color.surface} />
-                      <Text className="text-sm text-white">{selectLabel}</Text>
+                      <Text className="text-sm text-white">{effectiveSelectLabel}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -159,14 +163,14 @@ export function ExerciseLibrary({
         </View>
       )}
 
-      <Sheet visible={previewing !== null} title={previewing?.name ?? '動作'} onClose={() => setPreviewing(null)}>
+      <Sheet visible={previewing !== null} title={previewing?.name ?? t('workouts.library.exerciseFallback')} onClose={() => setPreviewing(null)}>
         {previewing ? (
           <>
             <ExerciseFigure exerciseId={previewing.id} name={previewing.name} mode="pair" />
             {previewing.description ? <Hint>{previewing.description}</Hint> : null}
             {addedIds?.has(previewing.id) ? (
               <PrimaryButton tone="plain" icon={CheckIcon} disabled>
-                已加入
+                {t('common.states.added')}
               </PrimaryButton>
             ) : (
               <PrimaryButton
@@ -176,7 +180,7 @@ export function ExerciseLibrary({
                   onSelect(chosen);
                 }}
               >
-                {selectLabel}
+                {effectiveSelectLabel}
               </PrimaryButton>
             )}
           </>
@@ -198,24 +202,35 @@ export function defaultExercisePrescription(category: string) {
 }
 
 function categoryLabel(value: string) {
-  return { all: '全部', strength: '肌力', cardio: '有氧', mobility: '活動度' }[value] ?? value;
+  return {
+    all: translate('workouts.library.categoryAll'),
+    strength: translate('workouts.library.categoryStrength'),
+    cardio: translate('workouts.library.categoryCardio'),
+    mobility: translate('workouts.library.categoryMobility'),
+  }[value] ?? value;
 }
 
 function bodyLabel(value: string | null) {
-  if (!value || value === 'all') return value === 'all' ? '部位全部' : '';
-  return { upper_body: '上半身', lower_body: '下半身', core: '核心', full_body: '全身', mobility: '活動度' }[value] ?? value;
+  if (!value || value === 'all') return value === 'all' ? translate('workouts.library.bodyAll') : '';
+  return {
+    upper_body: translate('workouts.library.upperBody'),
+    lower_body: translate('workouts.library.lowerBody'),
+    core: translate('workouts.library.core'),
+    full_body: translate('workouts.library.fullBody'),
+    mobility: translate('workouts.library.categoryMobility'),
+  }[value] ?? value;
 }
 
 function equipmentLabel(value: string | null) {
-  if (!value || value === 'all') return value === 'all' ? '器材全部' : '';
+  if (!value || value === 'all') return value === 'all' ? translate('workouts.library.equipmentAll') : '';
   return {
-    bodyweight: '徒手',
-    dumbbell: '啞鈴',
-    barbell: '槓鈴',
-    kettlebell: '壺鈴',
-    machine: '器械',
-    cable: '滑輪',
-    resistance_band: '彈力帶',
-    treadmill: '跑步機',
+    bodyweight: translate('workouts.library.bodyweight'),
+    dumbbell: translate('workouts.library.dumbbell'),
+    barbell: translate('workouts.library.barbell'),
+    kettlebell: translate('workouts.library.kettlebell'),
+    machine: translate('workouts.library.machine'),
+    cable: translate('workouts.library.cable'),
+    resistance_band: translate('workouts.library.resistanceBand'),
+    treadmill: translate('workouts.library.treadmill'),
   }[value] ?? value;
 }

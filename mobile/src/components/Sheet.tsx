@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppModal } from '@/components/AppModal';
 import { CheckIcon } from '@/components/icons';
 import { Text } from '@/components/text';
+import { useI18n } from '@/i18n/runtime';
 
 /** One selectable line in a sheet's list; the selected one is tinted and checked. */
 export function ChoiceOption({
@@ -52,6 +53,7 @@ export function Sheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <AppModal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       {/* Lifts the sheet above the keyboard when the content has a text field. */}
@@ -77,7 +79,7 @@ export function Sheet({
                   onPress={onClose}
                   className="min-h-[44px] justify-center px-2"
                 >
-                  <Text className="text-base text-primary">關閉</Text>
+                  <Text className="text-base text-primary">{t('common.actions.close')}</Text>
                 </Pressable>
               </View>
               {children}

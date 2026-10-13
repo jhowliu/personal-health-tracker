@@ -4,6 +4,7 @@
  * sets the server keeps, or says what is wrong with them.
  */
 import type { Schema } from '@/api/client';
+import { translate } from '@/i18n/translator';
 
 type Entry = Schema<'WorkoutExecutionItemOut'>;
 export type Effort = 'easy' | 'appropriate' | 'hard';
@@ -74,17 +75,21 @@ export function toRecords(
   const timed = isTimed(entry);
   const sets: Schema<'SetRecordIn'>[] = [];
   for (const [index, row] of rows.entries()) {
-    const which = timed ? '時間' : `第 ${index + 1} 組`;
+    const which = timed
+      ? translate('workouts.validation.partTime')
+      : translate('workouts.validation.partSet', { number: index + 1 });
     if (timed) {
       const minutes = Number(row.minutes);
-      if (!/^\d+$/.test(row.minutes.trim()) || minutes < 1) return { error: `${which}要填 1 以上的整數分鐘` };
+      if (!/^\d+$/.test(row.minutes.trim()) || minutes < 1) {
+        return { error: translate('workouts.validation.minutesPositive', { part: which }) };
+      }
       const speed = optionalNumber(row.speed);
       if (speed === undefined || (speed !== null && (speed <= 0 || speed > 30))) {
-        return { error: '速度要填 30 以內的 km/h' };
+        return { error: translate('workouts.validation.speedRange') };
       }
       const incline = optionalNumber(row.incline);
       if (incline === undefined || (incline !== null && (incline < 0 || incline > 40))) {
-        return { error: '坡度要填 0 到 40 的 %' };
+        return { error: translate('workouts.validation.inclineRange') };
       }
       sets.push({
         duration_sec: minutes * 60,
@@ -94,10 +99,14 @@ export function toRecords(
       continue;
     }
     const reps = Number(row.reps);
-    if (!/^\d+$/.test(row.reps.trim()) || reps < 1) return { error: `${which}的次數要填 1 以上的整數` };
+    if (!/^\d+$/.test(row.reps.trim()) || reps < 1) {
+      return { error: translate('workouts.validation.repsPositive', { part: which }) };
+    }
     const weightText = row.weight.trim();
     const weight = Number(weightText);
-    if (weightText && (!Number.isFinite(weight) || weight < 0)) return { error: `${which}的重量要是數字` };
+    if (weightText && (!Number.isFinite(weight) || weight < 0)) {
+      return { error: translate('workouts.validation.weightNumber', { part: which }) };
+    }
     sets.push({ reps_done: reps, weight_kg: weightText ? weight : null, effort: row.effort });
   }
   return { sets };
