@@ -282,6 +282,89 @@ export const en = {
     },
   },
 
+  onboarding: {
+    offer: {
+      title: "New here?",
+      body: "Follow the screen to record a body check-in and breakfast. It takes about two minutes, and you can leave or replay it from Settings at any time.",
+      start: "Start tour",
+      later: "Maybe later",
+      skip: "Skip tour",
+    },
+    progress: "Step %{current} of %{total}",
+    actions: {
+      back: "Back",
+      next: "Next",
+      exit: "Exit tour",
+    },
+    waiting: "Preparing the next step…",
+    complete: {
+      title: "Tour complete",
+      body: "You now know how to record body measurements, add food manually, and find photo recognition.",
+      done: "Start using the app",
+    },
+    replay: {
+      label: "Getting started",
+      value: "Replay tour",
+      accessibilityLabel: "Replay the getting started tour",
+    },
+    steps: {
+      bodyReview: {
+        title: "Today’s body check-in is recorded",
+        body: "Weight and waist measurements power your weekly trends. Return to Body check-in whenever you need to update today’s record.",
+      },
+      bodyWeight: {
+        title: "Start with your weight",
+        body: "Enter today’s weight to keep weekly averages and changes accurate.",
+      },
+      bodyWaist: {
+        title: "Waist is optional",
+        body: "Waist measurements show changes that weight alone may miss. Leave it blank if now is not a good time.",
+      },
+      bodySave: {
+        title: "Save today’s measurements",
+        body: "Tap Save record. After it succeeds, the app automatically continues to breakfast.",
+        action: "Save record",
+      },
+      mealAdd: {
+        title: "Add your breakfast",
+        body: "Tap Add food to start recording what you ate.",
+        action: "Add food",
+      },
+      mealLibrary: {
+        title: "Start with the food library",
+        body: "The food library lets you record each food and its actual portion.",
+        action: "Add from food library",
+      },
+      foodSearch: {
+        title: "Search or use a category",
+        body: "Enter a food name or alias, or use the categories below to narrow the list.",
+      },
+      foodResult: {
+        title: "Choose a food",
+        body: "Tap the food that most closely matches what you ate.",
+        action: "Choose the first food",
+      },
+      foodPortion: {
+        title: "Confirm the portion",
+        body: "A usual portion is filled in for you. Calories and nutrients update when you change it.",
+      },
+      foodAdd: {
+        title: "Add it to breakfast",
+        body: "When the food and portion look right, add it to today’s breakfast.",
+        action: "Add this food",
+      },
+      foodPhoto: {
+        title: "You can also use photo recognition",
+        body: "Take a photo or choose one to identify several foods. You can review every item and portion before saving. This step will not open the camera.",
+      },
+      foodDone: {
+        title: "Finish recording breakfast",
+        body: "Back at breakfast, you can add more food or mark the meal as eaten.",
+        action: "Finish and return to breakfast",
+      },
+    },
+  },
+
   settings: {
     title: "Settings",
     personalDetails: "Personal details",

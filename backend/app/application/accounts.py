@@ -106,6 +106,13 @@ class AccountService:
         await self._objects.delete_user_objects(user_id)
         await self._store.delete_account(user_id)
 
+    async def onboarding_version(self, user_id: str) -> int:
+        return await self._store.onboarding_version(user_id)
+
+    async def complete_onboarding(self, user_id: str, version: int) -> int:
+        """Remember the newest tour seen; an older client must never move this backwards."""
+        return await self._store.set_onboarding_version(user_id, version)
+
     async def _open_account(self, account: Account, password_hash: str | None) -> None:
         """Every new account starts with its own editable copy of the default foods."""
         await self._store.create_account(account, password_hash)

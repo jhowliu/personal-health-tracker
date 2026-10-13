@@ -163,6 +163,14 @@ class ProfileWithTargetsOut(BaseModel):
     targets: TargetsOut
 
 
+class OnboardingProgressIn(BaseModel):
+    version: int = Field(ge=0, le=1000)
+
+
+class OnboardingProgressOut(BaseModel):
+    version: int
+
+
 class BodyLogIn(BaseModel):
     weight_kg: float | None = Field(default=None, ge=30, le=300)
     waist_cm: float | None = Field(default=None, ge=40, le=200)

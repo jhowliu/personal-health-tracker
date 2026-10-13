@@ -47,11 +47,14 @@ export function Sheet({
   title,
   onClose,
   children,
+  overlay,
 }: {
   visible: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  /** Optional full-screen content rendered inside the native modal layer. */
+  overlay?: ReactNode;
 }) {
   const { t } = useI18n();
   return (
@@ -86,6 +89,7 @@ export function Sheet({
             </Pressable>
           </SafeAreaView>
         </Pressable>
+        {overlay}
       </KeyboardAvoidingView>
     </AppModal>
   );

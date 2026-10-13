@@ -200,6 +200,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/me/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Onboarding */
+        get: operations["read_onboarding_users_me_onboarding_get"];
+        /** Complete Onboarding */
+        put: operations["complete_onboarding_users_me_onboarding_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/me": {
         parameters: {
             query?: never;
@@ -1448,6 +1466,16 @@ export interface components {
             /** Carb G */
             carb_g: number;
         };
+        /** OnboardingProgressIn */
+        OnboardingProgressIn: {
+            /** Version */
+            version: number;
+        };
+        /** OnboardingProgressOut */
+        OnboardingProgressOut: {
+            /** Version */
+            version: number;
+        };
         /** PastSetOut */
         PastSetOut: {
             /**
@@ -2546,6 +2574,72 @@ export interface operations {
             };
         };
     };
+    read_onboarding_users_me_onboarding_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    complete_onboarding_users_me_onboarding_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingProgressIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_me_users_me_delete: {
         parameters: {
             query?: never;
@@ -3412,6 +3506,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodCategoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

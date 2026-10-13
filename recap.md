@@ -2,55 +2,51 @@
 
 ## Current task
 
-- English (`en`) i18n is implemented across the mobile app, including auth, Today, Progress,
-  Meals, Workouts, Focus mode, Settings, privacy, validation, accessibility, alerts, and local
-  notifications.
-- Pull request [#30](https://github.com/jhowliu/personal-health-tracker/pull/30) is open from
-  `codex/english-i18n` into `main`.
+- Implemented a bilingual, account-level spotlight onboarding tour on
+  `codex/onboarding-spotlight`, stacked on the English i18n branch (`codex/english-i18n`, PR #30).
+- The tour follows the agreed path: body check-in → breakfast → food library → search → first food
+  → portion → add → photo-recognition introduction → return to breakfast.
 
 ## What changed
 
-- Added typed `zh-TW` and `en` catalogs with compile-time key/variable parity checks, runtime locale
-  detection, System/繁體中文/English preference persistence, and locale-aware number/date formatting.
-- Added native locale metadata and permission strings. Web now updates `<html lang>` and the page
-  title (`Daily Fat Loss Plan`) when English is active.
-- Requests send `Accept-Language`; registration sends the current locale; legacy Chinese API errors
-  are translated for English UI.
-- Migrated every user-facing hard-coded Chinese mobile string found by the source scan to the
-  catalog. Internal comments, tests, and bilingual custom-exercise matching patterns remain by
-  design.
-- Workout weekdays use compact `Mon`–`Sun` labels while accessibility labels keep full weekday
-  names. Exercise-library category/body/equipment filters are English, including `All equipment`.
-- Built-in exercise, food, and public workout-plan names/descriptions localize by request locale.
-  Added migration `0024_builtin_catalog_translations.sql` plus seed translation data and tests.
-- Added English-name matching for custom-exercise figure animations.
+- Added versioned onboarding persistence (`users.onboarding_version_seen`) with migration 0025 and
+  authenticated GET/PUT `/users/me/onboarding` endpoints. Existing accounts are migrated to version
+  1; accounts created afterward start at version 0. Updates are monotonic.
+- Added a reusable onboarding provider, spotlight target component, scrim/tooltip overlay, progress,
+  Back/Exit controls, welcome and completion modals, accessibility announcements, and Chinese/English
+  copy. Disabled target actions remain disabled through the tour.
+- Connected the tour to Today body fields/save, automatic breakfast progression, Add food, the native
+  add-food sheet, food search/result/portion/add, non-invoking photo recognition education, and Done.
+- Added Settings → 新手導覽 / Getting started for replay. A replay after today's body log exists uses
+  a shorter review step instead of requesting duplicate entry.
+- Regenerated OpenAPI and mobile API types. Added unit tests for step sequences and backend versioning.
 
 ## Validation completed
 
-- Fixed PR #30 backend CI failure caused by Ruff `E501` in `backend/app/api/deps.py`; the exact
-  CI lint command (`.venv/bin/ruff check .`) now passes locally.
-- Mobile: `npm run typecheck`, `npm run lint`, `npm test -- --runInBand` — 9 suites / 79 tests.
-- Backend: `.venv/bin/python -m pytest -q` — 245 passed.
-- OpenAPI: `.venv/bin/python -m scripts.check_openapi` — current.
-- Web production export completed successfully.
+- Mobile: `npm run typecheck`, `npm run lint`, `npm test -- --runInBand` — 10 suites / 82 tests.
+- Backend: `.venv/bin/ruff check .`, `.venv/bin/python -m pytest -q` — 246 passed.
+- Architecture/OpenAPI: `.venv/bin/lint-imports` (4 contracts kept) and
+  `.venv/bin/python -m scripts.check_openapi` passed.
 - `git diff --check` passed.
-- Live browser QA at `http://localhost:8081` verified:
-  - `All equipment`, all equipment filters, and 64 English built-in exercises.
-  - `Mon`–`Sun` weekly schedule and 12 English public workout plans.
-  - English Meals home, New meal editor, and add-food/photo options.
-  - English web page title and no console errors (only expected Expo/Reanimated warnings).
-- Local backend and Expo development servers are running.
+- Live Chinese browser QA at `http://localhost:8081` completed the entire 11-step path. Verified the
+  body save automatically opens breakfast, the native sheet spotlight renders above the modal, photo
+  education does not open the camera, Done returns to breakfast, completion displays, and replay with
+  an existing body log uses the 9-step review path.
+- Local backend is running on port 8010 and Expo web on port 8081. Migration 0025 was applied to
+  `backend/dev.sqlite`.
+- The temporary registration-only QA account was deleted after testing. The existing browser QA
+  account retains today's 62 kg body log and a breakfast entry of two pieces of toast.
 
 ## Decisions and remaining gaps
 
-- User-authored names stay exactly as entered; only built-in catalog content is translated.
-- Existing stored AI weekly advice may remain Chinese. Fully localizing generated AI advice needs
-  locale-aware prompting plus either per-locale storage or regeneration semantics.
-- Native metadata changes require a new development/EAS binary; they are not OTA-only changes.
-- A physical-device pass at large Dynamic Type and native notification permission flows is still
-  recommended before release.
+- Photo recognition is introduced only; the tour never opens camera/gallery or requests permission.
+- Existing accounts are not interrupted automatically, but can replay from Settings. New accounts see
+  the offer once their profile is ready.
+- The tour can be deferred without marking it complete; Skip/Exit and full completion persist version 1.
+- Physical iOS/Android checks for native modal layering, largest Dynamic Type, screen-reader focus,
+  reduced motion, and landscape are still recommended before release.
 
 ## Next target
 
-- Review and merge PR #30, then add locale-aware AI weekly-advice generation/storage and run
-  physical iOS/Android QA.
+- Review the onboarding diff, then commit/push and open a PR when requested. Test the English replay
+  and complete the physical-device accessibility pass before merging.

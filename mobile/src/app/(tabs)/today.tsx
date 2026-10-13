@@ -30,6 +30,8 @@ import { FoodActions, FoodGroup, FoodItem, FoodMacros } from '@/meals/FoodGroup'
 import { photoDraft } from '@/meals/photo-draft';
 import { stepCache } from '@/today/step-cache';
 import { syncWeighInReminder } from '@/notifications/reminder';
+import { SpotlightOverlay, useOnboarding } from '@/onboarding/OnboardingProvider';
+import { SpotlightTarget } from '@/onboarding/SpotlightTarget';
 import { clearSession, loadSession } from '@/workouts/focus/storage';
 import { photoErrorMessage, pickAndAnalyzeMealPhoto } from '@/meals/pick-and-analyze-photo';
 import { checkWeeklyReport } from '@/progress/weekly-popup';
@@ -75,6 +77,7 @@ const MAX_DAYS_BACK = 30;
 
 export default function TodayScreen() {
   const { t } = useI18n();
+  const tour = useOnboarding();
   const [day, setDay] = useState<Today | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
   const [weighIn, setWeighIn] = useState({ weight: '', waist: '' });
@@ -149,6 +152,20 @@ export default function TodayScreen() {
     }, [load]),
   );
 
+  useEffect(() => {
+    if (!day || (!tour.shouldOffer && !tour.replayRequested)) return;
+    const frame = requestAnimationFrame(() => {
+      if (day.date !== today) {
+        setDay(null);
+        setViewing(null);
+        setPicked(null);
+        return;
+      }
+      tour.offer(day.flow.completed.includes('body'));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [day, today, tour]);
+
   // The weekly report pops up from today: when it opens, and again as its flow moves on, since
   // finishing a Sunday brings that week's report forward.
   const onToday = day?.date === today;
@@ -167,7 +184,14 @@ export default function TodayScreen() {
     );
   }
 
-  const step = viewing ?? day.flow.current;
+  const tourStep = tour.step?.id;
+  const forcedStep =
+    tour.phase === 'offer' || (tour.phase === 'running' && tourStep?.startsWith('body-'))
+      ? 'body'
+      : tour.phase === 'running' && (tourStep === 'meal-add' || tourStep === 'meal-library')
+        ? 'breakfast'
+        : null;
+  const step = forcedStep ?? viewing ?? day.flow.current;
   const header = (
     <TodayHeader
       day={day}
@@ -346,9 +370,10 @@ function WeighInStep({
   logged: boolean;
   value: { weight: string; waist: string };
   onChange: (value: { weight: string; waist: string }) => void;
-  onSaved: () => void;
+  onSaved: () => void | Promise<void>;
 }) {
   const { t } = useI18n();
+  const tour = useOnboarding();
   const [busy, setBusy] = useState(false);
   const { weight, waist } = value;
   const prefilled = useRef(false);
@@ -386,7 +411,8 @@ function WeighInStep({
       if (date === todayISO()) {
         void syncWeighInReminder(profile?.profile.reminder_time ?? null).catch(() => {});
       }
-      onSaved();
+      await onSaved();
+      tour.actionCompleted('body-save');
     } catch (error) {
       Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
     } finally {
@@ -407,26 +433,34 @@ function WeighInStep({
           {logged ? <StatusBadge label={t('today.body.logged')} tone="good" /> : null}
         </View>
 
-        <Card className="gap-4">
-          <Field
-            label={t('common.labels.weight')}
-            suffix="kg"
-            value={weight}
-            onChangeText={(next) => onChange({ ...value, weight: next })}
-            keyboardType="decimal-pad"
-          />
-          <View className="h-px bg-line" />
-          <Field
-            label={t('today.body.waistOptional')}
-            suffix="cm"
-            value={waist}
-            onChangeText={(next) => onChange({ ...value, waist: next })}
-            keyboardType="decimal-pad"
-          />
-          <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
-            {busy ? t('common.states.saving') : logged ? t('today.body.updateRecord') : t('today.body.saveRecord')}
-          </PrimaryButton>
-        </Card>
+        <SpotlightTarget id="body-review" radius={24}>
+          <Card className="gap-4">
+            <SpotlightTarget id="body-weight">
+              <Field
+                label={t('common.labels.weight')}
+                suffix="kg"
+                value={weight}
+                onChangeText={(next) => onChange({ ...value, weight: next })}
+                keyboardType="decimal-pad"
+              />
+            </SpotlightTarget>
+            <View className="h-px bg-line" />
+            <SpotlightTarget id="body-waist">
+              <Field
+                label={t('today.body.waistOptional')}
+                suffix="cm"
+                value={waist}
+                onChangeText={(next) => onChange({ ...value, waist: next })}
+                keyboardType="decimal-pad"
+              />
+            </SpotlightTarget>
+            <SpotlightTarget id="body-save" activate={weight || waist ? () => void save() : undefined}>
+              <PrimaryButton onPress={save} disabled={!weight && !waist} busy={busy}>
+                {busy ? t('common.states.saving') : logged ? t('today.body.updateRecord') : t('today.body.saveRecord')}
+              </PrimaryButton>
+            </SpotlightTarget>
+          </Card>
+        </SpotlightTarget>
 
         <BodyStats />
       </View>
@@ -514,6 +548,7 @@ function MealStep({
   onPlanChanged: () => void | Promise<void>;
 }) {
   const { t } = useI18n();
+  const tour = useOnboarding();
   const [plan, setPlan] = useState<DayPlan | null>(() => stepCache.get(`plan:${day.date}`));
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -545,6 +580,7 @@ function MealStep({
   // The add sheet closes before navigating, so it is not still open on the way back.
   const addFrom = (source: 'meal' | 'food') => {
     setAdding(false);
+    if (source === 'food') tour.actionCompleted('meal-library');
     requestAnimationFrame(() =>
       router.navigate(
         source === 'meal'
@@ -552,6 +588,10 @@ function MealStep({
           : `/meals/add-food?destination=day&date=${day.date}&slot=${step}`,
       ),
     );
+  };
+  const openAdding = () => {
+    setAdding(true);
+    tour.actionCompleted('meal-add');
   };
   const recordFromPhoto = async () => {
     setPhotoBusy(true);
@@ -643,14 +683,23 @@ function MealStep({
     }
   };
 
+  const libraryStepActive = tour.phase === 'running' && tour.step?.id === 'meal-library';
+  const mealAddStepActive = tour.phase === 'running' && tour.step?.id === 'meal-add';
   const addSheet = (
-    <Sheet visible={adding} title={t('today.meal.addTo', { meal: stepLabel(step) })} onClose={() => setAdding(false)}>
+    <Sheet
+      visible={libraryStepActive || (adding && !mealAddStepActive)}
+      title={t('today.meal.addTo', { meal: stepLabel(step) })}
+      onClose={libraryStepActive ? () => {} : () => setAdding(false)}
+      overlay={libraryStepActive ? <SpotlightOverlay /> : undefined}
+    >
       <PrimaryButton tone="plain" icon={BowlIcon} onPress={() => addFrom('meal')}>
         {t('today.meal.chooseSavedMeal')}
       </PrimaryButton>
-      <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => addFrom('food')}>
-        {t('today.meal.addFromLibrary')}
-      </PrimaryButton>
+      <SpotlightTarget id="meal-library" activate={() => addFrom('food')}>
+        <PrimaryButton tone="plain" icon={PlusIcon} onPress={() => addFrom('food')}>
+          {t('today.meal.addFromLibrary')}
+        </PrimaryButton>
+      </SpotlightTarget>
     </Sheet>
   );
 
@@ -718,7 +767,9 @@ function MealStep({
       >
         <View className="gap-4">
           {title}
-          <AddRow label={t('today.meal.addFood')} disabled={busy || photoBusy} onPress={() => setAdding(true)} />
+          <SpotlightTarget id="meal-add" activate={busy || photoBusy ? undefined : openAdding}>
+            <AddRow label={t('today.meal.addFood')} disabled={busy || photoBusy} onPress={openAdding} />
+          </SpotlightTarget>
         </View>
         {addSheet}
       </Screen>
@@ -809,7 +860,9 @@ function MealStep({
                 })}
               </FoodGroup>
             ))}
-            <AddRow label={t('today.meal.addFood')} disabled={busy} onPress={() => setAdding(true)} />
+            <SpotlightTarget id="meal-add" activate={busy ? undefined : openAdding}>
+              <AddRow label={t('today.meal.addFood')} disabled={busy} onPress={openAdding} />
+            </SpotlightTarget>
             {meal.items.some((item) => item.food) ? (
               <View className="items-center">
                 <TextAction

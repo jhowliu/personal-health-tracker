@@ -1,10 +1,11 @@
-import { Pressable } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, View } from 'react-native';
 
 import { PrivacySettings } from '@/ai/PrivacySettings';
 import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
-import { LogOutIcon, TrashIcon } from '@/components/icons';
+import { ChevronIcon, LogOutIcon, TrashIcon } from '@/components/icons';
 import { ChoiceRow, NumberRow } from '@/components/ProfileRows';
 import { ReminderRow } from '@/components/ReminderRow';
 import { Text } from '@/components/text';
@@ -15,11 +16,13 @@ import type { LocalePreference } from '@/i18n';
 import { formatNumber } from '@/i18n/format';
 import { useI18n } from '@/i18n/runtime';
 import { syncWeighInReminder } from '@/notifications/reminder';
+import { useOnboarding } from '@/onboarding/OnboardingProvider';
 import { color } from '@/theme/tokens';
 
 export default function SettingsScreen() {
   const { profile, signOut, reload } = useSession();
   const { preference, setPreference, t } = useI18n();
+  const tour = useOnboarding();
 
   if (!profile) return null;
   const { profile: me, targets } = profile;
@@ -217,6 +220,21 @@ export default function SettingsScreen() {
             options={languageOptions}
             onSave={saveLanguage}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('onboarding.replay.accessibilityLabel')}
+            onPress={() => {
+              tour.requestReplay();
+              router.navigate('/today');
+            }}
+            className="min-h-[52px] flex-row items-center justify-between gap-3 py-3 active:opacity-70"
+          >
+            <Text className="text-base text-ink">{t('onboarding.replay.label')}</Text>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base text-muted">{t('onboarding.replay.value')}</Text>
+              <ChevronIcon direction="right" size={18} tint={color.muted} />
+            </View>
+          </Pressable>
         </Rows>
       </Card>
 

@@ -4,6 +4,8 @@ from app.api.deps import Accounts, AiConsent, CurrentUserId, Profiles
 from app.api.schemas import (
     AiConsentIn,
     AiConsentOut,
+    OnboardingProgressIn,
+    OnboardingProgressOut,
     ProfileIn,
     ProfileOut,
     ProfilePatch,
@@ -112,6 +114,21 @@ async def set_ai_consent(
 ) -> AiConsentOut:
     """Agree to AI analysis, or withdraw; the AI features ask again once it is withdrawn."""
     return AiConsentOut(consent=await service.set(user_id, payload.consent))
+
+
+@router.get("/onboarding", response_model=OnboardingProgressOut)
+async def read_onboarding(
+    user_id: CurrentUserId, service: Accounts
+) -> OnboardingProgressOut:
+    return OnboardingProgressOut(version=await service.onboarding_version(user_id))
+
+
+@router.put("/onboarding", response_model=OnboardingProgressOut)
+async def complete_onboarding(
+    payload: OnboardingProgressIn, user_id: CurrentUserId, service: Accounts
+) -> OnboardingProgressOut:
+    version = await service.complete_onboarding(user_id, payload.version)
+    return OnboardingProgressOut(version=version)
 
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)

@@ -16,6 +16,8 @@ export const color = {
   fill: '#F3EDE4',
   bg: '#FFFCF6',
   surface: '#FFFFFF',
+  /** Stronger than the sheet scrim so one highlighted control stays visually dominant. */
+  tourScrim: 'rgba(35, 31, 32, 0.68)',
   primary: '#A32B64',
   primarySoft: '#F6E3EC',
   good: '#30694D',
