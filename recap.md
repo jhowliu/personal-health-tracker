@@ -5,6 +5,8 @@
 - English (`en`) i18n is implemented across the mobile app, including auth, Today, Progress,
   Meals, Workouts, Focus mode, Settings, privacy, validation, accessibility, alerts, and local
   notifications.
+- Pull request [#30](https://github.com/jhowliu/personal-health-tracker/pull/30) is open from
+  `codex/english-i18n` into `main`.
 
 ## What changed
 
@@ -48,5 +50,5 @@
 
 ## Next target
 
-- Add locale-aware AI weekly-advice generation/storage, then run physical iOS/Android QA and prepare
-  the i18n changes for commit/review.
+- Review and merge PR #30, then add locale-aware AI weekly-advice generation/storage and run
+  physical iOS/Android QA.
