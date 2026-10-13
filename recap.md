@@ -4,6 +4,7 @@
 
 - Implemented a bilingual, account-level spotlight onboarding tour on
   `codex/onboarding-spotlight`, stacked on the English i18n branch (`codex/english-i18n`, PR #30).
+- Opened stacked PR #31: https://github.com/jhowliu/personal-health-tracker/pull/31
 - The tour follows the agreed path: body check-in → breakfast → food library → search → first food
   → portion → add → photo-recognition introduction → return to breakfast.
 
@@ -48,5 +49,5 @@
 
 ## Next target
 
-- Review the onboarding diff, then commit/push and open a PR when requested. Test the English replay
-  and complete the physical-device accessibility pass before merging.
+- Review PR #31 after PR #30 is ready. Test the English replay and complete the physical-device
+  accessibility pass before merging.
