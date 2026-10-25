@@ -12,7 +12,8 @@ dependencies = [
     "pyjwt>=2.9",
     "argon2-cffi>=23.1",
     "httpx>=0.27",
-    "anthropic>=1.11",
+    # 2.x moves to API version 2026-10-21 (Bearer auth, other request changes); upgrade on purpose.
+    "anthropic>=1.11,<2",
     # The Anthropic SDK's HTTP layer; imported directly to hand it a client in tests.
     "httpx2>=2.0",
     "cryptography>=43.0",

@@ -18,6 +18,7 @@ import {
   View,
   useWindowDimensions,
   type KeyboardTypeOptions,
+  type PressableInstance,
   type TextInputProps,
   type ViewProps,
 } from 'react-native';
@@ -509,7 +510,7 @@ const TIP_ARROW = 12;
  */
 export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
   const { t } = useI18n();
-  const button = useRef<View>(null);
+  const button = useRef<PressableInstance>(null);
   const [anchor, setAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(
     null,
   );

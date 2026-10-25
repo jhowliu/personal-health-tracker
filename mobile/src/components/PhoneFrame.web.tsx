@@ -1,6 +1,6 @@
 /** Web only: draws the app inside an iPhone-sized frame, so the browser shows what a phone shows. */
 import { useCallback, useState, type ReactNode } from 'react';
-import { View } from 'react-native';
+import { View, type ViewInstance } from 'react-native';
 
 import { FrameHostContext } from '@/components/frame-host';
 import { color } from '@/theme/tokens';
@@ -10,7 +10,7 @@ const PHONE = { width: 393, height: 852 };
 
 export function PhoneFrame({ children }: { children: ReactNode }) {
   const [host, setHost] = useState<Element | null>(null);
-  const attach = useCallback((node: View | null) => setHost(node as unknown as Element | null), []);
+  const attach = useCallback((node: ViewInstance | null) => setHost(node as unknown as Element | null), []);
 
   return (
     <View
