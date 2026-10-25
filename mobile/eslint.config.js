@@ -11,6 +11,9 @@ module.exports = defineConfig([
     files: ["src/**/*.{ts,tsx}"],
     ignores: ["src/components/alert.tsx"],
     rules: {
+      // TypeScript already checks namespace members. This rule misreads SDK 58's compiled
+      // expo-notifications (an `export` after `*/` on one line) and flags Notifications.AndroidImportance.
+      "import/namespace": "off",
       "no-restricted-imports": ["error", {
         paths: [{
           name: "react-native",

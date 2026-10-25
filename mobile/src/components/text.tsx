@@ -9,7 +9,9 @@ import { forwardRef } from 'react';
 import {
   Text as NativeText,
   TextInput as NativeTextInput,
+  type TextInputInstance,
   type TextInputProps,
+  type TextInstance,
   type TextProps,
 } from 'react-native';
 
@@ -17,11 +19,11 @@ export const FONT_FAMILY = 'Huninn_400Regular';
 
 const face = { fontFamily: FONT_FAMILY };
 
-export const Text = forwardRef<NativeText, TextProps>(function Text({ style, ...props }, ref) {
+export const Text = forwardRef<TextInstance, TextProps>(function Text({ style, ...props }, ref) {
   return <NativeText ref={ref} style={[face, style]} {...props} />;
 });
 
-export const TextInput = forwardRef<NativeTextInput, TextInputProps>(function TextInput(
+export const TextInput = forwardRef<TextInputInstance, TextInputProps>(function TextInput(
   { style, ...props },
   ref,
 ) {
