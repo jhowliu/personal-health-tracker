@@ -346,6 +346,15 @@ it('moves on to what came next when the current exercise is removed while paused
   expect(restored.exercises[restored.currentIndex].itemId).toBe('c');
 });
 
+it('lands on an exercise when they are added after focus mode was opened on an empty day', () => {
+  const empty = fromWorkout(workout([]), T0);
+  // Opening it twice on the empty day stored no exercise to be on.
+  const stored = restore(restore(empty, empty), empty);
+  const restored = restore(stored, fromWorkout(workout([{ id: 'a' }, { id: 'b' }]), T0));
+
+  expect(restored.exercises[restored.currentIndex].itemId).toBe('a');
+});
+
 describe('warming up', () => {
   it('ramps to the working weight in 2.5 kg steps, and only for a weight worth warming up to', () => {
     expect(warmupPlan(60)).toEqual([
