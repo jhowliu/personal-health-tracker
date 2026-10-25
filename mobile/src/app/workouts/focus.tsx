@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
 import { CloseIcon, PlusIcon } from '@/components/icons';
+import { CheckNumber, Highlight, Paper } from '@/components/journal';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
 import { Chip, Hint, PrimaryButton } from '@/components/ui';
@@ -356,6 +357,7 @@ export default function FocusWorkout() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} className={`flex-1 ${resting ? 'bg-primary-soft' : 'bg-bg'}`}>
+      <Paper />
       <View className="flex-row items-center justify-between px-3.5 pt-2">
         <Pressable
           accessibilityRole="button"
@@ -642,11 +644,10 @@ export default function FocusWorkout() {
                 accessibilityLabel={t('workouts.focus.changeToNamed', { name: candidate.name })}
                 disabled={done || current}
                 onPress={() => switchTo(index)}
-                className="min-h-14 flex-1 flex-row items-center justify-between gap-2"
+                className="min-h-14 flex-1 flex-row items-center justify-between gap-2.5"
               >
-                <Text className="flex-1 text-base text-ink">
-                  {index + 1}. {candidate.name}
-                </Text>
+                <CheckNumber number={index + 1} done={done} current={current} />
+                <Text className="flex-1 text-base text-ink">{candidate.name}</Text>
                 <Text
                   className={`text-sm ${done ? 'text-good' : current ? 'text-primary' : 'text-muted'}`}
                 >
@@ -769,9 +770,12 @@ function Summary({
   const [asked] = useState(() => new Set(asking.map((exercise) => exercise.itemId)));
   return (
     <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-bg">
+      <Paper />
       <ScrollView className="flex-1" contentContainerClassName="gap-3 px-[18px] pb-6 pt-6">
-        <View>
-          <Text className="text-[32px] font-extrabold text-ink">{t('workouts.focus.completeTitle')}</Text>
+        <View className="gap-1">
+          <Highlight size="title" className="self-start">
+            <Text className="text-[32px] font-extrabold text-ink">{t('workouts.focus.completeTitle')}</Text>
+          </Highlight>
           <Text className="text-sm text-muted">
             {t('workouts.focus.completeSubtitle', { name: title, count: session.exercises.length })}
           </Text>

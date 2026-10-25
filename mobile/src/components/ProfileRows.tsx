@@ -22,9 +22,10 @@ function TapRow({
       accessibilityRole="button"
       accessibilityLabel={t('common.accessibility.changeNamed', { name: label })}
       onPress={onPress}
-      className="min-h-[44px] flex-row items-center justify-between py-3"
+      className="min-h-[44px] flex-row items-center justify-between gap-3 py-3"
     >
-      <Text className="text-base text-ink">{label}</Text>
+      {/* The value wraps before the label does: a label broken mid-word (日常活動 / 量) reads badly. */}
+      <Text className="shrink-0 text-base text-ink">{label}</Text>
       {/* An editable value sits in a soft box, like a field; read-only rows show plain text. */}
       <View className="min-w-[118px] shrink rounded-field border border-line bg-warm-soft px-3 py-2">
         <Text className="shrink text-right text-base text-ink">{display}</Text>

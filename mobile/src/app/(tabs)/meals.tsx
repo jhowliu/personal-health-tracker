@@ -8,7 +8,7 @@ import { MealCard } from '@/components/MealCard';
 import { ShowMore, usePaged } from '@/components/paging';
 import { CameraIcon, ChevronIcon } from '@/components/icons';
 import { Text } from '@/components/text';
-import { Card, Chip, Empty, HeaderAddButton, HeaderIconButton, Hint, Rows, Screen, Segmented } from '@/components/ui';
+import { Card, Chip, Empty, HeaderAddButton, HeaderIconButton, Hint, Rows, Screen, Segmented, Title } from '@/components/ui';
 import { useI18n } from '@/i18n/runtime';
 import { byCategoryOrder } from '@/meals/order';
 import { describeFood, formatPortion } from '@/meals/portion';
@@ -29,25 +29,26 @@ export default function MealsScreen() {
       footerSafeArea={false}
       pinnedHeader={
         <>
-          <View className="flex-row items-center justify-between">
-            <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
-              {t('meals.home.title')}
-            </Text>
-            <View className="flex-row items-center gap-2">
-              {tab === 'mine' ? (
-                <HeaderIconButton
-                  icon={CameraIcon}
-                  accessibilityLabel={t('meals.home.photoAccessibility')}
-                  onPress={() => router.navigate('/meals/photo?destination=today')}
+          <Title
+            action={
+              <View className="flex-row items-center gap-2">
+                {tab === 'mine' ? (
+                  <HeaderIconButton
+                    icon={CameraIcon}
+                    accessibilityLabel={t('meals.home.photoAccessibility')}
+                    onPress={() => router.navigate('/meals/photo?destination=today')}
+                  />
+                ) : null}
+                <HeaderAddButton
+                  label={t('common.actions.create')}
+                  accessibilityLabel={tab === 'mine' ? t('meals.home.addMeal') : t('meals.home.addFood')}
+                  onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
                 />
-              ) : null}
-              <HeaderAddButton
-                label={t('common.actions.create')}
-                accessibilityLabel={tab === 'mine' ? t('meals.home.addMeal') : t('meals.home.addFood')}
-                onPress={() => router.navigate(tab === 'mine' ? '/meals/new' : '/foods/new')}
-              />
-            </View>
-          </View>
+              </View>
+            }
+          >
+            {t('meals.home.title')}
+          </Title>
           <Segmented
             value={tab}
             onChange={setTab}
@@ -106,7 +107,7 @@ function MyMeals() {
       {meals === null ? (
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
-        <Empty>{t('meals.home.noSavedMeals')}</Empty>
+        <Empty sticker="bowl">{t('meals.home.noSavedMeals')}</Empty>
       ) : (
         <View className="gap-3">
           {meals.map((meal) => (

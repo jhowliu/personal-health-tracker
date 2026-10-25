@@ -27,6 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppModal } from '@/components/AppModal';
 import { FrameHostContext } from '@/components/frame-host';
 import { ChevronIcon, PlusIcon, type IconProps } from '@/components/icons';
+import { Highlight, Paper, Sticker, type StickerKind } from '@/components/journal';
 import { Text, TextInput } from '@/components/text';
 import { color } from '@/theme/tokens';
 import { useI18n } from '@/i18n/runtime';
@@ -66,12 +67,14 @@ export function Screen({
       className="flex-1 bg-bg"
       edges={footerSafeArea && !footer ? ['top', 'bottom'] : ['top']}
     >
+      <Paper />
       <KeyboardAvoidingView
         className="flex-1"
         // Android already resizes the window; adding padding on top double-counts it.
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {pinnedHeader ? <View className="gap-3 bg-bg px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
+        {/* No fill: the list scrolls below this header, never under it, so the paper shows through. */}
+        {pinnedHeader ? <View className="gap-3 px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
         {scroll ? (
           <ScrollView
             className="flex-1"
@@ -125,12 +128,29 @@ export function Rows({ children }: { children: ReactNode }) {
   );
 }
 
-export function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
+/**
+ * A page title. `action` sits on its right, such as the ＋ 新增 button on a tab. The title line is
+ * always as tall as a header button, so the title sits at the same height on every tab.
+ */
+export function Title({
+  children,
+  sub,
+  action,
+}: {
+  children: React.ReactNode;
+  sub?: string;
+  action?: ReactNode;
+}) {
   return (
     <View className="gap-1">
-      <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
-        {children}
-      </Text>
+      <View className="min-h-[44px] flex-row items-center justify-between gap-3">
+        <Highlight size="title" className="shrink">
+          <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
+            {children}
+          </Text>
+        </Highlight>
+        {action}
+      </View>
       {sub ? <Text className="text-sm text-muted">{sub}</Text> : null}
     </View>
   );
@@ -591,18 +611,25 @@ export function LabelWithTip({ label, tip }: { label: string; tip: string }) {
   );
 }
 
-/** "Nothing here yet": muted text, plus an optional action when there is a way forward. */
+/**
+ * "Nothing here yet": muted text, plus an optional action when there is a way forward. A blank
+ * page the person fills themselves (my meals, my plans, body records, reports) gets a `sticker`; a search with
+ * no results does not.
+ */
 export function Empty({
   children,
   action,
   compact,
+  sticker,
 }: {
   children: React.ReactNode;
   action?: ReactNode;
   compact?: boolean;
+  sticker?: StickerKind;
 }) {
   return (
     <View className={`items-center gap-3 ${compact ? 'py-6' : 'py-12'}`}>
+      {sticker ? <Sticker kind={sticker} size={compact ? 52 : 64} /> : null}
       <Text className="text-center text-base text-muted">{children}</Text>
       {action}
     </View>

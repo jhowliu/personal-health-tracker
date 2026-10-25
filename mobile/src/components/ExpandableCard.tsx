@@ -48,7 +48,7 @@ export function ExpandableCard({
           : t('common.accessibility.expandNamed', { name })}
         disabled={busy}
         onPress={onToggle}
-        className={`min-h-[104px] flex-row items-start gap-3 px-4 py-3 active:bg-warm-soft ${
+        className={`min-h-[96px] flex-row items-start gap-3 px-4 py-3 active:bg-warm-soft ${
           busy ? 'opacity-40' : ''
         }`}
       >

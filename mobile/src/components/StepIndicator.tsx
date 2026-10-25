@@ -129,7 +129,8 @@ export function StepIndicator({
                 isCurrent ? 'bg-primary-soft text-primary' : isNext || isDone ? 'text-ink' : 'text-muted'
               }`}
             >
-              {name}
+              {/* A non-breaking hyphen: a narrow column otherwise splits Body check-in into check- / in. */}
+              {name.replace(/-/g, '\u2011')}
             </Text>
           </Pressable>
         );

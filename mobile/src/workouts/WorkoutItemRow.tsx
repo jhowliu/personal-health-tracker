@@ -9,6 +9,7 @@ import { Pressable, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
 import { ChevronIcon } from '@/components/icons';
+import { CheckNumber } from '@/components/journal';
 import { Text } from '@/components/text';
 import { Field, Hint, PrimaryButton } from '@/components/ui';
 import { useI18n } from '@/i18n/runtime';
@@ -96,13 +97,7 @@ export function WorkoutItemRow({
           onPress={onToggle}
           className={`min-h-[66px] flex-1 flex-row items-center gap-3 py-3 pr-4 active:opacity-70 ${handle ? 'pl-1' : 'pl-3'}`}
         >
-          <View
-            className={`h-6 w-6 items-center justify-center rounded-full border-[1.5px] ${
-              done ? 'border-good bg-good-soft' : 'border-edge'
-            }`}
-          >
-            <Text className={`text-xs ${done ? 'text-good' : 'text-ink'}`}>{index + 1}</Text>
-          </View>
+          <CheckNumber number={index + 1} done={done} />
           <Text className="flex-1 text-sm text-ink">{prescribed.exercise_name}</Text>
           {edited ? (
             <Text className="text-sm text-primary">{t('common.states.unsaved')}</Text>

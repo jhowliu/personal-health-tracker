@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppModal } from '@/components/AppModal';
 import { CheckIcon } from '@/components/icons';
+import { Highlight, Paper } from '@/components/journal';
 import { Text } from '@/components/text';
 import { useI18n } from '@/i18n/runtime';
 
@@ -64,16 +65,19 @@ export function Sheet({
           className="flex-1 justify-end bg-scrim"
         >
           {/* Padding sits on the inner Pressable: on web SafeAreaView overwrites className padding. */}
-          <SafeAreaView edges={['bottom']} className="max-h-[75%] rounded-t-sheet border-x-2 border-t-2 border-edge bg-bg">
+          <SafeAreaView edges={['bottom']} className="max-h-[75%] overflow-hidden rounded-t-sheet border-x-2 border-t-2 border-edge bg-bg">
+            <Paper />
             <Pressable
               accessible={false}
               onPress={(event) => event.stopPropagation()}
               className="gap-3 px-5 pb-3 pt-5"
             >
               <View className="flex-row items-center justify-between gap-3">
-                <Text accessibilityRole="header" className="text-2xl text-ink">
-                  {title}
-                </Text>
+                <Highlight className="shrink">
+                  <Text accessibilityRole="header" className="text-2xl text-ink">
+                    {title}
+                  </Text>
+                </Highlight>
                 <Pressable
                   accessibilityRole="button"
                   onPress={onClose}

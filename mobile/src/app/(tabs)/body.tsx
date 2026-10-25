@@ -4,12 +4,13 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
+import { BodyStatRow } from '@/components/BodyStatRow';
 import { ChevronIcon, ReportIcon } from '@/components/icons';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Text } from '@/components/text';
 import { TrendChart } from '@/components/TrendChart';
 import { VolumeChart } from '@/components/VolumeChart';
-import { Card, HeaderIconButton, Rows, Screen, SectionHeading } from '@/components/ui';
+import { Card, Empty, HeaderIconButton, Rows, Screen, SectionHeading, Title } from '@/components/ui';
 import { formatDate } from '@/i18n/format';
 import { useI18n } from '@/i18n/runtime';
 import { color } from '@/theme/tokens';
@@ -66,37 +67,25 @@ export default function BodyScreen() {
 
   return (
     <Screen footerSafeArea={false}>
-      <View className="flex-row items-center justify-between">
-        <Text accessibilityRole="header" className="text-[28px] leading-[38px] text-ink">
-          {t('body.title')}
-        </Text>
-        <HeaderIconButton
-          icon={ReportIcon}
-          accessibilityLabel={newReport ? t('body.weeklyReportNew') : t('body.weeklyReport')}
-          badge={newReport}
-          onPress={() => router.push('/progress/weeks')}
-        />
-      </View>
+      <Title
+        action={
+          <HeaderIconButton
+            icon={ReportIcon}
+            accessibilityLabel={newReport ? t('body.weeklyReportNew') : t('body.weeklyReport')}
+            badge={newReport}
+            onPress={() => router.push('/progress/weeks')}
+          />
+        }
+      >
+        {t('body.title')}
+      </Title>
 
       <Card>
         <MonthCalendar refreshKey={logs} />
       </Card>
 
-      <View className="flex-row border-b border-line pb-4">
-        <Kpi label={t('common.labels.weeklyAverage')} value={summary.week_avg_weight?.toFixed(1) ?? '—'} unit="kg" />
-        <Kpi
-          label={t('common.labels.comparedWithLastWeek')}
-          value={
-            summary.week_avg_delta === null
-              ? '—'
-              : `${summary.week_avg_delta > 0 ? '+' : summary.week_avg_delta < 0 ? '−' : ''}${Math.abs(summary.week_avg_delta).toFixed(1)}`
-          }
-          unit="kg"
-          tone={
-            summary.week_avg_delta === null ? 'ink' : summary.week_avg_delta <= 0 ? 'good' : 'warm'
-          }
-        />
-        <Kpi label={t('common.labels.waist')} value={summary.latest_waist?.toFixed(1) ?? '—'} unit="cm" />
+      <View className="border-b border-line pb-4">
+        <BodyStatRow stats={summary} />
       </View>
 
       <TrendChart title={t('body.weightTrend')} unit={t('body.lastThirtyDaysKg')} points={summary.weight_series} />
@@ -129,9 +118,9 @@ export default function BodyScreen() {
         {t('body.records')}
       </SectionHeading>
       {logs.length === 0 ? (
-        <Card>
-          <Text className="py-2 text-center text-base text-muted">{t('body.noRecords')}</Text>
-        </Card>
+        <Empty compact sticker="scale">
+          {t('body.noRecords')}
+        </Empty>
       ) : showLogs ? (
         <Card className="py-0">
           <Rows>
@@ -160,28 +149,5 @@ export default function BodyScreen() {
         </Card>
       ) : null}
     </Screen>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  unit,
-  tone = 'ink',
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  tone?: 'ink' | 'good' | 'warm';
-}) {
-  const text = { ink: 'text-ink', good: 'text-good', warm: 'text-warm' }[tone];
-  return (
-    <View className="flex-1 gap-0.5">
-      <Text className="text-xs text-muted">{label}</Text>
-      <Text className={`text-[25px] ${text}`}>
-        {value}
-        {value === '—' ? null : <Text className="text-xs text-muted"> {unit}</Text>}
-      </Text>
-    </View>
   );
 }

@@ -30,6 +30,13 @@ export const color = {
   danger: '#B42318',
 } as const;
 
+/** Journal decoration only: the highlighter, stickers and tape, in small areas. Never text. */
+export const deco = {
+  yellow: '#F6D27A',
+  coral: '#F2A497',
+  blue: '#A8D3E6',
+} as const;
+
 /** Category accents used by meal composition cards and their generated SVG icons. */
 export const foodCategoryColor = {
   staple: { accent: '#89580E', soft: '#FFF2D7' },

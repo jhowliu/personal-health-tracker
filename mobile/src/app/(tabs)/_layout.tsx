@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ProtectedRoute } from '@/auth/route-gates';
@@ -15,6 +16,8 @@ export default function TabsLayout() {
   const { status } = useSession();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
+  // Under 360 pt the pills give up some side margin so labels such as Workouts are not cut off.
+  const narrow = useWindowDimensions().width < 360;
   const tabs = [
     { name: 'today', title: t('navigation.today'), icon: CalendarCheckIcon },
     { name: 'body', title: t('navigation.progress'), icon: ScaleIcon },
@@ -44,8 +47,8 @@ export default function TabsLayout() {
             height: 64 + insets.bottom,
             paddingBottom: insets.bottom,
           },
-          tabBarItemStyle: { borderRadius: 14, marginHorizontal: 6, marginVertical: 6, overflow: 'hidden' },
-          tabBarLabelStyle: { fontFamily: FONT_FAMILY, fontSize: 12 },
+          tabBarItemStyle: { borderRadius: 14, marginHorizontal: narrow ? 2 : 6, marginVertical: 6, overflow: 'hidden' },
+          tabBarLabelStyle: { fontFamily: FONT_FAMILY, fontSize: narrow ? 11 : 12 },
           sceneStyle: { backgroundColor: color.bg },
         }}
       >

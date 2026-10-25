@@ -75,6 +75,7 @@ export default function PickMealForToday() {
         <ActivityIndicator color={color.primary} />
       ) : meals.length === 0 ? (
         <Empty
+          sticker="bowl"
           action={
             // A first-time user lands here with nothing to pick; the catalog is the way on.
             <PrimaryButton

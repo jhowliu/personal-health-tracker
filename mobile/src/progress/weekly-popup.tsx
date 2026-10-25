@@ -8,6 +8,7 @@ import { ScrollView, View } from 'react-native';
 
 import { api } from '@/api/client';
 import { AppModal } from '@/components/AppModal';
+import { Highlight, Tape } from '@/components/journal';
 import { Text } from '@/components/text';
 import { PrimaryButton } from '@/components/ui';
 import { todayISO } from '@/dates';
@@ -72,11 +73,14 @@ export function WeeklyReportHost() {
       <View className="flex-1 items-center justify-center bg-scrim px-5 py-10">
         {/* With the advice it outgrows a small phone: the report scrolls, 知道了 stays put. */}
         <View className="max-h-full w-full max-w-[400px] gap-4 rounded-sheet border-2 border-edge bg-bg p-5">
+          <Tape />
           <ScrollView className="grow-0" contentContainerClassName="gap-4">
             <View className="gap-1">
-              <Text accessibilityRole="header" className="text-2xl text-ink">
-                {review.end >= todayISO() ? t('progress.thisWeekReport') : t('progress.lastWeekReport')}
-              </Text>
+              <Highlight className="self-start">
+                <Text accessibilityRole="header" className="text-2xl text-ink">
+                  {review.end >= todayISO() ? t('progress.thisWeekReport') : t('progress.lastWeekReport')}
+                </Text>
+              </Highlight>
               <Text className="text-sm text-muted">{weekRange(review)}</Text>
             </View>
             <WeeklyReport review={review} onLeave={close} />

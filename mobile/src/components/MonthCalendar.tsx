@@ -37,7 +37,7 @@ export function MonthCalendar({
   /** Change it to load the shown month again, after something was logged. */
   refreshKey?: unknown;
 }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   // The month asked for; null is this month, which the server knows from the user's time zone.
   const [wanted, setWanted] = useState<string | null>(null);
   const [data, setData] = useState<Month | null>(null);
@@ -98,7 +98,9 @@ export function MonthCalendar({
         </Pressable>
         <Text className="text-[17px] text-ink">
           {t('calendar.monthHeading', {
-            month: formatDate(monthDate, { month: 'long' }),
+            // English spells the month out. The Chinese template writes 月 itself, and Intl's
+            // zh-TW month already ends in 月, so it gets the bare number.
+            month: locale === 'en' ? formatDate(monthDate, { month: 'long' }) : number,
             year,
           })}
         </Text>
@@ -145,7 +147,8 @@ export function MonthCalendar({
         ))}
       </View>
 
-      <View className="flex-row items-center justify-between">
+      {/* Wraps the count onto its own line when the legend and the count do not fit side by side. */}
+      <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <View className="flex-row items-center gap-3">
           <View className="flex-row items-center gap-1">
             <PawIcon size={13} tint={color.primary} />

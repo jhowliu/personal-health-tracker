@@ -166,10 +166,13 @@ export default function WorkoutsScreen() {
     <Screen
       footerSafeArea={false}
       pinnedHeader={
-        <View className="flex-row items-center justify-between">
-          <Title>{t('workouts.home.title')}</Title>
-          <HeaderAddButton label={t('common.actions.create')} accessibilityLabel={t('workouts.home.addTemplate')} onPress={() => router.navigate('/workouts/new')} />
-        </View>
+        <Title
+          action={
+            <HeaderAddButton label={t('common.actions.create')} accessibilityLabel={t('workouts.home.addTemplate')} onPress={() => router.navigate('/workouts/new')} />
+          }
+        >
+          {t('workouts.home.title')}
+        </Title>
       }
     >
       <SectionHeading action={<Text className="text-xs text-muted">{weekRange()}</Text>}>
@@ -222,7 +225,7 @@ export default function WorkoutsScreen() {
         {t('workouts.home.myTemplates')}
       </SectionHeading>
       {ownedTemplates.length === 0 ? (
-        <Empty compact>{t('workouts.home.noOwnedTemplates')}</Empty>
+        <Empty compact sticker="dumbbell">{t('workouts.home.noOwnedTemplates')}</Empty>
       ) : (
         <View className="gap-3">{ownedTemplates.map(renderTemplate)}</View>
       )}
@@ -279,7 +282,7 @@ function weekRange(): string {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   const short = (day: Date) => formatDate(day, { month: 'numeric', day: 'numeric' });
-  return `${short(monday)} — ${short(sunday)}`;
+  return `${short(monday)} – ${short(sunday)}`;
 }
 
 function describe(template: Template): string {
