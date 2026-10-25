@@ -842,7 +842,7 @@ export const zhTW = {
       namePlaceholder: "我的全身訓練",
     },
     item: {
-      completed: "✓ 完成",
+      completed: "完成",
       setProgress: "%{done} / %{total} 組",
       setPrescription: "%{sets} 組%{reps}",
       replacedOriginal: "%{day}已替換原本的 %{name}",

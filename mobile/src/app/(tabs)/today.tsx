@@ -14,7 +14,9 @@ import { ApiError, api, type Schema } from '@/api/client';
 import { useSession } from '@/auth/session';
 import { Alert } from '@/components/alert';
 import { AppModal } from '@/components/AppModal';
+import { BodyStatRow } from '@/components/BodyStatRow';
 import { DaySummary } from '@/components/DaySummary';
+import { DayStamp, Highlight } from '@/components/journal';
 import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { Sheet } from '@/components/Sheet';
 import { MonthCalendar } from '@/components/MonthCalendar';
@@ -400,9 +402,11 @@ function WeighInStep({
         <View className="flex-row items-end justify-between gap-3">
           <View className="flex-1 gap-1">
             <Hint>{t('today.body.recordsFor', { day: word })}</Hint>
-            <Text accessibilityRole="header" className="text-2xl text-ink">
-              {t('today.body.title')}
-            </Text>
+            <Highlight className="self-start">
+              <Text accessibilityRole="header" className="text-2xl text-ink">
+                {t('today.body.title')}
+              </Text>
+            </Highlight>
           </View>
           {logged ? <StatusBadge label={t('today.body.logged')} tone="good" /> : null}
         </View>
@@ -454,37 +458,15 @@ function BodyStats() {
   }, []);
 
   if (!stats) return null;
-  const delta = stats.week_avg_delta;
   return (
     <View className="gap-3">
-      <View className="flex-row">
-        <BodyStat label={t('common.labels.weeklyAverage')} value={stats.week_avg_weight?.toFixed(1)} unit="kg" />
-        <BodyStat
-          label={t('common.labels.comparedWithLastWeek')}
-          value={delta === null ? undefined : `${delta > 0 ? '+' : delta < 0 ? '−' : ''}${Math.abs(delta).toFixed(1)}`}
-          unit="kg"
-          tone={delta === null ? undefined : delta <= 0 ? 'text-good' : 'text-warm'}
-        />
-        <BodyStat label={t('common.labels.latestWaist')} value={stats.latest_waist?.toFixed(1)} unit="cm" />
-      </View>
+      <BodyStatRow stats={stats} />
       <View className="h-px bg-line" />
       <TextAction
         label={t('today.body.viewTrends')}
         onPress={() => router.navigate('/body')}
         className="min-h-[44px] justify-center self-start"
       />
-    </View>
-  );
-}
-
-function BodyStat({ label, value, unit, tone }: { label: string; value?: string; unit: string; tone?: string }) {
-  return (
-    <View className="flex-1 gap-0.5">
-      <Text className="text-xs text-muted">{label}</Text>
-      <Text className={`text-[25px] ${tone ?? 'text-ink'}`}>
-        {value ?? '—'}
-        {value ? <Text className="text-xs text-muted"> {unit}</Text> : null}
-      </Text>
     </View>
   );
 }
@@ -670,9 +652,11 @@ function MealStep({
         <Hint>
           {t('today.meal.titleForDay', { day: word, meal: stepLabel(step) })}
         </Hint>
-        <Text accessibilityRole="header" className="text-2xl text-ink">
-          {meal?.name || stepLabel(step)}
-        </Text>
+        <Highlight className="self-start">
+          <Text accessibilityRole="header" className="text-2xl text-ink">
+            {meal?.name || stepLabel(step)}
+          </Text>
+        </Highlight>
       </View>
       {meal?.skipped || (resolved && !meal?.items.length) ? (
         <StatusBadge label={t('common.states.skipped')} tone="warm" />
@@ -1292,9 +1276,11 @@ function WorkoutStep({
                 : ''}
               {workout.template?.duration_min ? t('today.workout.approximateMinutes', { count: workout.template.duration_min }) : ''}
             </Hint>
-            <Text accessibilityRole="header" className="text-2xl text-ink">
-              {templateName ?? (total ? t('today.workout.titleForDay', { day: word }) : t('today.workout.noWorkoutScheduled', { day: word }))}
-            </Text>
+            <Highlight className="self-start">
+              <Text accessibilityRole="header" className="text-2xl text-ink">
+                {templateName ?? (total ? t('today.workout.titleForDay', { day: word }) : t('today.workout.noWorkoutScheduled', { day: word }))}
+              </Text>
+            </Highlight>
           </View>
           {skipped ? (
             <StatusBadge label={t('common.states.skipped')} tone="warm" />
@@ -1416,7 +1402,13 @@ function DoneStep({ day, onChanged }: { day: Today; onChanged: () => void }) {
 
   return (
     <View className="flex-1 gap-4">
-      <Title sub={t('today.summary.subtitle', { day: dayWord(day.date) })}>{t('today.summary.title')}</Title>
+      {/* The stamp sits beside the title and its line together, not inside the title row. */}
+      <View className="flex-row items-center gap-3">
+        <View className="flex-1">
+          <Title sub={t('today.summary.subtitle', { day: dayWord(day.date) })}>{t('today.summary.title')}</Title>
+        </View>
+        <DayStamp label={t('calendar.completedLabel')} />
+      </View>
 
       <Card className="gap-3">
         <Text className="text-[28px] text-ink">

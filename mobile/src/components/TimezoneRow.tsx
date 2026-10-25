@@ -20,6 +20,7 @@ export function TimezoneRow({
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const device = deviceTimezone();
+  const known = COMMON_TIMEZONES.find((zone) => zone.id === value);
 
   const choose = async (id: string) => {
     setOpen(false);
@@ -49,7 +50,12 @@ export function TimezoneRow({
         onPress={() => setOpen(true)}
         className="min-h-[44px] flex-1 flex-row items-center justify-end gap-1"
       >
-        <Text className="shrink text-base text-muted">{timezoneLabel(value, t)}</Text>
+        {/* City over zone id, like the options in the list. On one line the id cannot break and
+            spills over the label. */}
+        <View className="shrink items-end">
+          <Text className="text-right text-base text-muted">{known ? t(known.labelKey) : value}</Text>
+          {known ? <Text className="text-right text-xs text-muted">{value}</Text> : null}
+        </View>
         <ChevronIcon direction="right" size={16} tint={color.muted} />
       </Pressable>
       <Sheet visible={open} title={t('timezone.label')} onClose={() => setOpen(false)}>

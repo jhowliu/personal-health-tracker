@@ -35,11 +35,9 @@ export function TemplateCard({
   const category = workoutCategory(template.category_id);
   const gym = template.location === 'gym';
   const summary = template.items.map((item) => item.exercise_name).join('・');
-  const length = template.duration_min
-    ? `${template.duration_min} ${t('common.units.minute')}`
-    : t(template.items.length === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', {
-        count: template.items.length,
-      });
+  const count = t(template.items.length === 1 ? 'common.counts.exercises.one' : 'common.counts.exercises.other', {
+    count: template.items.length,
+  });
 
   return (
     <ExpandableCard
@@ -49,9 +47,17 @@ export function TemplateCard({
       onToggle={onToggle}
       summary={
         <>
+          {/* Same scale as a meal card: 15 px name, the number in ink with a small unit. */}
           <View className="flex-row items-baseline justify-between gap-3">
-            <Text className="flex-1 text-base text-ink">{template.name}</Text>
-            <Text className="text-base text-muted">{length}</Text>
+            <Text className="flex-1 text-[15px] text-ink">{template.name}</Text>
+            {template.duration_min ? (
+              <Text className="text-sm text-ink">
+                {template.duration_min}
+                <Text className="text-xs text-muted"> {t('common.units.minute')}</Text>
+              </Text>
+            ) : (
+              <Text className="text-xs text-muted">{count}</Text>
+            )}
           </View>
 
           <View className="flex-row flex-wrap gap-1.5">
@@ -59,7 +65,7 @@ export function TemplateCard({
             <Tag label={gym ? t('common.locations.gym') : t('common.locations.home')} tone={gym ? 'good' : 'warm'} />
           </View>
 
-          <Text className="text-sm text-muted" numberOfLines={1}>
+          <Text className="text-xs text-muted" numberOfLines={1}>
             {summary || t('workouts.templateCard.noExercises')}
           </Text>
         </>

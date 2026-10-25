@@ -64,7 +64,7 @@ export default function PastWeeks() {
           <ActivityIndicator color={color.primary} />
         </View>
       ) : weeks.length === 0 ? (
-        <Empty>{t('progress.noReports')}</Empty>
+        <Empty sticker="notebook">{t('progress.noReports')}</Empty>
       ) : (
         <Card className="py-0">
           <Rows>

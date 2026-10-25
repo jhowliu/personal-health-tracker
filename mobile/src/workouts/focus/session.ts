@@ -244,7 +244,8 @@ export function restore(stored: Session, fresh: Session): Session {
   // rest up. When the current one itself is gone, its old place holds what came next.
   const currentId = stored.exercises[stored.currentIndex]?.itemId;
   const found = exercises.findIndex((exercise) => exercise.itemId === currentId);
-  const currentIndex = found !== -1 ? found : Math.min(stored.currentIndex, exercises.length - 1);
+  // Never below 0: a day with no exercises has none to be on, and its stored -1 would outlive it.
+  const currentIndex = found !== -1 ? found : Math.max(0, Math.min(stored.currentIndex, exercises.length - 1));
   const merged = { ...stored, exercises, currentIndex };
   const current = merged.exercises[merged.currentIndex];
   if (current && isDone(current)) {

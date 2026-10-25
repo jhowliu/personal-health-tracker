@@ -26,6 +26,8 @@ module.exports = {
         danger: '#B42318',
         // The dimmed backdrop behind a bottom sheet.
         scrim: 'rgba(35, 31, 32, 0.35)',
+        // Journal decoration only (highlighter, stickers, tape), in small areas; never text.
+        deco: { yellow: '#F6D27A', coral: '#F2A497', blue: '#A8D3E6' },
       },
       borderRadius: {
         field: '10px',

@@ -9,6 +9,7 @@ import { defaultExercisePrescription, ExerciseLibrary, type Exercise } from '@/c
 import { NumberStepper } from '@/components/NumberStepper';
 import { ReorderList } from '@/components/ReorderList';
 import { ChevronIcon, PlusIcon } from '@/components/icons';
+import { CheckNumber } from '@/components/journal';
 import { Text } from '@/components/text';
 import {
   BackLink,
@@ -393,19 +394,20 @@ export default function EditTemplate() {
                     accessibilityLabel={t('common.accessibility.editNamed', { name: item.exercise_name })}
                     disabled={isBuiltin}
                     onPress={() => setEditing(index)}
-                    className="min-h-[44px] flex-1 justify-center gap-0.5"
+                    className="min-h-[44px] flex-1 flex-row items-center gap-3"
                   >
-                    <Text className="text-base text-ink">
-                      {index + 1}. {item.exercise_name}
-                    </Text>
-                    <Text className="text-sm text-muted">
-                      {item.duration_sec
-                        ? t('workouts.editor.durationSummary', { minutes: Math.round(item.duration_sec / 60) })
-                        : item.sets
-                          ? t('workouts.editor.setsRepsSummary', { sets: item.sets, reps: item.reps ?? '' })
-                          : item.reps}
-                      {item.weight_kg ? `,${item.weight_kg} kg` : ''}
-                    </Text>
+                    <CheckNumber number={index + 1} />
+                    <View className="flex-1 gap-0.5">
+                      <Text className="text-base text-ink">{item.exercise_name}</Text>
+                      <Text className="text-sm text-muted">
+                        {item.duration_sec
+                          ? t('workouts.editor.durationSummary', { minutes: Math.round(item.duration_sec / 60) })
+                          : item.sets
+                            ? t('workouts.editor.setsRepsSummary', { sets: item.sets, reps: item.reps ?? '' })
+                            : item.reps}
+                        {item.weight_kg ? `,${item.weight_kg} kg` : ''}
+                      </Text>
+                    </View>
                   </Pressable>
                   {isBuiltin ? null : <ChevronIcon direction="right" size={15} tint={color.ink} />}
                 </View>

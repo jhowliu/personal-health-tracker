@@ -1,10 +1,11 @@
 /** A cartoon of an exercise: how it starts and where it ends, drawn from joint angles. */
 import { Image as AnimatedImage } from 'expo-image';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Image, View } from 'react-native';
 import Svg, { Circle, G, Line, Path } from 'react-native-svg';
 
 import { ChevronIcon } from '@/components/icons';
+import { printTilt, Tape } from '@/components/journal';
 import { color } from '@/theme/tokens';
 import { EXERCISE_ANIMATIONS } from '@/workouts/figure/exercise-animations';
 import { EXERCISE_IMAGES } from '@/workouts/figure/exercise-images';
@@ -200,6 +201,37 @@ function Figure({ built, scale, size }: { built: Built; scale: number; size: num
  * animation from `assets/exercise-anim/` replaces all of that; `single` tiles stay still so a
  * long list does not play dozens of animations at once.
  */
+/** The white border and hairline edge of a print, on each side: 3 px plus a 1 px line. */
+const PRINT_EDGE = 8;
+
+/** A small print of the move, stuck in at its own angle. Its outer size stays `size`. */
+function Print({ tilt, size, children }: { tilt: string; size: number; children: ReactNode }) {
+  return (
+    <View
+      aria-hidden
+      className="rounded-[6px] border border-line bg-surface p-[3px]"
+      style={{ width: size, height: size, transform: [{ rotate: tilt }] }}
+    >
+      <View className="flex-1 items-center justify-center overflow-hidden rounded-[3px]">{children}</View>
+    </View>
+  );
+}
+
+/** The large demo in 查看動作: a print taped in, so it gets room above for the tape. */
+function DemoPrint({ row = false, children }: { row?: boolean; children: ReactNode }) {
+  return (
+    <View
+      aria-hidden
+      className={`mt-2 rounded-field border border-line bg-surface pb-2 pt-4 ${
+        row ? 'flex-row items-center justify-center gap-1' : 'items-center'
+      }`}
+    >
+      <Tape />
+      {children}
+    </View>
+  );
+}
+
 export function ExerciseFigure({
   exerciseId,
   name,
@@ -228,33 +260,33 @@ export function ExerciseFigure({
   const animation = EXERCISE_ANIMATIONS[exerciseId];
   if (mode === 'pair' && animation !== undefined) {
     return (
-      <View aria-hidden className="items-center rounded-field bg-surface py-2">
+      <DemoPrint>
         <AnimatedImage source={animation} contentFit="contain" style={{ width: 220, height: 220 }} />
-      </View>
+      </DemoPrint>
     );
   }
 
   if (picture !== undefined) {
     if (mode === 'single') {
       return (
-        <View aria-hidden className="overflow-hidden rounded-field bg-surface" style={{ width: size, height: size }}>
-          <Image source={picture} resizeMode="contain" style={{ width: size, height: size }} />
-        </View>
+        <Print tilt={printTilt(exerciseId)} size={size}>
+          <Image source={picture} resizeMode="contain" style={{ width: size - PRINT_EDGE, height: size - PRINT_EDGE }} />
+        </Print>
       );
     }
     if (startPicture !== undefined && endPicture !== undefined) {
       return (
-        <View aria-hidden className="flex-row items-center justify-center gap-1 rounded-field bg-surface py-2">
+        <DemoPrint row>
           <Image source={startPicture} resizeMode="contain" style={{ width: 120, height: 120 }} />
           <ChevronIcon direction="right" size={18} tint={color.muted} />
           <Image source={endPicture} resizeMode="contain" style={{ width: 120, height: 120 }} />
-        </View>
+        </DemoPrint>
       );
     }
     return (
-      <View aria-hidden className="items-center rounded-field bg-surface py-2">
+      <DemoPrint>
         <Image source={picture} resizeMode="contain" style={{ width: 140, height: 140 }} />
-      </View>
+      </DemoPrint>
     );
   }
 
@@ -263,17 +295,17 @@ export function ExerciseFigure({
 
   if (mode === 'single') {
     return (
-      <View aria-hidden className="overflow-hidden rounded-field bg-surface" style={{ width: size, height: size }}>
-        <Figure built={end} scale={scale} size={size} />
-      </View>
+      <Print tilt={printTilt(exerciseId)} size={size}>
+        <Figure built={end} scale={scale} size={size - PRINT_EDGE} />
+      </Print>
     );
   }
 
   return (
-    <View aria-hidden className="flex-row items-center justify-center gap-1 rounded-field bg-fill py-2">
+    <DemoPrint row>
       <Figure built={start} scale={scale} size={108} />
       <ChevronIcon direction="right" size={18} tint={color.muted} />
       <Figure built={end} scale={scale} size={108} />
-    </View>
+    </DemoPrint>
   );
 }
