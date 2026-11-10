@@ -1,4 +1,5 @@
-/** How a workout template's category reads: its name, and the tone of its tag. */
+/** How a workout template reads: its category's name and tag tone, and a one-line summary. */
+import type { Schema } from '@/api/client';
 import { translate } from '@/i18n/translator';
 
 const WORKOUT_CATEGORY_TONE = {
@@ -16,4 +17,12 @@ export function workoutCategory(id: string) {
     mobility: translate('common.workoutCategories.mobility'),
   } satisfies Record<keyof typeof WORKOUT_CATEGORY_TONE, string>;
   return { label: labels[id as keyof typeof labels], tone };
+}
+
+/** "6 exercises, about 45 min": what a plan holds, for a line under its name. */
+export function describePlan(template: Schema<'TemplateOut'>): string {
+  const minutes = template.duration_min
+    ? translate('workouts.home.approximateMinutes', { count: template.duration_min })
+    : '';
+  return translate('workouts.home.summary', { count: template.items.length, minutes });
 }

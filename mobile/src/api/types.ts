@@ -373,6 +373,23 @@ export interface paths {
         patch: operations["update_workout_item_days__day__workout_items__item_id__patch"];
         trace?: never;
     };
+    "/days/{day}/workout/template": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Use Workout Template */
+        put: operations["use_workout_template_days__day__workout_template_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/days/{day}/workout/order": {
         parameters: {
             query?: never;
@@ -1115,6 +1132,14 @@ export interface components {
             /** Extras */
             extras: components["schemas"]["ExtraItemOut"][];
             nutrients: components["schemas"]["NutrientsOut"];
+        };
+        /**
+         * DayTemplateIn
+         * @description The plan the day's workout becomes.
+         */
+        DayTemplateIn: {
+            /** Template Id */
+            template_id: string;
         };
         /** DayWorkoutItemOut */
         DayWorkoutItemOut: {
@@ -2996,6 +3021,43 @@ export interface operations {
             };
         };
     };
+    use_workout_template_days__day__workout_template_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+            };
+            path: {
+                day: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DayTemplateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutExecutionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     reorder_workout_items_days__day__workout_order_put: {
         parameters: {
             query?: never;
@@ -3412,6 +3474,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FoodCategoryOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

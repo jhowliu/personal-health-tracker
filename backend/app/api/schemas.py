@@ -518,6 +518,12 @@ class TemplateOut(BaseModel):
         )
 
 
+class DayTemplateIn(BaseModel):
+    """The plan the day's workout becomes."""
+
+    template_id: str = Field(min_length=1)
+
+
 class WorkoutOrderIn(BaseModel):
     """Every exercise on the day, once each, in the order they should be done."""
 

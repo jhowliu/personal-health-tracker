@@ -1,6 +1,7 @@
 /** Line icons from Lucide, one stroke weight everywhere, named for what they mean here. */
 import {
   Apple,
+  ArrowLeftRight,
   CalendarCheck,
   Camera,
   ChartNoAxesCombined,
@@ -9,7 +10,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
+  ClipboardList,
   Copy,
+  Ellipsis,
   Droplet,
   Drumstick,
   Dumbbell,
@@ -91,3 +94,6 @@ export const LogOutIcon = icon(LogOut);
 export const GripIcon = icon(GripVertical);
 export const PawIcon = icon(PawPrint);
 export const ReportIcon = icon(FileChartColumn);
+export const MoreIcon = icon(Ellipsis);
+export const SwapIcon = icon(ArrowLeftRight);
+export const PlanIcon = icon(ClipboardList);

@@ -224,6 +224,52 @@ class SqliteWorkoutExecutionStore:
         )
         return cursor.rowcount == 1
 
+    async def use_template(self, user_id: str, day: date, template: WorkoutTemplate) -> None:
+        await open_day(self._conn, user_id, day)
+        day_key = (user_id, to_day(day))
+        # The sets go first, for the same reason as in delete_item: left behind, earlier-day
+        # history would still read them as done.
+        await self._conn.execute(
+            "DELETE FROM set_logs WHERE day_workout_item_id IN"
+            " (SELECT id FROM day_workout_items WHERE user_id = ? AND date = ?)",
+            day_key,
+        )
+        await self._conn.execute(
+            "DELETE FROM day_workout_items WHERE user_id = ? AND date = ?", day_key
+        )
+        items = sorted(template.items, key=lambda item: item.sort_order)
+        if items:
+            await self._conn.executemany(
+                f"INSERT INTO day_workout_items ({_SNAPSHOT_COLUMNS})"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    (
+                        new_id(),
+                        user_id,
+                        to_day(day),
+                        item.exercise_id,
+                        index,
+                        item.sets,
+                        item.reps,
+                        item.duration_sec,
+                        item.weight_kg,
+                        item.rest_sec,
+                        item.note,
+                        item.id,
+                    )
+                    for index, item in enumerate(items)
+                ],
+            )
+        # A new plan is a workout still to do: done, skipped or timed belonged to the old one,
+        # whose sets are gone.
+        await self._conn.execute(
+            "UPDATE days SET template_id = ?,"
+            " workout_initialized_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),"
+            " workout_done_at = NULL, workout_skipped_at = NULL, workout_trained_sec = NULL"
+            " WHERE user_id = ? AND date = ?",
+            (template.id, *day_key),
+        )
+
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None:
         await open_day(self._conn, user_id, day)
         await self._conn.execute(

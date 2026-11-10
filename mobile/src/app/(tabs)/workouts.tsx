@@ -11,9 +11,8 @@ import { Text } from '@/components/text';
 import { Card, Empty, HeaderAddButton, Hint, Rows, Screen, SectionHeading, Tag, Title } from '@/components/ui';
 import { formatDate } from '@/i18n/format';
 import { useI18n } from '@/i18n/runtime';
-import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
-import { workoutCategory } from '@/workouts/category';
+import { describePlan, workoutCategory } from '@/workouts/category';
 
 type Template = Schema<'TemplateOut'>;
 type ScheduleEntry = Schema<'ScheduleEntryOut'>;
@@ -258,7 +257,7 @@ export default function WorkoutsScreen() {
             <ChoiceOption
               key={option.id}
               label={option.name}
-              detail={`${option.is_builtin ? t('workouts.home.publicPrefix') : ''}${describe(option)}`}
+              detail={`${option.is_builtin ? t('workouts.home.publicPrefix') : ''}${describePlan(option)}`}
               selected={editingEntry?.template_id === option.id}
               disabled={busy || editingDay === null}
               onPress={() => editingDay !== null && assign(editingDay, option.id)}
@@ -283,11 +282,4 @@ function weekRange(): string {
   sunday.setDate(monday.getDate() + 6);
   const short = (day: Date) => formatDate(day, { month: 'numeric', day: 'numeric' });
   return `${short(monday)} – ${short(sunday)}`;
-}
-
-function describe(template: Template): string {
-  const minutes = template.duration_min
-    ? translate('workouts.home.approximateMinutes', { count: template.duration_min })
-    : '';
-  return translate('workouts.home.summary', { count: template.items.length, minutes });
 }

@@ -1,23 +1,23 @@
 /**
  * One exercise in the day's workout, a row in the day's list. Closed, it reads as a summary line;
- * opened, it holds the exercise's sets and target for editing in place, and the buttons to swap
- * it or take it off the day. Nothing is saved from here: the day's workout saves every open
- * change at once.
+ * opened, it holds the exercise's sets for editing in place. Swapping it or taking it off the day
+ * sits behind the row's ⋯, open or closed. Nothing is saved from here: the day's workout saves
+ * every open change at once.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 
 import type { Schema } from '@/api/client';
-import { ChevronIcon } from '@/components/icons';
+import { ChevronIcon, MoreIcon, SwapIcon, TrashIcon, type IconProps } from '@/components/icons';
 import { CheckNumber } from '@/components/journal';
 import { Text } from '@/components/text';
-import { Field, Hint, PrimaryButton } from '@/components/ui';
+import { Sheet } from '@/components/Sheet';
+import { Hint } from '@/components/ui';
 import { useI18n } from '@/i18n/runtime';
 import { translate } from '@/i18n/translator';
 import { color } from '@/theme/tokens';
 import { type RecordRow } from '@/workouts/record';
 import { SetRecordEditor } from '@/workouts/SetRecordEditor';
-import { type TargetEdit } from '@/workouts/target';
 
 type Entry = Schema<'WorkoutExecutionItemOut'>;
 
@@ -45,8 +45,6 @@ export function WorkoutItemRow({
   index,
   open,
   onToggle,
-  target,
-  onTargetChange,
   rows,
   onRowsChange,
   edited,
@@ -61,9 +59,6 @@ export function WorkoutItemRow({
   index: number;
   open: boolean;
   onToggle: () => void;
-  /** The target fields: what was typed, or the prescription as it stands. */
-  target: TargetEdit;
-  onTargetChange: (target: TargetEdit) => void;
   /** The sets: what was typed, or what is logged. */
   rows: RecordRow[];
   onRowsChange: (rows: RecordRow[]) => void;
@@ -81,7 +76,13 @@ export function WorkoutItemRow({
   const { t } = useI18n();
   const prescribed = entry.item;
   const done = isItemDone(entry);
-  const set = (change: Partial<TargetEdit>) => onTargetChange({ ...target, ...change });
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Let the sheet slide away first: iOS drops an alert presented while a modal is closing, and
+  // removing asks before it deletes.
+  const closeMenuThen = (action: () => void) => {
+    setMenuOpen(false);
+    setTimeout(action, 400);
+  };
 
   return (
     <View className={open ? 'bg-warm-soft' : ''}>
@@ -95,7 +96,7 @@ export function WorkoutItemRow({
           accessibilityState={{ expanded: open, disabled: busy }}
           disabled={busy}
           onPress={onToggle}
-          className={`min-h-[66px] flex-1 flex-row items-center gap-3 py-3 pr-4 active:opacity-70 ${handle ? 'pl-1' : 'pl-3'}`}
+          className={`min-h-[66px] flex-1 flex-row items-center gap-3 py-3 pr-1 active:opacity-70 ${handle ? 'pl-1' : 'pl-3'}`}
         >
           <CheckNumber number={index + 1} done={done} />
           <Text className="flex-1 text-sm text-ink">{prescribed.exercise_name}</Text>
@@ -106,7 +107,24 @@ export function WorkoutItemRow({
           )}
           <ChevronIcon direction={open ? 'down' : 'right'} size={15} tint={color.ink} />
         </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('workouts.item.moreActions', { name: prescribed.exercise_name })}
+          disabled={busy}
+          onPress={() => setMenuOpen(true)}
+          hitSlop={{ top: 11, bottom: 11 }}
+          className="mr-1 h-11 w-11 items-center justify-center active:opacity-60"
+        >
+          <MoreIcon size={20} tint={color.ink} />
+        </Pressable>
       </View>
+
+      <Sheet visible={menuOpen} title={prescribed.exercise_name} onClose={() => setMenuOpen(false)}>
+        <View className="gap-2 pb-4">
+          <MenuOption icon={SwapIcon} label={t('workouts.item.changeExercise')} onPress={() => closeMenuThen(onReplace)} />
+          <MenuOption icon={TrashIcon} label={t('workouts.item.removeFromDay', { day: word })} danger onPress={() => closeMenuThen(onRemove)} />
+        </View>
+      </Sheet>
 
       {open ? (
         <View className="gap-4 border-t border-line px-4 pb-4 pt-3">
@@ -124,61 +142,32 @@ export function WorkoutItemRow({
               </View>
             ) : null}
           </View>
-
-          <View className="gap-3">
-            <Text className="text-sm text-muted">{t('workouts.item.target')}</Text>
-            {prescribed.duration_sec ? (
-              <Field
-                label={t('workouts.item.targetTime')}
-                suffix={t('common.units.minute')}
-                value={target.durationMin}
-                onChangeText={(durationMin) => set({ durationMin })}
-                keyboardType="numeric"
-              />
-            ) : (
-              <View className="flex-row gap-3">
-                <Field
-                  label={t('common.labels.sets')}
-                  value={target.sets}
-                  onChangeText={(sets) => set({ sets })}
-                  keyboardType="numeric"
-                />
-                <Field label={t('common.labels.reps')} value={target.reps} onChangeText={(reps) => set({ reps })} />
-              </View>
-            )}
-            <View className="flex-row gap-3">
-              <Field
-                label={t('common.labels.weight')}
-                suffix="kg"
-                value={target.weight}
-                onChangeText={(weight) => set({ weight })}
-                keyboardType="decimal-pad"
-              />
-              <Field
-                label={t('common.labels.rest')}
-                suffix={t('common.units.second')}
-                value={target.rest}
-                onChangeText={(rest) => set({ rest })}
-                keyboardType="numeric"
-              />
-            </View>
-            <Field label={t('common.labels.notes')} value={target.note} onChangeText={(note) => set({ note })} />
-          </View>
-
-          <View className="flex-row gap-2">
-            <View className="flex-1">
-              <PrimaryButton tone="plain" onPress={onReplace} disabled={busy}>
-                {t('workouts.item.changeExercise')}
-              </PrimaryButton>
-            </View>
-            <View className="flex-1">
-              <PrimaryButton tone="danger" onPress={onRemove} disabled={busy}>
-                {t('common.actions.remove')}
-              </PrimaryButton>
-            </View>
-          </View>
         </View>
       ) : null}
     </View>
+  );
+}
+
+/** One line in the row's ⋯ sheet. */
+function MenuOption({
+  icon: Icon,
+  label,
+  danger = false,
+  onPress,
+}: {
+  icon: (props: IconProps) => ReactNode;
+  label: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      className="min-h-[52px] flex-row items-center gap-3 rounded-control border-[1.5px] border-line bg-surface px-4 active:opacity-70"
+    >
+      <Icon size={18} tint={danger ? color.danger : color.ink} />
+      <Text className={`text-base ${danger ? 'text-danger' : 'text-ink'}`}>{label}</Text>
+    </Pressable>
   );
 }

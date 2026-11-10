@@ -157,6 +157,13 @@ class WorkoutExecutionService:
             raise NotFound("找不到今天排定的動作")
         return await self.view(user_id, day)
 
+    async def use_template(self, user_id: str, day: date, template_id: str) -> WorkoutExecution:
+        """Train another plan on the day, or one on a day that had none. Only the day changes:
+        the plan and the weekly schedule stay as they are."""
+        template = await self._training.template(user_id, template_id)
+        await self._store.use_template(user_id, day, template)
+        return await self.view(user_id, day)
+
     async def reorder(self, user_id: str, day: date, item_ids: tuple[str, ...]) -> WorkoutExecution:
         """Put the day's exercises in this order. Only the day changes, never its template."""
         workout = await self._store.load(user_id, day)

@@ -1007,3 +1007,87 @@ async def test_reps_are_a_number_or_a_range(with_exercises: AsyncClient):
     )
     assert template.status_code == 422
 
+
+
+async def _second_template(client: AsyncClient) -> tuple[dict, dict]:
+    """Another plan to switch to: a single timed exercise."""
+    walk = (
+        await client.post("/exercises", json={"category_id": "cardio", "name": "快走"})
+    ).json()
+    template = (
+        await client.post(
+            "/workout-templates",
+            json={
+                "category_id": "cardio",
+                "name": "有氧日",
+                "location": "home",
+                "items": [{"exercise_id": walk["id"], "duration_sec": 1200}],
+            },
+        )
+    ).json()
+    return walk, template
+
+
+async def _use_plan(client: AsyncClient, template_id: str):
+    return await client.put(f"/days/{DAY}/workout/template", json={"template_id": template_id})
+
+
+async def test_a_plan_replaces_the_days_whole_workout(with_profile: AsyncClient):
+    original, _, scheduled = await _workout(with_profile)
+    item_id = (await _day_items(with_profile))[0]["id"]
+    await with_profile.put(
+        f"/days/{DAY}/workout/items/{item_id}/sets",
+        json={"sets": [{"reps_done": 10, "weight_kg": 20}]},
+    )
+    walk, cardio = await _second_template(with_profile)
+
+    switched = await _use_plan(with_profile, cardio["id"])
+
+    assert switched.status_code == 200
+    body = switched.json()
+    assert body["template"]["id"] == cardio["id"]
+    assert [entry["item"]["exercise_id"] for entry in body["items"]] == [walk["id"]]
+    assert body["items"][0]["item"]["duration_sec"] == 1200
+    assert body["items"][0]["logs"] == []
+    # The squat's sets went with it: next week's squat no longer starts from them.
+    next_week = (await with_profile.get("/days/2026-09-29/workout")).json()
+    assert next_week["items"][0]["item"]["exercise_id"] == original["id"]
+    assert next_week["items"][0]["last_set"] is None
+    # Only the day changed: the plan and the weekly schedule are as they were.
+    plan = (await with_profile.get(f"/workout-templates/{scheduled['id']}")).json()
+    assert len(plan["items"]) == 1
+    schedule = (await with_profile.get("/workout-schedule")).json()
+    assert [entry["template_id"] for entry in schedule] == [scheduled["id"]]
+
+
+async def test_a_plan_fills_an_empty_day(with_profile: AsyncClient):
+    walk, cardio = await _second_template(with_profile)
+    assert (await with_profile.get(f"/days/{DAY}/workout")).json()["items"] == []
+
+    switched = await _use_plan(with_profile, cardio["id"])
+
+    assert switched.status_code == 200
+    assert [entry["item"]["exercise_id"] for entry in switched.json()["items"]] == [walk["id"]]
+    day = (await with_profile.get(f"/days/{DAY}")).json()
+    assert "workout" in day["flow"]["steps"]
+
+
+async def test_a_new_plan_reopens_a_skipped_workout(with_profile: AsyncClient):
+    await _workout(with_profile)
+    await with_profile.patch(f"/days/{DAY}", json={"workout_skipped": True})
+    _, cardio = await _second_template(with_profile)
+
+    await _use_plan(with_profile, cardio["id"])
+
+    day = (await with_profile.get(f"/days/{DAY}")).json()
+    assert "workout" not in day["flow"]["completed"]
+
+
+async def test_switching_to_an_unknown_plan_leaves_the_day_alone(with_profile: AsyncClient):
+    await _workout(with_profile)
+    before = await _day_items(with_profile)
+
+    missing = await _use_plan(with_profile, "nope")
+
+    assert missing.status_code == 404
+    assert (await _day_items(with_profile)) == before

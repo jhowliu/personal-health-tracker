@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
 import { Alert } from '@/components/alert';
-import { CheckIcon, ChevronIcon, PlusIcon } from '@/components/icons';
+import { CheckIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
 import { ShowMore, usePaged } from '@/components/paging';
 import { Sheet } from '@/components/Sheet';
 import { Text } from '@/components/text';
@@ -18,13 +18,19 @@ export type Exercise = Schema<'ExerciseOut'>;
 
 export function ExerciseLibrary({
   onSelect,
+  onUnselect,
   selectLabel,
   addedIds,
+  pendingId,
 }: {
   onSelect: (exercise: Exercise) => void;
+  /** Given, an added card's button takes the exercise back out, for an add made by mistake. */
+  onUnselect?: (exercise: Exercise) => void;
   selectLabel?: string;
   /** Exercises that are already in place: their card turns green and cannot be added again. */
   addedIds?: ReadonlySet<string>;
+  /** The exercise being added or taken out right now; every card button waits for it. */
+  pendingId?: string | null;
 }) {
   const { t } = useI18n();
   const effectiveSelectLabel = selectLabel ?? t('common.actions.add');
@@ -138,22 +144,27 @@ export function ExerciseLibrary({
                     <ChevronIcon direction="right" size={16} tint={color.primary} />
                   </Pressable>
                   {addedIds?.has(exercise.id) ? (
-                    <View
-                      accessibilityRole="text"
-                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control px-3"
-                    >
-                      <CheckIcon size={16} tint={color.good} />
-                      <Text className="text-sm text-good">{t('common.states.added')}</Text>
-                    </View>
+                    <CardAction
+                      added
+                      pending={pendingId === exercise.id}
+                      waiting={Boolean(pendingId)}
+                      label={t('common.states.added')}
+                      accessibilityLabel={
+                        onUnselect
+                          ? t('workouts.library.removeNamed', { name: exercise.name })
+                          : t('common.states.added')
+                      }
+                      onPress={onUnselect ? () => onUnselect(exercise) : undefined}
+                    />
                   ) : (
-                    <Pressable
-                      accessibilityRole="button"
+                    <CardAction
+                      added={false}
+                      pending={pendingId === exercise.id}
+                      waiting={Boolean(pendingId)}
+                      label={effectiveSelectLabel}
+                      accessibilityLabel={`${effectiveSelectLabel} ${exercise.name}`}
                       onPress={() => onSelect(exercise)}
-                      className="min-h-[44px] flex-row items-center justify-center gap-1.5 rounded-control border-[1.5px] border-edge bg-primary px-4 active:opacity-80"
-                    >
-                      <PlusIcon size={16} tint={color.surface} />
-                      <Text className="text-sm text-white">{effectiveSelectLabel}</Text>
-                    </Pressable>
+                    />
                   )}
                 </View>
               </View>
@@ -187,6 +198,53 @@ export function ExerciseLibrary({
         ) : null}
       </Sheet>
     </View>
+  );
+}
+
+/**
+ * A card's add / added button. It keeps one size in every state, adding and taking out
+ * included: the spinner stands in for the icon and the words never change, so the row does
+ * not jump while a request is in flight.
+ */
+function CardAction({
+  added,
+  pending,
+  waiting,
+  label,
+  accessibilityLabel,
+  onPress,
+}: {
+  added: boolean;
+  /** This card's request is in flight. */
+  pending: boolean;
+  /** Some card's request is in flight, so no other one starts. */
+  waiting: boolean;
+  label: string;
+  accessibilityLabel: string;
+  /** Absent, an added card just says so. */
+  onPress?: () => void;
+}) {
+  const tint = added ? color.good : color.surface;
+  const Icon = added ? CheckIcon : PlusIcon;
+  return (
+    <Pressable
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ disabled: waiting, busy: pending }}
+      disabled={!onPress || waiting}
+      onPress={onPress}
+      className={`h-11 w-[120px] flex-row items-center justify-center gap-1.5 rounded-control border-[1.5px] px-2 ${
+        !added ? 'border-edge bg-primary active:opacity-80' : onPress ? 'border-good bg-surface active:opacity-70' : 'border-transparent'
+      }`}
+    >
+      <View className="h-5 w-5 items-center justify-center">
+        {pending ? <ActivityIndicator size="small" color={tint} /> : <Icon size={16} tint={tint} />}
+      </View>
+      <Text numberOfLines={1} className={`shrink text-sm ${added ? 'text-good' : 'text-white'}`}>
+        {label}
+      </Text>
+      {added && onPress ? <CloseIcon size={14} tint={color.good} /> : null}
+    </Pressable>
   );
 }
 

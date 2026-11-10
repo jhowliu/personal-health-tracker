@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,8 +18,8 @@ import { AppModal } from '@/components/AppModal';
 import { BodyStatRow } from '@/components/BodyStatRow';
 import { DaySummary } from '@/components/DaySummary';
 import { DayStamp, Highlight } from '@/components/journal';
-import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlusIcon } from '@/components/icons';
-import { Sheet } from '@/components/Sheet';
+import { BowlIcon, CameraIcon, ChevronIcon, CloseIcon, PlanIcon, PlusIcon, SwapIcon } from '@/components/icons';
+import { ChoiceOption, Sheet } from '@/components/Sheet';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ReorderList } from '@/components/ReorderList';
 import { stepLabel, StepIndicator } from '@/components/StepIndicator';
@@ -38,8 +39,8 @@ import { checkWeeklyReport } from '@/progress/weekly-popup';
 import { amountToGrams, formatPortion, gramsToAmount, portionUnit, readableAmount } from '@/meals/portion';
 import { color } from '@/theme/tokens';
 import { rowsFromLogs, toRecords, type RecordRow } from '@/workouts/record';
+import { describePlan } from '@/workouts/category';
 import { dayFooter } from '@/workouts/day-footer';
-import { targetChanges, targetError, targetFromItem, type TargetEdit } from '@/workouts/target';
 import { isItemDone, WorkoutItemRow } from '@/workouts/WorkoutItemRow';
 
 type Today = Schema<'TodayOut'>;
@@ -64,6 +65,7 @@ type PlannedMeal = {
 type DayPlan = Omit<Schema<'DayPlanOut'>, 'meals'> & { meals: PlannedMeal[] };
 type WorkoutItem = Schema<'WorkoutExecutionItemOut'>;
 type Workout = Schema<'WorkoutExecutionOut'>;
+type Plan = Schema<'TemplateOut'>;
 type SetLogResult = { next_weight_kg: number | null };
 
 /** Where finishing `step` leads: the first other step still to do, or 完成. */
@@ -709,15 +711,13 @@ function MealStep({
     );
   }
 
-  const footer = (
+  // An eaten meal has nothing left to do, so undoing it sits at the end of the list instead of
+  // taking a pinned footer's room from the foods.
+  const footer = meal.eaten ? undefined : (
     <>
       {meal.skipped ? (
         <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
           {busy ? t('common.states.processing') : t('today.meal.markEatenAnyway')}
-        </PrimaryButton>
-      ) : meal.eaten ? (
-        <PrimaryButton onPress={() => setMealState('planned')} busy={busy}>
-          {busy ? t('common.states.processing') : t('today.meal.markNotEaten')}
         </PrimaryButton>
       ) : (
         <PrimaryButton onPress={() => setMealState('eaten')} busy={busy}>
@@ -733,7 +733,7 @@ function MealStep({
             onPress={() => setMealState('planned')}
             className="min-h-[44px] justify-center"
           />
-        ) : meal.eaten ? null : (
+        ) : (
           <TextAction
             label={t('today.meal.skipMeal')}
             disabled={busy}
@@ -800,6 +800,16 @@ function MealStep({
                   label={t('today.meal.saveAsMeal')}
                   disabled={busy}
                   onPress={() => router.navigate(`/meals/save-today?date=${day.date}&slot=${step}`)}
+                  className="min-h-[44px] justify-center"
+                />
+              </View>
+            ) : null}
+            {meal.eaten ? (
+              <View className="items-center">
+                <TextAction
+                  label={busy ? t('common.states.processing') : t('today.meal.markNotEaten')}
+                  disabled={busy}
+                  onPress={() => setMealState('planned')}
                   className="min-h-[44px] justify-center"
                 />
               </View>
@@ -1001,14 +1011,15 @@ function WorkoutStep({
   const [busy, setBusy] = useState(false);
   // Several exercises can be open at once, so a whole day can be typed in top to bottom.
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  // Typed in and not saved yet, per item: the target fields, and the sets. An item without an
-  // entry shows what the server has.
-  const [targets, setTargets] = useState<Record<string, TargetEdit>>({});
+  // Sets typed in and not saved yet, per item. An item without an entry shows what the server has.
   const [drafts, setDrafts] = useState<Record<string, RecordRow[]>>({});
   const [suggestions, setSuggestions] = useState<Record<string, number>>({});
   const [sessionStarted, setSessionStarted] = useState(false);
   // While a row is dragged the page holds still under the finger.
   const [dragging, setDragging] = useState(false);
+  // Switching the day to another plan: the list loads the first time the sheet opens.
+  const [choosingPlan, setChoosingPlan] = useState(false);
+  const [plans, setPlans] = useState<Plan[] | null>(null);
   const word = dayWord(date);
 
   const load = useCallback(async () => {
@@ -1048,11 +1059,10 @@ function WorkoutStep({
   };
 
   // One save for everything typed in, so the footer never offers a way out that drops it.
-  const dirty = Object.keys(drafts).length > 0 || Object.keys(targets).length > 0;
+  const dirty = Object.keys(drafts).length > 0;
 
   const forget = (itemId: string) => {
     setDrafts(({ [itemId]: _rows, ...rest }) => rest);
-    setTargets(({ [itemId]: _target, ...rest }) => rest);
   };
 
   const toggle = (itemId: string) =>
@@ -1064,13 +1074,11 @@ function WorkoutStep({
 
   const discardChanges = () => {
     setDrafts({});
-    setTargets({});
   };
 
   const saveChanges = async () => {
     if (!workout) return;
     const records: { entry: WorkoutItem; sets: Schema<'SetRecordIn'>[] }[] = [];
-    const changes: { entry: WorkoutItem; edit: TargetEdit }[] = [];
     for (const entry of workout.items) {
       const rows = drafts[entry.item.id];
       if (rows) {
@@ -1080,15 +1088,6 @@ function WorkoutStep({
           return;
         }
         records.push({ entry, sets: result.sets });
-      }
-      const edit = targets[entry.item.id];
-      if (edit) {
-        const problem = targetError(entry, edit);
-        if (problem) {
-          Alert.alert(t('today.workout.cannotSave'), `“${entry.item.exercise_name}” ${problem}.`);
-          return;
-        }
-        changes.push({ entry, edit });
       }
     }
 
@@ -1106,11 +1105,6 @@ function WorkoutStep({
         );
         // Dropped one by one, so a failure further down does not send these twice.
         setDrafts(({ [itemId]: _saved, ...rest }) => rest);
-      }
-      for (const { entry, edit } of changes) {
-        const itemId = entry.item.id;
-        await api.patch(`/days/${date}/workout/items/${itemId}`, targetChanges(entry, edit));
-        setTargets(({ [itemId]: _saved, ...rest }) => rest);
       }
     } catch (error) {
       Alert.alert(t('common.errors.saveFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
@@ -1166,6 +1160,60 @@ function WorkoutStep({
         },
       },
     ]);
+  };
+
+  const openPlans = async () => {
+    setChoosingPlan(true);
+    if (plans) return;
+    try {
+      setPlans((await api.get('/workout-templates')) as Plan[]);
+    } catch (error) {
+      setChoosingPlan(false);
+      Alert.alert(t('today.workout.switchPlanFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
+    }
+  };
+
+  const applyPlan = async (plan: Plan) => {
+    setBusy(true);
+    try {
+      const fresh = await api.put(`/days/${date}/workout/template`, { template_id: plan.id });
+      // The old exercises are gone, and with them what was typed for them and any focus
+      // session running through them.
+      await clearSession(date);
+      setDrafts({});
+      setOpen(new Set());
+      setSessionStarted(false);
+      stepCache.set(`workout:${date}`, fresh);
+      setWorkout(fresh);
+      // A skipped or finished workout is open again, and the day's burn starts over.
+      onStateChanged();
+    } catch (error) {
+      Alert.alert(t('today.workout.switchPlanFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // An empty day takes the plan at once; one with exercises asks first, since they go.
+  const choosePlan = (plan: Plan) => {
+    setChoosingPlan(false);
+    const count = workout?.items.length ?? 0;
+    if (count === 0) {
+      void applyPlan(plan);
+      return;
+    }
+    const logged = workout?.items.some((entry) => entry.logs.length > 0);
+    // Let the sheet slide away first: iOS drops an alert presented while a modal is closing.
+    setTimeout(() => {
+      Alert.alert(
+        t('today.workout.switchPlanTitle', { name: plan.name }),
+        t(logged ? 'today.workout.switchPlanLogged' : 'today.workout.switchPlanBody', { day: word, count }),
+        [
+          { text: t('common.actions.cancel'), style: 'cancel' },
+          { text: t('today.workout.switchPlanConfirm'), style: 'destructive', onPress: () => void applyPlan(plan) },
+        ],
+      );
+    }, 400);
   };
 
   const skipWorkout = async () => {
@@ -1309,11 +1357,9 @@ function WorkoutStep({
                     index={workout.items.indexOf(entry)}
                     open={open.has(itemId)}
                     onToggle={() => toggle(itemId)}
-                    target={targets[itemId] ?? targetFromItem(entry)}
-                    onTargetChange={(target) => setTargets((current) => ({ ...current, [itemId]: target }))}
                     rows={drafts[itemId] ?? rowsFromLogs(entry)}
                     onRowsChange={(rows) => setDrafts((current) => ({ ...current, [itemId]: rows }))}
-                    edited={itemId in targets || itemId in drafts}
+                    edited={itemId in drafts}
                     suggestion={suggestions[itemId]}
                     busy={busy}
                     word={word}
@@ -1326,6 +1372,11 @@ function WorkoutStep({
             />
           </Card>
         ) : null}
+        {total === 0 ? (
+          <PrimaryButton tone="plain" icon={PlanIcon} onPress={() => void openPlans()} disabled={busy}>
+            {t('today.workout.choosePlan')}
+          </PrimaryButton>
+        ) : null}
         <AddRow
           label={t('today.workout.addExercise')}
           disabled={busy}
@@ -1333,7 +1384,14 @@ function WorkoutStep({
         />
 
         {total > 0 ? (
-          <View className="items-center">
+          <View className="flex-row flex-wrap items-center justify-center gap-x-6">
+            <TextAction
+              icon={SwapIcon}
+              label={t('today.workout.switchPlan')}
+              disabled={busy}
+              onPress={() => void openPlans()}
+              className="min-h-[44px] justify-center"
+            />
             <TextAction
               label={t('today.workout.saveAsTemplate')}
               disabled={busy}
@@ -1342,6 +1400,28 @@ function WorkoutStep({
             />
           </View>
         ) : null}
+
+        <Sheet visible={choosingPlan} title={t('today.workout.planSheetTitle')} onClose={() => setChoosingPlan(false)}>
+          <Hint>{t('today.workout.planSheetHint', { day: word })}</Hint>
+          {plans === null ? (
+            <View className="items-center py-8">
+              <ActivityIndicator color={color.primary} />
+            </View>
+          ) : (
+            <ScrollView contentContainerClassName="gap-2 pb-4" keyboardShouldPersistTaps="handled">
+              {plans.map((plan) => (
+                <ChoiceOption
+                  key={plan.id}
+                  label={plan.name}
+                  detail={`${plan.is_builtin ? t('workouts.home.publicPrefix') : ''}${describePlan(plan)}`}
+                  selected={workout.template?.id === plan.id}
+                  disabled={busy}
+                  onPress={() => choosePlan(plan)}
+                />
+              ))}
+            </ScrollView>
+          )}
+        </Sheet>
 
       </View>
     </Screen>

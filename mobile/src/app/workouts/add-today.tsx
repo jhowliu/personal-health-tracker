@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { ApiError, api, type Schema } from '@/api/client';
@@ -21,7 +21,11 @@ export default function AddTodayWorkout() {
   const { date, from } = useLocalSearchParams<{ date: string; from?: string }>();
   const backLabel = from === 'focus' ? t('workouts.addToday.backToWorkout') : t('common.labels.today');
   const [workout, setWorkout] = useState<Workout | null>(null);
-  const [busy, setBusy] = useState(false);
+  /** The exercise being added or taken out; the whole screen waits for it. */
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const busy = pendingId !== null;
+  /** Added on this visit: taking one back out is undoing a slip, so it needs no confirmation. */
+  const addedHere = useRef(new Set<string>());
   const word = date ? dayWord(date) : t('common.labels.today');
 
   useEffect(() => {
@@ -55,25 +59,62 @@ export default function AddTodayWorkout() {
 
   const add = async (exercise: Exercise) => {
     if (busy || !workout || addedIds.has(exercise.id)) return;
-    setBusy(true);
+    setPendingId(exercise.id);
     try {
       await api.post(`/days/${date}/workout/items`, {
         exercise_id: exercise.id,
         ...defaultExercisePrescription(exercise.category_id),
       });
+      addedHere.current.add(exercise.id);
       setWorkout((await api.get(`/days/${date}/workout`)) as Workout);
     } catch (error) {
       Alert.alert(t('workouts.addToday.addFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgainNoStop'));
     } finally {
-      setBusy(false);
+      setPendingId(null);
     }
+  };
+
+  const takeOut = async (itemId: string, exerciseId: string) => {
+    setPendingId(exerciseId);
+    try {
+      await api.delete(`/days/${date}/workout/items/${itemId}`);
+      addedHere.current.delete(exerciseId);
+      setWorkout((await api.get(`/days/${date}/workout`)) as Workout);
+    } catch (error) {
+      Alert.alert(t('today.workout.removeFailed'), error instanceof ApiError ? error.message : t('common.errors.tryAgain'));
+    } finally {
+      setPendingId(null);
+    }
+  };
+
+  // Just added and not trained yet: straight back out. One from the day's plan, or one with sets
+  // logged, asks first, the same way removing it on Today does.
+  const remove = (exercise: Exercise) => {
+    const entry = workout?.items.find(({ item }) => item.exercise_id === exercise.id);
+    if (busy || !entry) return;
+    const logged = entry.logs.length;
+    if (!logged && addedHere.current.has(exercise.id)) {
+      void takeOut(entry.item.id, exercise.id);
+      return;
+    }
+    const name = entry.item.exercise_name;
+    const message = !logged
+      ? t('today.workout.removeDayOnly', { name, day: word })
+      : entry.item.duration_sec
+        ? t('today.workout.removeTimedLogged', { name })
+        : t('today.workout.removeSetsLogged', { name, count: logged });
+    Alert.alert(t('today.workout.removeTitle'), message, [
+      { text: t('common.actions.cancel'), style: 'cancel' },
+      { text: t('common.actions.remove'), style: 'destructive', onPress: () => void takeOut(entry.item.id, exercise.id) },
+    ]);
   };
 
   return (
     <Screen
       footer={
         <View className="flex-row items-center justify-between gap-3">
-          <Text className="text-base text-ink">
+          {/* Wraps rather than pushing the button off the screen. */}
+          <Text className="flex-1 text-base text-ink">
             {t('workouts.addToday.dayTotal', { day: word, count: workout?.items.length ?? 0 })}
           </Text>
           <Pressable
@@ -96,8 +137,9 @@ export default function AddTodayWorkout() {
       <Title sub={t('workouts.addToday.subtitle', { day: word })}>{t('workouts.addToday.title')}</Title>
       <ExerciseLibrary
         onSelect={add}
-        selectLabel={busy ? t('common.states.adding') : t('workouts.addToday.addToDay', { day: word })}
+        onUnselect={remove}
         addedIds={addedIds}
+        pendingId={pendingId}
       />
     </Screen>
   );

@@ -11,6 +11,8 @@ function entry(spec: {
   equipment?: string | null;
   suggested?: number | null;
   lastReps?: number | null;
+  lastWeight?: number | null;
+  lastDurationSec?: number | null;
   lastSpeed?: number | null;
   lastIncline?: number | null;
   logs?: Partial<Schema<'SetLogOut'>>[];
@@ -42,12 +44,12 @@ function entry(spec: {
     })),
     completed_set_count: spec.logs?.length ?? 0,
     last_set:
-      spec.lastReps || spec.lastSpeed
+      spec.lastReps || spec.lastSpeed || spec.lastDurationSec
         ? {
             date: '2026-10-01',
-            weight_kg: 8,
+            weight_kg: spec.lastWeight === undefined ? 8 : spec.lastWeight,
             reps_done: spec.lastReps ?? null,
-            duration_sec: null,
+            duration_sec: spec.lastDurationSec ?? null,
             effort: null,
             speed_kmh: spec.lastSpeed ?? null,
             incline_pct: spec.lastIncline ?? null,
@@ -80,6 +82,11 @@ describe('an exercise record', () => {
     const first = nextRow(entry({ suggested: 10, weightKg: 8, lastReps: 11 }), []);
     expect(first).toMatchObject({ reps: '11', weight: '10' });
     expect(nextRow(entry({}), [row('9', '7.5', 'easy')])).toEqual(row('9', '7.5'));
+  });
+
+  it('starts a first set from the last record when nothing is suggested', () => {
+    expect(nextRow(entry({ weightKg: 5, lastReps: 12, lastWeight: 9 }), [])).toMatchObject({ reps: '12', weight: '9' });
+    expect(nextRow(entry({ durationSec: 600, lastDurationSec: 1800 }), [])).toMatchObject({ minutes: '30' });
   });
 
   it('leaves bodyweight work without a weight and falls back to the prescribed reps', () => {

@@ -421,6 +421,15 @@ export const en = {
       removeSetsLogged:
         "Remove “%{name}”? Its %{count} recorded sets will also be deleted.",
       removeFailed: "Could not remove exercise",
+      switchPlan: "Switch plan",
+      choosePlan: "Choose a plan",
+      planSheetTitle: "Choose a plan",
+      planSheetHint: "Only %{day}’s workout changes; your plans and weekly schedule stay as they are.",
+      switchPlanTitle: "Switch to “%{name}”?",
+      switchPlanBody: "%{day}’s %{count} exercises will be replaced.",
+      switchPlanLogged: "%{day}’s %{count} exercises will be replaced, and the sets already logged deleted.",
+      switchPlanConfirm: "Switch",
+      switchPlanFailed: "Could not switch plan",
       saveChanges: "Save changes",
       discardChanges: "Discard changes",
       resumeProgress: "Resume workout · %{done} / %{total}",
@@ -473,7 +482,6 @@ export const en = {
   },
 
   daySummary: {
-    workoutAdded: "Workout added back",
     spoken:
       "%{status} %{remaining} kcal, %{eaten} eaten out of a %{target} kcal target%{workout}",
     spokenWorkout: ", including %{calories} added back from training",
@@ -488,7 +496,7 @@ export const en = {
   },
 
   stepIndicator: {
-    body: "Body check-in",
+    body: "Check-in",
     workout: "Workout",
     done: "Done",
     accessibility:
@@ -831,6 +839,7 @@ export const en = {
       resultCount: "%{count} exercises",
       viewDemo: "View %{name} demonstration",
       viewExercise: "View exercise",
+      removeNamed: "Remove %{name}",
       exerciseFallback: "Exercise",
       categoryAll: "All",
       categoryStrength: "Strength",
@@ -861,7 +870,6 @@ export const en = {
       subtitle:
         "This only adds the exercise to %{day}; the original plan will not change.",
       title: "Add exercise",
-      addToDay: "Add to %{day}",
     },
     replacement: {
       equipment: "No equipment",
@@ -904,15 +912,15 @@ export const en = {
       replacedOriginal: "On %{day}, this replaced %{name}",
       record: "Record",
       nextWeight: "Start at %{weight} kg next time",
-      target: "Target",
-      targetTime: "Target time",
       changeExercise: "Change exercise",
+      removeFromDay: "Remove from %{day}",
+      moreActions: "More for %{name}",
     },
     record: {
       clearTime: "Clear time",
       speedOptional: "Speed (optional)",
       inclineOptional: "Incline (optional)",
-      timeTarget: "Record time (target %{minutes} min)",
+      recordTime: "Record time",
       weightHeader: "Weight kg",
       setWeight: "Set %{number} weight",
       bodyweight: "Bodyweight",
@@ -928,12 +936,6 @@ export const en = {
       inclineRange: "Incline must be between 0 and 40%",
       repsPositive: "%{part} reps must be a whole number of at least 1",
       weightNumber: "%{part} weight must be a number",
-      targetMinutesPositive:
-        " target time must be a whole number of at least 1 minute",
-      setsPositive: " sets must be a whole number of at least 1",
-      repsPattern: " reps must be a number or range, such as 12 or 10–12",
-      targetWeightNumber: " weight must be a number",
-      restInteger: " rest must be a whole number of seconds",
       partTime: "Time",
       partSet: "Set %{number}",
     },

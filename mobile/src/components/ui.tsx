@@ -5,6 +5,7 @@ import {
   type ComponentType,
   type ReactNode,
   useContext,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -43,6 +44,21 @@ export const NUMERIC_ACCESSORY_ID = 'numeric-done-bar';
 
 const NUMERIC_KEYBOARDS: KeyboardTypeOptions[] = ['numeric', 'decimal-pad', 'number-pad'];
 
+/** Whether the software keyboard is up. iOS reports it as it starts to rise, Android once it has. */
+function useKeyboardShown(): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const show = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', () => setShown(true));
+    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () => setShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return shown;
+}
+
 export function Screen({
   children,
   scroll = true,
@@ -62,6 +78,7 @@ export function Screen({
   /** Disable when the screen is already above a tab bar that owns the bottom safe area. */
   footerSafeArea?: boolean;
 }) {
+  const typing = useKeyboardShown();
   return (
     <SafeAreaView
       className="flex-1 bg-bg"
@@ -73,8 +90,10 @@ export function Screen({
         // Android already resizes the window; adding padding on top double-counts it.
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* No fill: the list scrolls below this header, never under it, so the paper shows through. */}
-        {pinnedHeader ? <View className="gap-3 px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
+        {/* No fill: the list scrolls below this header, never under it, so the paper shows through.
+            Hidden while typing: with the keyboard and footer up, a tall header leaves the field
+            being typed into no room at all. So a pinned header must never hold an input. */}
+        {pinnedHeader && !typing ? <View className="gap-3 px-5 pb-3 pt-2">{pinnedHeader}</View> : null}
         {scroll ? (
           <ScrollView
             className="flex-1"

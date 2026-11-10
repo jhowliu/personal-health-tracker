@@ -41,18 +41,20 @@ export function rowsFromLogs(entry: Entry): RecordRow[] {
 }
 
 /**
- * The next set to add: a copy of the one before it, or for the first one the same starting
- * point focus mode uses — earlier days' suggestion or last reps, then the prescription.
+ * The next set to add: a copy of the one before it, or for the first one the latest record
+ * from earlier days — the weight nudged by how it felt when there is a suggestion — and only
+ * without one the prescription.
  */
 export function nextRow(entry: Entry, rows: RecordRow[]): RecordRow {
   const before = rows[rows.length - 1];
   if (before) return { ...before, effort: null };
-  const { item } = entry;
-  const weight = item.equipment === 'bodyweight' ? null : (entry.suggested_weight_kg ?? item.weight_kg);
+  const { item, last_set: last } = entry;
+  const weight =
+    item.equipment === 'bodyweight' ? null : (entry.suggested_weight_kg ?? last?.weight_kg ?? item.weight_kg);
   return {
-    reps: shown(entry.last_set?.reps_done ?? firstNumber(item.reps) ?? 10),
+    reps: shown(last?.reps_done ?? firstNumber(item.reps) ?? 10),
     weight: shown(weight),
-    minutes: String(Math.max(1, Math.round((item.duration_sec ?? 60) / 60))),
+    minutes: String(Math.max(1, Math.round((last?.duration_sec ?? item.duration_sec ?? 60) / 60))),
     // The last walk's settings carry over; the first time they are left for the user.
     speed: isTreadmill(entry) ? shown(entry.last_set?.speed_kmh) : '',
     incline: isTreadmill(entry) ? shown(entry.last_set?.incline_pct) : '',

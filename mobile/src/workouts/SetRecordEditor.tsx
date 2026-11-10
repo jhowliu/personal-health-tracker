@@ -77,7 +77,7 @@ export function SetRecordEditor({
     ) : (
       <TextAction
         icon={PlusIcon}
-        label={t('workouts.record.timeTarget', { minutes: Math.round((entry.item.duration_sec ?? 60) / 60) })}
+        label={t('workouts.record.recordTime')}
         onPress={() => onChange(prescribedRows(entry))}
         className="min-h-[44px] justify-center self-start"
       />
