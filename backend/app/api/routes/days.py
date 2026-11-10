@@ -6,6 +6,7 @@ from app.api.deps import CurrentUserId, DailyFlow, DailyPlan, Extras, WorkoutExe
 from app.api.schemas import (
     DayPatch,
     DayPlanOut,
+    DayTemplateIn,
     ExtraItemIn,
     ExtraItemOut,
     MealStateIn,
@@ -101,6 +102,16 @@ async def update_workout_item(
     return WorkoutExecutionOut.of(
         await service.update_item(user_id, day, item_id, _item_change(payload))
     )
+
+
+@router.put("/{day}/workout/template", response_model=WorkoutExecutionOut)
+async def use_workout_template(
+    day: date,
+    payload: DayTemplateIn,
+    user_id: CurrentUserId,
+    service: WorkoutExecution,
+) -> WorkoutExecutionOut:
+    return WorkoutExecutionOut.of(await service.use_template(user_id, day, payload.template_id))
 
 
 @router.put("/{day}/workout/order", response_model=WorkoutExecutionOut)

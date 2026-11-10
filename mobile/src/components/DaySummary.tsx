@@ -79,7 +79,6 @@ export function DaySummary({
   const remaining = targets.kcal - kcal;
   const over = remaining < 0;
   const added = targets.exercise_kcal;
-  const addedLabel = t('daySummary.workoutAdded');
 
   const toggle = () => {
     expanded = !open;
@@ -95,44 +94,46 @@ export function DaySummary({
   });
 
   return (
-    <View className="gap-3 rounded-[18px] border-[2.5px] border-edge bg-warm-soft px-4 py-3.5">
+    // Pinned above every step, so it stays two rows tall: the words on the left, the number on
+    // the right, the bar under both. The full workout breakdown is in the expanded part.
+    <View className="gap-2 rounded-[18px] border-[2.5px] border-edge bg-warm-soft px-4 py-2.5">
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
         accessibilityLabel={spoken}
         accessibilityHint={open ? t('daySummary.collapseNutrients') : t('daySummary.expandNutrients')}
         onPress={toggle}
-        className="gap-3"
+        className="gap-2"
       >
-        <View className="flex-row items-center justify-between">
-          <Text className={`text-sm ${over ? 'text-warm' : 'text-ink'}`}>
-            {over ? t('daySummary.overTarget') : t('daySummary.remaining')}
-          </Text>
-          <View className="flex-row items-center gap-1.5">
-            <Text className={`text-[22px] ${over ? 'text-warm' : 'text-ink'}`}>
-              {formatNumber(Math.abs(remaining))}
-              <Text className="text-xs text-muted"> {t('common.units.kcal')}</Text>
-            </Text>
-            <ChevronIcon direction={open ? 'up' : 'down'} size={16} tint={color.ink} />
-          </View>
-        </View>
-
         <View className="flex-row items-center justify-between gap-3">
-          <Text className="flex-1 text-xs text-muted">
-            {t('daySummary.eatenTarget', {
-              eaten: formatNumber(kcal),
-              target: formatNumber(targets.kcal),
-            })}
-          </Text>
-          {added > 0 ? (
-            <View className="flex-row items-center gap-2 rounded-control bg-primary-soft px-3 py-1.5">
-              <RunIcon size={17} tint={color.primary} />
-              <View>
-                <Text className="text-xs text-primary">{addedLabel}</Text>
-                <Text className="text-sm text-primary">+{formatNumber(added)} {t('common.units.kcal')}</Text>
-              </View>
+          <View className="flex-1 gap-0.5">
+            <Text className={`text-sm ${over ? 'text-warm' : 'text-ink'}`}>
+              {over ? t('daySummary.overTarget') : t('daySummary.remaining')}
+            </Text>
+            <Text className="text-xs text-muted">
+              {t('daySummary.eatenTarget', {
+                eaten: formatNumber(kcal),
+                target: formatNumber(targets.kcal),
+              })}
+            </Text>
+          </View>
+          <View className="items-end">
+            <View className="flex-row items-center gap-1.5">
+              <Text className={`text-[22px] ${over ? 'text-warm' : 'text-ink'}`}>
+                {formatNumber(Math.abs(remaining))}
+                <Text className="text-xs text-muted"> {t('common.units.kcal')}</Text>
+              </Text>
+              <ChevronIcon direction={open ? 'up' : 'down'} size={16} tint={color.ink} />
             </View>
-          ) : null}
+            {added > 0 ? (
+              <View className="flex-row items-center gap-1">
+                <RunIcon size={13} tint={color.primary} />
+                <Text className="text-xs text-primary">
+                  +{formatNumber(added)} {t('common.units.kcal')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         <Bar value={kcal} target={targets.kcal} tone={over ? color.warmFill : color.primary} />

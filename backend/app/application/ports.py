@@ -220,6 +220,10 @@ class WorkoutExecutionStore(Protocol):
     async def delete_item(self, user_id: str, day: date, item_id: str) -> bool:
         """Take one exercise off the day, along with the sets logged for it."""
 
+    async def use_template(self, user_id: str, day: date, template: WorkoutTemplate) -> None:
+        """Make `template` the day's workout: a fresh copy of its items replaces the day's
+        exercises and their sets, and the workout is open again, neither done nor skipped."""
+
     async def log_set(self, user_id: str, day: date, log: SetLog) -> None: ...
 
     async def replace_sets(
